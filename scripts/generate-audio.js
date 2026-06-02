@@ -425,6 +425,15 @@ function finishTrack(kit, loopSamples, tail, opts = {}) {
   return foldTail(L, R, loopSamples, tail);
 }
 
+/** A small fill across the last beat of a phrase so the loop resolves with life. */
+function addFill(kit, pos, base, useClap) {
+  for (let s = 12; s < 16; s++) {
+    kit.hat(pos(base + s), { gain: 0.09, open: s === 15, pan: s % 2 ? 0.4 : -0.4 });
+  }
+  if (useClap) kit.clap(pos(base + 14), { gain: 0.22 });
+  else kit.snare(pos(base + 14), { gain: 0.2, decay: 22, noiseAmt: 0.6, tone: 200, toneAmt: 0.2 });
+}
+
 /** Fold voice tails that cross the loop point back onto the head for a seamless loop. */
 function foldTail(L, R, loopSamples, tail) {
   const left = new Float32Array(loopSamples);
@@ -483,6 +492,7 @@ function generateLoFi() {
       if (s % 2 === 0) kit.hat(p, { gain: 0.11, open: s === 14, pan: s % 4 === 0 ? -0.6 : 0.6 });
     }
   }
+  addFill(kit, pos, (bars - 1) * 16, false);
   return finishTrack(kit, loopSamples, tail, { reverbMix: 0.12 });
 }
 
@@ -524,6 +534,7 @@ function generateLiquid() {
       if (s === 7 || s === 15) kit.snare(p, { gain: 0.16, decay: 26, noiseAmt: 0.7, tone: 200, toneAmt: 0.2 });
     }
   }
+  addFill(kit, pos, (bars - 1) * 16, false);
   return finishTrack(kit, loopSamples, tail, { reverbMix: 0.22 });
 }
 
@@ -571,6 +582,8 @@ function generateChillstep() {
       if (s === 8) kit.hat(p, { gain: 0.1, open: true });
     }
   }
+  addFill(kit, pos, (bars - 1) * 16, false);
+  addFill(kit, pos, (bars - 1) * 16, false);
   return finishTrack(kit, loopSamples, tail, { reverbMix: 0.16 });
 }
 
@@ -664,6 +677,7 @@ function generateZhu() {
       if (s % 4 === 2) kit.sub(pos(base + s), midiToFreq(bassRoots[ci]), stepDur * 1.6, { gain: 0.5 }); // off-beat house bass
     }
   }
+  addFill(kit, pos, (bars - 1) * 16, true);
   return finishTrack(kit, loopSamples, tail, { reverbMix: 0.18, pumpBpm: 122, pumpDepth: 0.45 });
 }
 
@@ -804,6 +818,7 @@ function generateRufus() {
   const wetL = reverbChannel(sweepLowPass(tonal.L, cutoffFn), 0.2);
   const wetR = reverbChannel(sweepLowPass(tonal.R, cutoffFn), 0.2);
 
+  addFill(drums, pos, (bars - 1) * 16, true);
   // Sidechain: pad + bass duck on every kick; drums punch through.
   const duck = duckEnvelope(N, bpm, 0.55, 0.16);
   const L = new Float32Array(N);
