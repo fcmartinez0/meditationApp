@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { Alert, Platform, Pressable, StyleSheet, Switch, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
@@ -12,8 +13,11 @@ import {
   requestPermission,
   scheduleDailyReminder,
 } from '@/lib/notifications';
+import { clearRatings, loadRatings, summarizePreference } from '@/lib/preferences';
+import type { PieceRating } from '@/lib/types';
 import { useAppData } from '@/store/AppData';
 import { radius, spacing } from '@/theme';
+import { CATEGORY_STYLES } from '@/theme/categories';
 
 const INTERVALS = [
   { value: 0, label: 'Off' },
@@ -44,6 +48,34 @@ export default function SettingsScreen() {
   const colors = useThemeColors();
   const { settings, updateSettings, resetData } = useAppData();
   const [busy, setBusy] = useState(false);
+  const [ratings, setRatings] = useState<PieceRating[]>([]);
+
+  // Refresh learned-taste summaries whenever the screen comes into focus.
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      void loadRatings().then((r) => {
+        if (active) setRatings(r);
+      });
+      return () => {
+        active = false;
+      };
+    }, []),
+  );
+
+  const restTaste = summarizePreference('rest', ratings);
+  const chillTaste = summarizePreference('chill', ratings);
+
+  const confirmResetTaste = () => {
+    Alert.alert('Reset learned taste?', 'The generative music will start fresh.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Reset',
+        style: 'destructive',
+        onPress: () => void clearRatings().then(() => setRatings([])),
+      },
+    ]);
+  };
 
   const reschedule = async (hour: number, minute: number) => {
     await scheduleDailyReminder(hour, minute);
@@ -186,6 +218,34 @@ export default function SettingsScreen() {
             );
           })}
         </View>
+      </Card>
+
+      <Card style={styles.card}>
+        <View style={styles.rowText}>
+          <AppText variant="label" muted>
+            GENERATIVE TASTE
+          </AppText>
+          <AppText variant="caption" muted>
+            What the live music has learned from your likes.
+          </AppText>
+        </View>
+        <Row label="Rest" hint={restTaste ?? 'No ratings yet — like a Rest piece to begin.'}>
+          <Ionicons name="sparkles" size={18} color={CATEGORY_STYLES.generative.accent} />
+        </Row>
+        <Row label="Flow" hint={chillTaste ?? 'No ratings yet — like a Flow piece to begin.'}>
+          <Ionicons name="infinite" size={18} color={CATEGORY_STYLES.generative.accent} />
+        </Row>
+        {(restTaste || chillTaste) && (
+          <>
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+            <Pressable onPress={confirmResetTaste} style={styles.resetRow}>
+              <Ionicons name="refresh-outline" size={20} color={colors.textSecondary} />
+              <AppText variant="body" muted>
+                Reset what I&apos;ve learned
+              </AppText>
+            </Pressable>
+          </>
+        )}
       </Card>
 
       <Card style={styles.card}>

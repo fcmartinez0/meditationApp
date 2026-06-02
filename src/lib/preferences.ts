@@ -119,6 +119,10 @@ export async function recordRating(spec: PieceSpec, score: number): Promise<void
   await saveRatings(ratings);
 }
 
+export async function clearRatings(): Promise<void> {
+  await AsyncStorage.removeItem(RATINGS_KEY);
+}
+
 /** A fresh random spec within the section's ranges. */
 function randomSpec(section: Section): PieceSpec {
   const r = RANGES[section];
