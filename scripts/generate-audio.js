@@ -714,6 +714,41 @@ function generateRufus() {
 }
 
 /**
+ * A cat's purr — a warm low rumble around 25 Hz (the frequency cats purr at,
+ * often associated with calming and healing). Harmonics make it audible on
+ * small speakers, a breathy noise layer adds texture, and a slow breath
+ * envelope rolls it in and out like a real purr.
+ */
+function generatePurr() {
+  const loopSeconds = 12;
+  const crossSeconds = 2;
+  const loopSamples = loopSeconds * SAMPLE_RATE;
+  const crossSamples = crossSeconds * SAMPLE_RATE;
+  const total = loopSamples + crossSamples;
+  const rng = makeRng(555);
+  const buf = new Float32Array(total);
+
+  const purrHz = 25; // the purr's fundamental rumble
+  const breathHz = 1.4; // in/out purr cycle, ~per second
+
+  for (let i = 0; i < total; i++) {
+    const t = i / SAMPLE_RATE;
+    let s =
+      Math.sin(2 * Math.PI * purrHz * t) * 1.0 +
+      Math.sin(2 * Math.PI * purrHz * 2 * t) * 0.5 +
+      Math.sin(2 * Math.PI * purrHz * 3 * t) * 0.3 +
+      Math.sin(2 * Math.PI * purrHz * 4 * t) * 0.15;
+    s += (rng() * 2 - 1) * 0.15; // breathy flutter
+    // Breath envelope — rolls in and out, never fully silent.
+    const breath = 0.55 + 0.45 * Math.pow(0.5 + 0.5 * Math.sin(2 * Math.PI * breathHz * t), 1.5);
+    buf[i] = s * breath * 0.4;
+  }
+  // Keep it warm and rumbly.
+  const warm = lowPass(buf, 400);
+  return makeSeamless(warm, loopSamples, crossSamples);
+}
+
+/**
  * Warm singing-bowl chime. The shimmer is produced by pairs of slightly
  * detuned partials beating against each other (a bounded, natural effect) —
  * NOT by frequency-modulating each partial, which previously created a
@@ -863,6 +898,7 @@ writeWav(path.join(OUT_DIR, 'bell.wav'), generateBell());
 writeWav(path.join(AMBIENT_DIR, 'rain.wav'), generateAmbient('rain'));
 writeWav(path.join(AMBIENT_DIR, 'ocean.wav'), generateAmbient('ocean'));
 writeWav(path.join(AMBIENT_DIR, 'forest.wav'), generateAmbient('forest'));
+writeWav(path.join(OUT_DIR, 'purr.wav'), generatePurr());
 
 // Frequency music — binaural-beat pads (stereo).
 const calm = generateMusic({

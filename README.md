@@ -11,7 +11,8 @@ A single codebase runs on both iOS and Android.
   brainwave-entrainment frequencies (see below).
 - **Beats** — a set of synthesized instrumental grooves, each modeled on a
   recognizable artist style (see _Beats_ below).
-- **Ambient sounds** — rain, ocean, and forest beds, plus pure silence.
+- **Ambient sounds** — rain, ocean, and forest beds, a ~25 Hz cat purr, plus
+  pure silence.
 - **Streaks & progress** — daily streak, longest streak, total time and sessions,
   and a weekly minutes chart. All stored locally on device.
 - **Daily reminders** — an optional local notification at a time you choose.

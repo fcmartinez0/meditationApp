@@ -9,6 +9,7 @@ export type AmbientSound =
   | 'rain'
   | 'ocean'
   | 'forest'
+  | 'purr'
   | 'calm'
   | 'focus'
   | 'deep'
@@ -29,6 +30,7 @@ export const AMBIENT_KEYS: AmbientSound[] = [
   'rain',
   'ocean',
   'forest',
+  'purr',
   'calm',
   'focus',
   'deep',

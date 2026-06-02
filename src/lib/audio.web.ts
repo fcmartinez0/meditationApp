@@ -21,6 +21,7 @@ const AMBIENT_SOURCES: Record<FileSound, number> = {
   rain: require('@/assets/audio/ambient/rain.wav'),
   ocean: require('@/assets/audio/ambient/ocean.wav'),
   forest: require('@/assets/audio/ambient/forest.wav'),
+  purr: require('@/assets/audio/purr.wav'),
   calm: require('@/assets/audio/music/calm.wav'),
   focus: require('@/assets/audio/music/focus.wav'),
   deep: require('@/assets/audio/music/deep.wav'),
@@ -129,6 +130,28 @@ export class SessionAudio {
     src.start();
     this.ambientSource = src;
     this.ambientGain = gain;
+  }
+
+  // A looping buffer can't truly pause, so mute it (it keeps looping silently).
+  pauseAmbient() {
+    const ctx = this.ctx;
+    const gain = this.ambientGain;
+    if (!ctx || !gain) return;
+    const now = ctx.currentTime;
+    gain.gain.cancelScheduledValues(now);
+    gain.gain.setValueAtTime(Math.max(SILENCE, gain.gain.value), now);
+    gain.gain.exponentialRampToValueAtTime(SILENCE, now + 0.2);
+  }
+
+  resumeAmbient() {
+    const ctx = this.ctx;
+    const gain = this.ambientGain;
+    if (!ctx || !gain) return;
+    if (ctx.state === 'suspended') void ctx.resume();
+    const now = ctx.currentTime;
+    gain.gain.cancelScheduledValues(now);
+    gain.gain.setValueAtTime(Math.max(SILENCE, gain.gain.value), now);
+    gain.gain.exponentialRampToValueAtTime(TARGET_VOLUME, now + 0.3);
   }
 
   async stopAmbient() {

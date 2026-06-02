@@ -152,9 +152,13 @@ export default function SessionScreen() {
   const togglePause = () => {
     if (phase === 'running') {
       setPhase('paused');
+      audioRef.current?.pauseAmbient();
+      engineRef.current?.pause();
     } else if (phase === 'paused') {
       endAtRef.current = Date.now() + remaining * 1000;
       setPhase('running');
+      audioRef.current?.resumeAmbient();
+      engineRef.current?.resume();
     }
   };
 
@@ -243,11 +247,17 @@ export default function SessionScreen() {
           accessibilityRole="button"
           accessibilityLabel="End session"
           onPress={endEarly}
+          hitSlop={16}
           style={styles.close}>
           <Ionicons name="close" size={26} color={colors.textSecondary} />
         </Pressable>
 
-        <Animated.View style={styles.center} entering={FadeIn.duration(1100)}>
+        {/* box-none lets taps fall through to the close button while the
+            fade-in plays, so the X stays tappable from the very start. */}
+        <Animated.View
+          style={styles.center}
+          pointerEvents="box-none"
+          entering={FadeIn.duration(1100)}>
           <BreathingOrb active={phase === 'running'}>
             <AppText variant="display" color={colors.textOnAccent} style={styles.clock}>
               {formatClock(remaining)}

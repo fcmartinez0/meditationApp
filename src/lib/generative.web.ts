@@ -229,6 +229,27 @@ export class GenerativeEngine {
     osc.stop(now + 3.2);
   }
 
+  pause(): void {
+    const ctx = this.ctx;
+    const master = this.master;
+    if (!ctx || !master) return;
+    const now = ctx.currentTime;
+    master.gain.cancelScheduledValues(now);
+    master.gain.setValueAtTime(Math.max(0.0001, master.gain.value), now);
+    master.gain.exponentialRampToValueAtTime(0.0001, now + 0.3);
+  }
+
+  resume(): void {
+    const ctx = this.ctx;
+    const master = this.master;
+    if (!ctx || !master) return;
+    if (ctx.state === 'suspended') void ctx.resume();
+    const now = ctx.currentTime;
+    master.gain.cancelScheduledValues(now);
+    master.gain.setValueAtTime(Math.max(0.0001, master.gain.value), now);
+    master.gain.exponentialRampToValueAtTime(0.5, now + 0.4);
+  }
+
   stop(): void {
     const ctx = this.ctx;
     this.timers.forEach((t) => {

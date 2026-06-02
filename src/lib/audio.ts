@@ -18,6 +18,7 @@ const AMBIENT_SOURCES: Record<FileSound, number> = {
   rain: require('@/assets/audio/ambient/rain.wav'),
   ocean: require('@/assets/audio/ambient/ocean.wav'),
   forest: require('@/assets/audio/ambient/forest.wav'),
+  purr: require('@/assets/audio/purr.wav'),
   calm: require('@/assets/audio/music/calm.wav'),
   focus: require('@/assets/audio/music/focus.wav'),
   deep: require('@/assets/audio/music/deep.wav'),
@@ -89,6 +90,24 @@ export class SessionAudio {
         await new Promise((r) => setTimeout(r, 25));
       }
     })();
+  }
+
+  /** Pause the loop (keeps position), e.g. when the session is paused. */
+  pauseAmbient() {
+    try {
+      this.ambient?.pause();
+    } catch {
+      // ignore
+    }
+  }
+
+  /** Resume after pauseAmbient(). */
+  resumeAmbient() {
+    try {
+      this.ambient?.play();
+    } catch {
+      // ignore
+    }
   }
 
   /** Fade ambient out over a few hundred ms, then pause. */
