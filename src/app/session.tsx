@@ -15,7 +15,7 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { SessionAudio } from '@/lib/audio';
 import { dayKey, formatClock } from '@/lib/date';
 import { GENERATIVE_SUPPORTED, GenerativeEngine } from '@/lib/generative';
-import { loadRatings, nextSpec, recordRating } from '@/lib/preferences';
+import { describeSpec, loadRatings, nextSpec, recordRating } from '@/lib/preferences';
 import type { AmbientSound, FileSound, GenerativeSound, PieceSpec } from '@/lib/types';
 import { isGenerative, sectionFor } from '@/lib/types';
 import { useAppData } from '@/store/AppData';
@@ -54,6 +54,8 @@ export default function SessionScreen() {
   const [remaining, setRemaining] = useState(totalSec);
   const [phase, setPhase] = useState<Phase>('running');
   const [rated, setRated] = useState<number | null>(null);
+  const [specLabel, setSpecLabel] = useState<string | null>(null);
+  const [liked, setLiked] = useState(false);
 
   const audioRef = useRef<SessionAudio | null>(null);
   const engineRef = useRef<GenerativeEngine | null>(null);
@@ -97,6 +99,7 @@ export default function SessionScreen() {
         if (cancelled) return;
         const spec = nextSpec(sectionFor(ambient as GenerativeSound), ratings);
         specRef.current = spec;
+        setSpecLabel(describeSpec(spec));
         const engine = new GenerativeEngine();
         engineRef.current = engine;
         await engine.start(spec);
@@ -175,6 +178,30 @@ export default function SessionScreen() {
     setRated(score);
     haptic();
     void recordRating(specRef.current, score);
+  };
+
+  // Like the currently-playing generative piece, mid-session.
+  const likeCurrent = () => {
+    if (liked || !specRef.current) return;
+    setLiked(true);
+    haptic();
+    void recordRating(specRef.current, 1);
+  };
+
+  // Swap to a freshly generated piece without ending the session.
+  const regenerate = () => {
+    if (!useEngine) return;
+    engineRef.current?.stop();
+    setLiked(false);
+    void (async () => {
+      const ratings = await loadRatings();
+      const spec = nextSpec(sectionFor(ambient as GenerativeSound), ratings);
+      specRef.current = spec;
+      setSpecLabel(describeSpec(spec));
+      const engine = new GenerativeEngine();
+      engineRef.current = engine;
+      await engine.start(spec);
+    })();
   };
 
   const progress = 1 - remaining / totalSec;
@@ -270,6 +297,28 @@ export default function SessionScreen() {
         </Animated.View>
 
         <View style={styles.controls}>
+          {useEngine && specLabel && (
+            <View style={[styles.nowPlaying, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <View style={styles.nowPlayingText}>
+                <AppText variant="caption" muted>
+                  NOW PLAYING
+                </AppText>
+                <AppText variant="body" numberOfLines={1}>
+                  {specLabel}
+                </AppText>
+              </View>
+              <Pressable accessibilityLabel="Like this piece" onPress={likeCurrent} hitSlop={10} style={styles.npBtn}>
+                <Ionicons
+                  name={liked ? 'heart' : 'heart-outline'}
+                  size={22}
+                  color={liked ? colors.accent : colors.textSecondary}
+                />
+              </Pressable>
+              <Pressable accessibilityLabel="Play another piece" onPress={regenerate} hitSlop={10} style={styles.npBtn}>
+                <Ionicons name="shuffle" size={22} color={colors.textSecondary} />
+              </Pressable>
+            </View>
+          )}
           <View style={[styles.progressTrack, { backgroundColor: colors.surfaceMuted }]}>
             <View
               style={[
@@ -305,6 +354,17 @@ const styles = StyleSheet.create({
   clock: { fontSize: 52, fontWeight: '200' },
   hint: { marginTop: spacing.sm },
   controls: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xl, gap: spacing.lg },
+  nowPlaying: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  nowPlayingText: { flex: 1, gap: 2 },
+  npBtn: { padding: spacing.xs },
   progressTrack: { height: 4, borderRadius: radius.pill, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: radius.pill },
   buttons: { flexDirection: 'row', gap: spacing.md },

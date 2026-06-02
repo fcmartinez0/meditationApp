@@ -200,6 +200,17 @@ export function nextSpec(section: Section, ratings: PieceRating[]): PieceSpec {
   };
 }
 
+const NOTE_NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
+
+/** A short "now playing" description of a piece, e.g. "D dorian · heartbeat". */
+export function describeSpec(spec: PieceSpec): string {
+  const note = NOTE_NAMES[(((spec.root % 12) + 12) % 12)];
+  const parts = [`${note} ${spec.scale.replace('_', ' ')}`];
+  if (spec.percussion !== 'none') parts.push(spec.percussion);
+  else if (spec.arp) parts.push('arp');
+  return parts.join(' · ');
+}
+
 /** A short human-readable summary of learned taste, for the Settings screen. */
 export function summarizePreference(section: Section, ratings: PieceRating[]): string | null {
   const here = ratings.filter((rt) => rt.section === section);
