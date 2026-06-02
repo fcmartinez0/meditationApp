@@ -48,14 +48,55 @@ function makeRng(seed) {
   };
 }
 
-function writeWav(filePath, samples) {
+const dbToLin = (db) => Math.pow(10, db / 20);
+// tanh soft clip: transparent below the ceiling, gently saturates above it.
+const softClip = (x, ceiling) => ceiling * Math.tanh(x / ceiling);
+
+/**
+ * A small mastering chain so every track sits at a similar, full loudness:
+ * a linked soft-knee compressor for glue, RMS normalisation to a target, then
+ * a soft limiter. Channels are gain-linked so stereo / binaural imaging (and
+ * the binaural beat) is preserved.
+ */
+function master(channels, { targetDb = -14, thresholdDb = -18, ratio = 3 } = {}) {
+  const n = channels[0].length;
+  const thr = dbToLin(thresholdDb);
+  const atk = Math.exp(-1 / (0.005 * SAMPLE_RATE));
+  const rel = Math.exp(-1 / (0.12 * SAMPLE_RATE));
+  let env = 0;
+
+  // 1) Linked compressor.
+  for (let i = 0; i < n; i++) {
+    let det = 0;
+    for (const ch of channels) det = Math.max(det, Math.abs(ch[i]));
+    env = (det > env ? atk : rel) * env + (1 - (det > env ? atk : rel)) * det;
+    let gainDb = 0;
+    if (env > thr) gainDb = -(20 * Math.log10(env / thr)) * (1 - 1 / ratio);
+    const g = dbToLin(gainDb);
+    for (const ch of channels) ch[i] *= g;
+  }
+
+  // 2) RMS normalise to the target loudness.
+  let sum = 0;
+  for (const ch of channels) for (let i = 0; i < n; i++) sum += ch[i] * ch[i];
+  const rms = Math.sqrt(sum / (n * channels.length));
+  let makeup = rms > 0 ? Math.min(dbToLin(targetDb) / rms, 12) : 1;
+
+  // 3) Soft limiter.
+  for (const ch of channels) for (let i = 0; i < n; i++) ch[i] = softClip(ch[i] * makeup, 0.97);
+  return channels;
+}
+
+function writeWav(filePath, samples, opts = {}) {
+  if (opts.master !== false) master([samples], { targetDb: opts.targetDb ?? -16 });
   // Normalize to avoid clipping, leaving a little headroom.
   let peak = 0;
   for (let i = 0; i < samples.length; i++) {
     const a = Math.abs(samples[i]);
     if (a > peak) peak = a;
   }
-  const gain = peak > 0 ? 0.92 / peak : 1;
+  // When mastered, levels are already set; otherwise peak-normalise with headroom.
+  const gain = opts.master === false ? (peak > 0 ? 0.92 / peak : 1) : 1;
 
   const numSamples = samples.length;
   const dataSize = numSamples * 2;
@@ -85,14 +126,15 @@ function writeWav(filePath, samples) {
   console.log(`  wrote ${path.relative(process.cwd(), filePath)} (${(buffer.length / 1024).toFixed(0)} KB)`);
 }
 
-function writeWavStereo(filePath, left, right) {
+function writeWavStereo(filePath, left, right, opts = {}) {
   const n = Math.min(left.length, right.length);
+  if (opts.master !== false) master([left, right], { targetDb: opts.targetDb ?? -14 });
   // Joint normalization keeps the stereo image balanced.
   let peak = 0;
   for (let i = 0; i < n; i++) {
     peak = Math.max(peak, Math.abs(left[i]), Math.abs(right[i]));
   }
-  const gain = peak > 0 ? 0.9 / peak : 1;
+  const gain = opts.master === false ? (peak > 0 ? 0.9 / peak : 1) : 1;
 
   const dataSize = n * 2 * 2; // 2 channels, 16-bit
   const buffer = Buffer.alloc(44 + dataSize);
@@ -932,7 +974,7 @@ function generateAmbient(kind) {
 }
 
 console.log('Generating audio assets...');
-writeWav(path.join(OUT_DIR, 'bell.wav'), generateBell());
+writeWav(path.join(OUT_DIR, 'bell.wav'), generateBell(), { master: false });
 writeWav(path.join(AMBIENT_DIR, 'rain.wav'), generateAmbient('rain'));
 writeWav(path.join(AMBIENT_DIR, 'ocean.wav'), generateAmbient('ocean'));
 writeWav(path.join(AMBIENT_DIR, 'forest.wav'), generateAmbient('forest'));
@@ -950,7 +992,7 @@ const calm = generateMusic({
   noiseAmp: 0.06,
   seed: 11,
 });
-writeWavStereo(path.join(MUSIC_DIR, 'calm.wav'), calm.left, calm.right);
+writeWavStereo(path.join(MUSIC_DIR, 'calm.wav'), calm.left, calm.right, { targetDb: -16 });
 
 const focus = generateMusic({
   carrierHz: 256, // "scientific" C
@@ -964,7 +1006,7 @@ const focus = generateMusic({
   noiseAmp: 0.03,
   seed: 22,
 });
-writeWavStereo(path.join(MUSIC_DIR, 'focus.wav'), focus.left, focus.right);
+writeWavStereo(path.join(MUSIC_DIR, 'focus.wav'), focus.left, focus.right, { targetDb: -16 });
 
 const deep = generateMusic({
   carrierHz: 144, // low warm drone
@@ -976,7 +1018,7 @@ const deep = generateMusic({
   noiseAmp: 0.05,
   seed: 33,
 });
-writeWavStereo(path.join(MUSIC_DIR, 'deep.wav'), deep.left, deep.right);
+writeWavStereo(path.join(MUSIC_DIR, 'deep.wav'), deep.left, deep.right, { targetDb: -16 });
 
 const lofi = generateLoFi();
 writeWavStereo(path.join(BEATS_DIR, 'lofi.wav'), lofi.left, lofi.right);
