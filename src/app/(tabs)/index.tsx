@@ -37,6 +37,8 @@ const BEATS: {
   icon: keyof typeof Ionicons.glyphMap;
   hint: string;
 }[] = [
+  { key: 'melodic', label: 'Melodic House', icon: 'sunny-outline', hint: '123 BPM · euphoric melodic house (RÜFÜS vibe)' },
+  { key: 'deephouse', label: 'Deep House', icon: 'moon-outline', hint: '122 BPM · dark deep house (ZHU vibe)' },
   { key: 'lofi', label: 'Lo-Fi', icon: 'cafe-outline', hint: '85 BPM · jazzy lo-fi (Nujabes vibe)' },
   { key: 'liquid', label: 'Liquid', icon: 'water-outline', hint: '172 BPM · liquid drum & bass (LTJ Bukem)' },
   { key: 'chillstep', label: 'Chillstep', icon: 'rainy-outline', hint: '140 BPM · future garage (Burial vibe)' },

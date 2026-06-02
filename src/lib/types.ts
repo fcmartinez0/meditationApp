@@ -12,7 +12,9 @@ export type AmbientSound =
   | 'lofi'
   | 'liquid'
   | 'chillstep'
-  | 'downtempo';
+  | 'downtempo'
+  | 'deephouse'
+  | 'melodic';
 
 /** Every selectable sound, used to validate persisted settings. */
 export const AMBIENT_KEYS: AmbientSound[] = [
@@ -27,6 +29,8 @@ export const AMBIENT_KEYS: AmbientSound[] = [
   'liquid',
   'chillstep',
   'downtempo',
+  'deephouse',
+  'melodic',
 ];
 
 /** A single completed (or partially completed) meditation session. */

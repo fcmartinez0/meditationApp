@@ -27,6 +27,8 @@ const AMBIENT_SOURCES: Record<Exclude<AmbientSound, 'none'>, number> = {
   liquid: require('@/assets/audio/beats/liquid.wav'),
   chillstep: require('@/assets/audio/beats/chillstep.wav'),
   downtempo: require('@/assets/audio/beats/downtempo.wav'),
+  deephouse: require('@/assets/audio/beats/deephouse.wav'),
+  melodic: require('@/assets/audio/beats/melodic.wav'),
 };
 
 let sharedCtx: AudioContext | null = null;

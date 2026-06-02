@@ -22,6 +22,8 @@
  *   assets/audio/beats/liquid.wav     – liquid drum & bass (LTJ Bukem / Netsky)
  *   assets/audio/beats/chillstep.wav  – future garage / chillstep (Burial)
  *   assets/audio/beats/downtempo.wav  – dreamy downtempo with arps (Tycho / Bonobo)
+ *   assets/audio/beats/deephouse.wav  – dark, sultry deep house (ZHU)
+ *   assets/audio/beats/melodic.wav    – warm, euphoric melodic house (RÜFÜS DU SOL)
  */
 
 const fs = require('fs');
@@ -519,6 +521,198 @@ function generateDowntempo() {
   return foldTail(kit.L, kit.R, loopSamples, tail);
 }
 
+/** Dark, sultry deep house — spacious four-on-the-floor in the spirit of ZHU. */
+function generateZhu() {
+  const bpm = 122;
+  const bars = 8;
+  const stepDur = 60 / bpm / 4;
+  const totalSteps = bars * 16;
+  const loopSamples = Math.round(totalSteps * stepDur * SAMPLE_RATE);
+  const tail = Math.round(0.7 * SAMPLE_RATE);
+  const N = loopSamples + tail;
+  const kit = makeKit(N, 505);
+  const pos = (step) => Math.round(step * stepDur * SAMPLE_RATE);
+  // F#m then D, four bars each — dark and sparse.
+  const chords = [
+    [54, 57, 61],
+    [50, 54, 57],
+  ];
+  const bassRoots = [30, 26]; // deep sub
+
+  kit.atmos({ gain: 0.05, cutoff: 700, swellHz: 0.05 }); // dark wash
+  kit.crackle({ gain: 0.3, density: 0.0006 });
+  for (let bar = 0; bar < bars; bar++) {
+    const ci = Math.floor(bar / 4) % 2;
+    const chord = chords[ci];
+    const base = bar * 16;
+    if (bar % 4 === 0) {
+      kit.pad(pos(base), chord.map(midiToFreq), 4 * 16 * stepDur * 0.99, {
+        gain: 0.09, attack: 1.0, release: 1.2, detune: 9, bright: 0.02,
+      });
+    }
+    // Sultry sustained lead note (root, up an octave) once per bar.
+    kit.key(pos(base + 0), midiToFreq(chord[0] + 12), stepDur * 6, { gain: 0.07, decay: 1.6 });
+    // Dark chord stabs on the "and" of beats 2 and 4.
+    for (const st of [6, 14]) for (const m of chord) kit.key(pos(base + st), midiToFreq(m), 0.32, { gain: 0.07, decay: 5 });
+    for (let s = 0; s < 16; s++) {
+      const p = pos(base + s);
+      if (s % 4 === 0) kit.kick(p, { gain: 0.95, pitchStart: 105, pitchEnd: 44, decay: 11 }); // four-on-floor
+      if (s % 4 === 2) kit.hat(p, { gain: 0.13, open: true, pan: s % 8 === 2 ? -0.4 : 0.4 }); // off-beat open hats
+      if (s === 4 || s === 12) kit.snare(p, { gain: 0.3, decay: 22, noiseAmt: 0.7, tone: 210, toneAmt: 0.2 }); // clap
+      if (s % 4 === 2) kit.sub(pos(base + s), midiToFreq(bassRoots[ci]), stepDur * 1.6, { gain: 0.5 }); // off-beat house bass
+    }
+  }
+  return foldTail(kit.L, kit.R, loopSamples, tail);
+}
+
+/** Sidechain "pump" envelope: dips on every quarter-note kick and recovers. */
+function duckEnvelope(N, bpm, depth, tau) {
+  const beat = 60 / bpm;
+  const env = new Float32Array(N);
+  for (let i = 0; i < N; i++) {
+    const tInBeat = (i / SAMPLE_RATE) % beat;
+    env[i] = 1 - depth + depth * (1 - Math.exp(-tInBeat / tau));
+  }
+  return env;
+}
+
+/** One-pole low-pass with a time-varying cutoff, for filter "build" sweeps. */
+function sweepLowPass(buf, cutoffFn) {
+  const out = new Float32Array(buf.length);
+  const dt = 1 / SAMPLE_RATE;
+  let prev = 0;
+  for (let i = 0; i < buf.length; i++) {
+    const rc = 1 / (2 * Math.PI * cutoffFn(i / SAMPLE_RATE));
+    const alpha = dt / (rc + dt);
+    prev += alpha * (buf[i] - prev);
+    out[i] = prev;
+  }
+  return out;
+}
+
+function allpass(buf, D, g) {
+  const out = new Float32Array(buf.length);
+  for (let i = 0; i < buf.length; i++) {
+    const xnD = i >= D ? buf[i - D] : 0;
+    const ynD = i >= D ? out[i - D] : 0;
+    out[i] = -g * buf[i] + xnD + g * ynD;
+  }
+  return out;
+}
+
+/** Cheap Schroeder reverb (4 combs + 2 allpasses) for a spacious wash. */
+function reverbChannel(buf, mix) {
+  const SR = SAMPLE_RATE;
+  const combDelays = [0.0297, 0.0371, 0.0411, 0.0437];
+  const combG = 0.72;
+  const wet = new Float32Array(buf.length);
+  for (const d of combDelays) {
+    const D = Math.floor(d * SR);
+    const y = new Float32Array(buf.length);
+    for (let i = 0; i < buf.length; i++) {
+      y[i] = buf[i] + combG * (i >= D ? y[i - D] : 0);
+      wet[i] += y[i];
+    }
+  }
+  for (let i = 0; i < buf.length; i++) wet[i] /= combDelays.length;
+  let ap = allpass(wet, Math.floor(0.005 * SR), 0.7);
+  ap = allpass(ap, Math.floor(0.0017 * SR), 0.7);
+  const out = new Float32Array(buf.length);
+  for (let i = 0; i < buf.length; i++) out[i] = buf[i] * (1 - mix) + ap[i] * mix;
+  return out;
+}
+
+/**
+ * Warm, euphoric melodic house in the spirit of RÜFÜS DU SOL. The signatures
+ * are layered deliberately: an emotional i–VI–III–VII progression, a wide
+ * detuned pad, a driving arp with dotted-eighth delay throws, a sidechain
+ * "pump" that ducks the pad and bass on every kick, a filter that swells over
+ * the 16-bar arrangement, and a reverb wash for space.
+ */
+function generateRufus() {
+  const bpm = 123;
+  const bars = 16; // a full 16-bar arrangement so it breathes rather than loops fast
+  const stepDur = 60 / bpm / 4;
+  const barDur = stepDur * 16;
+  const totalSteps = bars * 16;
+  const loopSamples = Math.round(totalSteps * stepDur * SAMPLE_RATE);
+  const loopDur = loopSamples / SAMPLE_RATE;
+  const tail = Math.round(1.0 * SAMPLE_RATE);
+  const N = loopSamples + tail;
+
+  // Separate buses so we can reverb/sweep the tonal parts and sidechain them
+  // independently of the drums.
+  const tonal = makeKit(N, 606); // pad + arp + delay throws
+  const bass = makeKit(N, 607); // dry sub
+  const drums = makeKit(N, 608); // kick / hats / clap / shaker (kept punchy)
+  const pos = (step) => Math.round(step * stepDur * SAMPLE_RATE);
+
+  // i–VI–III–VII in B minor with colour tones: Bm7 – Gmaj7 – Dadd9 – Amaj7.
+  const chords = [
+    [59, 62, 66, 69], // Bm7
+    [55, 59, 62, 66], // Gmaj7
+    [62, 66, 69, 64], // Dadd9
+    [57, 61, 64, 68], // Amaj7
+  ];
+  const bassRoots = [35, 31, 38, 33];
+
+  for (let bar = 0; bar < bars; bar++) {
+    const ci = Math.floor(bar / 2) % 4;
+    const chord = chords[ci];
+    const base = bar * 16;
+
+    // Wide, lush pad once per chord.
+    if (bar % 2 === 0) {
+      tonal.pad(pos(base), chord.map(midiToFreq), 2 * barDur * 0.99, {
+        gain: 0.1, attack: 0.7, release: 0.9, detune: 12, bright: 0.05,
+      });
+    }
+
+    // Plucky off-beat sub bass (the house "pump"), plus a grounding downbeat.
+    bass.sub(pos(base + 0), midiToFreq(bassRoots[ci]), stepDur * 1.2, { gain: 0.42 });
+    for (const s of [2, 6, 10, 14]) {
+      bass.sub(pos(base + s), midiToFreq(bassRoots[ci]), stepDur * 1.7, { gain: 0.5 });
+    }
+
+    // Driving arpeggio (up-and-back contour) with dotted-eighth delay throws.
+    const tones = chord.concat(chord.map((n) => n + 12));
+    const contour = [0, 2, 4, 5, 7, 5, 4, 2, 0, 2, 4, 6, 7, 6, 4, 2];
+    const arpGain = 0.55 + 0.45 * (bar / bars); // arp grows as the track builds
+    for (let s = 0; s < 16; s++) {
+      const note = tones[contour[(s + bar) % contour.length] % tones.length] + 12;
+      const pan = s % 2 === 0 ? -0.7 : 0.7;
+      tonal.key(pos(base + s), midiToFreq(note), stepDur * 1.3, { gain: 0.08 * arpGain, pan, decay: 6 });
+      // Dotted-eighth (3/16) echoes, decaying and ping-ponged.
+      tonal.key(pos(base + s + 3), midiToFreq(note), stepDur * 1.1, { gain: 0.04 * arpGain, pan: -pan, decay: 7 });
+      tonal.key(pos(base + s + 6), midiToFreq(note), stepDur * 0.9, { gain: 0.02 * arpGain, pan, decay: 8 });
+    }
+
+    // Drums.
+    for (let s = 0; s < 16; s++) {
+      const p = pos(base + s);
+      if (s % 4 === 0) drums.kick(p, { gain: 0.92, pitchStart: 100, pitchEnd: 46, decay: 11 });
+      if (s % 4 === 2) drums.hat(p, { gain: 0.12, open: true, pan: s % 8 === 2 ? -0.4 : 0.4 });
+      if (s === 4 || s === 12) drums.snare(p, { gain: 0.3, decay: 20, noiseAmt: 0.6, tone: 200, toneAmt: 0.25 });
+      if (s % 2 === 1) drums.shaker(p, { gain: 0.05, pan: s % 4 === 1 ? -0.5 : 0.5 });
+    }
+  }
+
+  // Filter build: cutoff swells up and back over the whole loop (seamless).
+  const cutoffFn = (t) => 650 + 4500 * (0.5 - 0.5 * Math.cos((2 * Math.PI * t) / loopDur));
+  const wetL = reverbChannel(sweepLowPass(tonal.L, cutoffFn), 0.2);
+  const wetR = reverbChannel(sweepLowPass(tonal.R, cutoffFn), 0.2);
+
+  // Sidechain: pad + bass duck on every kick; drums punch through.
+  const duck = duckEnvelope(N, bpm, 0.55, 0.16);
+  const L = new Float32Array(N);
+  const R = new Float32Array(N);
+  for (let i = 0; i < N; i++) {
+    L[i] = (wetL[i] + bass.L[i]) * duck[i] + drums.L[i];
+    R[i] = (wetR[i] + bass.R[i]) * duck[i] + drums.R[i];
+  }
+  return foldTail(L, R, loopSamples, tail);
+}
+
 /** Singing-bowl style chime: inharmonic partials with a soft beat and long decay. */
 function generateBell() {
   const duration = 4.0;
@@ -710,5 +904,9 @@ const chillstep = generateChillstep();
 writeWavStereo(path.join(BEATS_DIR, 'chillstep.wav'), chillstep.left, chillstep.right);
 const downtempo = generateDowntempo();
 writeWavStereo(path.join(BEATS_DIR, 'downtempo.wav'), downtempo.left, downtempo.right);
+const deephouse = generateZhu();
+writeWavStereo(path.join(BEATS_DIR, 'deephouse.wav'), deephouse.left, deephouse.right);
+const melodic = generateRufus();
+writeWavStereo(path.join(BEATS_DIR, 'melodic.wav'), melodic.left, melodic.right);
 
 console.log('Done.');

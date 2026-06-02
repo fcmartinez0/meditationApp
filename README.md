@@ -39,12 +39,14 @@ Four synthesized instrumental loops (drums, bass, chords and textures built from
 oscillators and filtered noise), each modeled on the signature style of an
 artist — an homage, not a sample of their work:
 
-| Track     | Tempo   | Style                          | Modeled on        |
-| --------- | ------- | ------------------------------ | ----------------- |
-| Lo-Fi     | 85 BPM  | jazzy, dusty lo-fi hip-hop     | Nujabes / J Dilla |
-| Liquid    | 172 BPM | lush, rolling liquid drum&bass | LTJ Bukem / Netsky |
-| Chillstep | 140 BPM | smoky 2-step / future garage   | Burial            |
-| Downtempo | 98 BPM  | dreamy, ping-pong arps         | Tycho / Bonobo    |
+| Track        | Tempo   | Style                                | Modeled on         |
+| ------------ | ------- | ------------------------------------ | ------------------ |
+| Melodic House | 123 BPM | euphoric melodic house (sidechain pump, dotted-eighth delays, filter build, reverb wash) | RÜFÜS DU SOL       |
+| Deep House   | 122 BPM | dark, sultry, spacious deep house    | ZHU                |
+| Lo-Fi        | 85 BPM  | jazzy, dusty lo-fi hip-hop           | Nujabes / J Dilla  |
+| Liquid       | 172 BPM | lush, rolling liquid drum & bass     | LTJ Bukem / Netsky |
+| Chillstep    | 140 BPM | smoky 2-step / future garage         | Burial             |
+| Downtempo    | 98 BPM  | dreamy, ping-pong arps               | Tycho / Bonobo     |
 
 All audio is generated procedurally — no third-party assets — so it is fully
 reproducible:
