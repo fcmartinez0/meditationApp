@@ -1,0 +1,55 @@
+name: Deploy web (PWA) to GitHub Pages
+
+# Builds the Expo web export and publishes it to GitHub Pages so the app can be
+# opened in Safari and added to the iPhone Home Screen. Requires the repository
+# to be public (free plan) or a paid plan that allows Pages on private repos.
+
+on:
+  push:
+    branches: ['claude/meditation-app-ios-android-j3pS2']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow only one concurrent deployment.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Export web build
+        run: npx expo export -p web --output-dir dist
+      - name: Disable Jekyll (serve _expo/ directory)
+        run: touch dist/.nojekyll
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

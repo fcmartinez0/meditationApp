@@ -22,7 +22,13 @@
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/favicon.png",
+      "name": "Stillness",
+      "shortName": "Stillness",
+      "display": "standalone",
+      "themeColor": "#0E1020",
+      "backgroundColor": "#0E1020",
+      "lang": "en"
     },
     "plugins": [
       "expo-router",
@@ -41,7 +47,8 @@
     ],
     "experiments": {
       "typedRoutes": true,
-      "reactCompiler": true
+      "reactCompiler": true,
+      "baseUrl": "/meditationApp"
     }
   }
 }
