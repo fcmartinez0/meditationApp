@@ -713,21 +713,28 @@ function generateRufus() {
   return foldTail(L, R, loopSamples, tail);
 }
 
-/** Singing-bowl style chime: inharmonic partials with a soft beat and long decay. */
+/**
+ * Warm singing-bowl chime. The shimmer is produced by pairs of slightly
+ * detuned partials beating against each other (a bounded, natural effect) —
+ * NOT by frequency-modulating each partial, which previously created a
+ * runaway metallic warble on the high partials.
+ */
 function generateBell() {
   const duration = 4.0;
   const n = Math.floor(duration * SAMPLE_RATE);
   const out = new Float32Array(n);
 
-  const fundamental = 396; // calming, low chime
-  // Inharmonic partials typical of a struck metal bowl.
+  const fundamental = 392; // G4 — calm and warm
+
+  // Mostly harmonic partials with only a hint of inharmonic bowl colour, and
+  // gentler highs so the chime is warm rather than clangy. `beat` Hz is the
+  // detuning between each partial's two voices, giving a slow natural shimmer.
   const partials = [
-    { ratio: 1.0, amp: 1.0, decay: 3.6 },
-    { ratio: 2.76, amp: 0.55, decay: 2.6 },
-    { ratio: 5.4, amp: 0.3, decay: 1.8 },
-    { ratio: 8.9, amp: 0.16, decay: 1.1 },
+    { ratio: 1.0, amp: 1.0, decay: 3.8, beat: 0.7 },
+    { ratio: 2.0, amp: 0.42, decay: 3.0, beat: 1.0 },
+    { ratio: 2.76, amp: 0.16, decay: 2.2, beat: 1.3 }, // subtle bowl inharmonicity
+    { ratio: 4.0, amp: 0.07, decay: 1.6, beat: 1.6 },
   ];
-  const beat = 0.8; // Hz – gentle shimmer
 
   for (let i = 0; i < n; i++) {
     const t = i / SAMPLE_RATE;
@@ -735,14 +742,15 @@ function generateBell() {
     for (const p of partials) {
       const env = Math.exp(-t / p.decay);
       const f = fundamental * p.ratio;
-      const shimmer = 1 + 0.004 * Math.sin(2 * Math.PI * beat * t);
-      s += p.amp * env * Math.sin(2 * Math.PI * f * shimmer * t);
+      // Two fixed, slightly detuned voices beat at `p.beat` Hz — bounded shimmer.
+      const voice = Math.sin(2 * Math.PI * f * t) + Math.sin(2 * Math.PI * (f + p.beat) * t);
+      s += p.amp * env * voice * 0.5;
     }
-    // Soft strike attack.
-    const attack = Math.min(1, t / 0.006);
+    const attack = Math.min(1, t / 0.01); // soft strike
     out[i] = s * attack * 0.5;
   }
-  return out;
+  // A touch of low-pass adds warmth and tames any remaining edge.
+  return lowPass(out, 4000);
 }
 
 /** One-pole low-pass filter (in place is avoided; returns new array). */
