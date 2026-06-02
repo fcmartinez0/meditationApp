@@ -102,6 +102,34 @@ src/
 scripts/generate-audio.js  # procedural audio generator
 ```
 
+## Privacy & security
+
+- **Local-first, no backend.** There is no account and no server. Settings,
+  streak, session history and learned music preferences live only on the
+  device (AsyncStorage). Nothing is transmitted; there is no tracking,
+  advertising or analytics.
+- **Notifications** are local-only (scheduled on-device).
+- **In-app disclosure.** A Privacy & Disclaimer screen (Settings → About)
+  covers the data model and the wellness/non-medical disclaimer.
+- **Web hardening.** The web build ships a Content-Security-Policy and a
+  referrer policy via `src/app/+html.tsx`. Header-only protections (HSTS,
+  `X-Frame-Options`, `X-Content-Type-Options`) require a host that can set
+  headers — GitHub Pages can't, so put a CDN (e.g. Cloudflare Pages) in front
+  to add those and to tighten the CSP once verified.
+- **Supply chain.** CI runs type-check, tests and **gitleaks** secret-scanning
+  on every push/PR; **Dependabot** proposes weekly dependency updates. No API
+  keys or secrets are stored in the app — if a backend/AI feature is added
+  later, proxy it server-side and never embed keys client-side.
+
+## Audio size & compression
+
+Audio is shipped as uncompressed 44.1 kHz WAV (~52 MB total, fetched per-track
+on the web so initial load is small). Lossy compression (MP3/AAC/OGG) is **not**
+used because those formats add encoder/decoder padding that the Web Audio
+`decodeAudioData` path doesn't trim, which would reintroduce a gap at the
+seamless loop point. A gapless-aware pipeline (or native-only compressed
+playback) is the path to shrinking this.
+
 ## Sources
 
 Frequency choices are informed by general brainwave-entrainment and

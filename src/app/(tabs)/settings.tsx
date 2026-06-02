@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, Platform, Pressable, StyleSheet, Switch, View } from 'react-native';
 
@@ -46,6 +46,7 @@ function Row({ children, label, hint }: { children: React.ReactNode; label: stri
 
 export default function SettingsScreen() {
   const colors = useThemeColors();
+  const router = useRouter();
   const { settings, updateSettings, resetData } = useAppData();
   const [busy, setBusy] = useState(false);
   const [ratings, setRatings] = useState<PieceRating[]>([]);
@@ -287,6 +288,19 @@ export default function SettingsScreen() {
         </Pressable>
       </Card>
 
+      <Card style={styles.card}>
+        <AppText variant="label" muted>
+          ABOUT
+        </AppText>
+        <Pressable onPress={() => router.push('/legal')} style={styles.aboutRow}>
+          <Ionicons name="shield-checkmark-outline" size={20} color={colors.accent} />
+          <AppText variant="body" style={{ flex: 1 }}>
+            Privacy & disclaimer
+          </AppText>
+          <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+        </Pressable>
+      </Card>
+
       <AppText variant="caption" muted center style={styles.footer}>
         Stillness · v1.0
       </AppText>
@@ -318,5 +332,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
   },
   resetRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.xs },
+  aboutRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.xs },
   footer: { marginTop: spacing.sm },
 });
