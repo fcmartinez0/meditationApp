@@ -28,6 +28,9 @@ const SCALES = [
   'lydian',
   'dorian',
   'aeolian',
+  'mixolydian',
+  'phrygian',
+  'harmonic_minor',
 ] as const;
 
 const WAVES: GenWave[] = ['sine', 'triangle', 'warm'];
@@ -66,7 +69,7 @@ const RANGES: Record<Section, Range> = {
     arpChance: 0.45,
     bassChance: 0.7,
     // Mostly still, with subtle motion options for variety.
-    percussion: ['none', 'none', 'heartbeat', 'shaker'],
+    percussion: ['none', 'none', 'heartbeat', 'shaker', 'tribal'],
   },
   chill: {
     rootMin: 48,
@@ -82,7 +85,7 @@ const RANGES: Record<Section, Range> = {
     pulseMax: 0.22,
     arpChance: 0.75,
     bassChance: 0.85,
-    percussion: ['pulse', 'shaker', 'broken', 'heartbeat'],
+    percussion: ['pulse', 'shaker', 'broken', 'heartbeat', 'offbeat', 'tribal'],
   },
 };
 

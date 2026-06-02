@@ -830,6 +830,53 @@ function generateRufus() {
   return foldTail(L, R, loopSamples, tail);
 }
 
+/** Hypnotic minimal / ambient techno: deep, rolling, evolving (à la Jon Hopkins). */
+function generateTechno() {
+  const bpm = 122;
+  const bars = 16;
+  const stepDur = 60 / bpm / 4;
+  const totalSteps = bars * 16;
+  const loopSamples = Math.round(totalSteps * stepDur * SAMPLE_RATE);
+  const tail = Math.round(0.9 * SAMPLE_RATE);
+  const N = loopSamples + tail;
+  const kit = makeKit(N, 707);
+  const pos = (step) => Math.round(step * stepDur * SAMPLE_RATE);
+  const chords = [
+    [48, 51, 55, 58], // Cm7
+    [44, 48, 51, 55], // Abmaj7
+  ];
+  const bassRoots = [36, 32];
+
+  kit.atmos({ gain: 0.05, cutoff: 900, swellHz: 0.04 });
+  for (let bar = 0; bar < bars; bar++) {
+    const ci = Math.floor(bar / 8) % 2;
+    const chord = chords[ci];
+    const base = bar * 16;
+    if (bar % 8 === 0) {
+      kit.pad(pos(base), chord.map(midiToFreq), 8 * 16 * stepDur * 0.99, {
+        gain: 0.09, attack: 1.2, release: 1.4, detune: 10, bright: 0.04,
+      });
+    }
+    kit.sub(pos(base + 0), midiToFreq(bassRoots[ci]), stepDur * 1.4, { gain: 0.45 });
+    for (const s of [2, 6, 10, 14]) {
+      kit.sub(pos(base + s), midiToFreq(bassRoots[ci]), stepDur * 1.6, { gain: 0.5 });
+    }
+    if (bar % 2 === 1) {
+      kit.key(pos(base + 7), midiToFreq(chord[1] + 12), 0.4, {
+        gain: 0.07, pan: bar % 4 === 1 ? -0.6 : 0.6,
+      });
+    }
+    for (let s = 0; s < 16; s++) {
+      const p = pos(base + s);
+      if (s % 4 === 0) kit.kick(p, { gain: 0.95, pitchStart: 108, pitchEnd: 44, decay: 11 });
+      if (s % 4 === 2) kit.hat(p, { gain: 0.12, open: true, pan: s % 8 === 2 ? -0.4 : 0.4 });
+      else if (s % 2 === 1) kit.hat(p, { gain: 0.05, open: false }); // ticking 16ths
+    }
+  }
+  addFill(kit, pos, (bars - 1) * 16, false);
+  return finishTrack(kit, loopSamples, tail, { reverbMix: 0.2, pumpBpm: 122, pumpDepth: 0.4 });
+}
+
 /**
  * A cat's purr — a warm low rumble around 25 Hz (the frequency cats purr at,
  * often associated with calming and healing). Harmonics make it audible on
@@ -863,6 +910,118 @@ function generatePurr() {
   // Keep it warm and rumbly.
   const warm = lowPass(buf, 400);
   return makeSeamless(warm, loopSamples, crossSamples);
+}
+
+/** A babbling stream: bright band-passed water with bubbling amplitude motion. */
+function generateStream() {
+  const loopSamples = 12 * SAMPLE_RATE;
+  const crossSamples = 2 * SAMPLE_RATE;
+  const total = loopSamples + crossSamples;
+  const rng = makeRng(4101);
+  let n = whiteNoise(total, rng);
+  n = highPass(n, 450);
+  n = lowPass(n, 5500);
+  for (let i = 0; i < total; i++) {
+    const t = i / SAMPLE_RATE;
+    const bubble =
+      0.55 +
+      0.2 * Math.sin(2 * Math.PI * 3.1 * t) +
+      0.12 * Math.sin(2 * Math.PI * 7.3 * t + 1) +
+      0.13 * Math.sin(2 * Math.PI * 1.6 * t);
+    n[i] *= Math.max(0.2, bubble);
+  }
+  return makeSeamless(n, loopSamples, crossSamples);
+}
+
+/** A campfire: a warm low rumble with random crackle pops and a soft hiss. */
+function generateFire() {
+  const loopSamples = 12 * SAMPLE_RATE;
+  const crossSamples = 2 * SAMPLE_RATE;
+  const total = loopSamples + crossSamples;
+  const rng = makeRng(4202);
+  let bed = brownNoise(total, rng);
+  bed = lowPass(bed, 240);
+  const out = new Float32Array(total);
+  for (let i = 0; i < total; i++) out[i] = bed[i] * 0.5 + (rng() * 2 - 1) * 0.04;
+  // Crackle pops: short decaying clicks scattered through the loop.
+  for (let k = 0; k < total; k++) {
+    if (rng() < 0.0009) {
+      const len = Math.floor((0.004 + rng() * 0.02) * SAMPLE_RATE);
+      const amp = 0.3 + rng() * 0.5;
+      for (let j = 0; j < len && k + j < total; j++) {
+        out[k + j] += (rng() * 2 - 1) * amp * Math.exp(-j / (len * 0.4));
+      }
+    }
+  }
+  return makeSeamless(lowPass(out, 6500), loopSamples, crossSamples);
+}
+
+/** A summer night: low ambience under a few chirping crickets. */
+function generateNight() {
+  const loopSamples = 12 * SAMPLE_RATE;
+  const crossSamples = 2 * SAMPLE_RATE;
+  const total = loopSamples + crossSamples;
+  const rng = makeRng(4303);
+  let bed = brownNoise(total, rng);
+  bed = lowPass(bed, 320);
+  const out = new Float32Array(total);
+  for (let i = 0; i < total; i++) out[i] = bed[i] * 0.22 + (rng() * 2 - 1) * 0.008;
+  const crickets = [
+    { f: 4300, rate: 1.6 },
+    { f: 4850, rate: 1.9 },
+    { f: 5250, rate: 2.3 },
+  ];
+  for (const c of crickets) {
+    for (let i = 0; i < total; i++) {
+      const t = i / SAMPLE_RATE;
+      const win = (t * c.rate) % 1 < 0.4 ? 1 : 0; // short chirp windows
+      const trill = 0.5 + 0.5 * Math.sign(Math.sin(2 * Math.PI * 28 * t)); // rapid pulse
+      out[i] += Math.sin(2 * Math.PI * c.f * t) * win * trill * 0.05;
+    }
+  }
+  return makeSeamless(lowPass(out, 8000), loopSamples, crossSamples);
+}
+
+/** Brown noise: a deep, warm, even hush (great for focus/sleep). */
+function generateBrownNoise() {
+  const loopSamples = 12 * SAMPLE_RATE;
+  const crossSamples = 2 * SAMPLE_RATE;
+  const total = loopSamples + crossSamples;
+  const rng = makeRng(4404);
+  const n = brownNoise(total, rng);
+  return makeSeamless(n, loopSamples, crossSamples);
+}
+
+/** White noise: a bright, even hush (the top of the room). */
+function generateWhiteNoise() {
+  const loopSamples = 12 * SAMPLE_RATE;
+  const crossSamples = 2 * SAMPLE_RATE;
+  const total = loopSamples + crossSamples;
+  const rng = makeRng(4505);
+  const n = lowPass(whiteNoise(total, rng), 13000); // tame the very top slightly
+  return makeSeamless(n, loopSamples, crossSamples);
+}
+
+/** Pink noise: equal energy per octave — softer than white (Kellet's filter). */
+function generatePink() {
+  const loopSamples = 12 * SAMPLE_RATE;
+  const crossSamples = 2 * SAMPLE_RATE;
+  const total = loopSamples + crossSamples;
+  const rng = makeRng(4606);
+  const out = new Float32Array(total);
+  let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+  for (let i = 0; i < total; i++) {
+    const w = rng() * 2 - 1;
+    b0 = 0.99886 * b0 + w * 0.0555179;
+    b1 = 0.99332 * b1 + w * 0.0750759;
+    b2 = 0.969 * b2 + w * 0.153852;
+    b3 = 0.8665 * b3 + w * 0.3104856;
+    b4 = 0.55 * b4 + w * 0.5329522;
+    b5 = -0.7616 * b5 - w * 0.016898;
+    out[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.11;
+    b6 = w * 0.115926;
+  }
+  return makeSeamless(out, loopSamples, crossSamples);
 }
 
 /**
@@ -1015,6 +1174,12 @@ writeWav(path.join(OUT_DIR, 'bell.wav'), generateBell(), { master: false });
 writeWav(path.join(AMBIENT_DIR, 'rain.wav'), generateAmbient('rain'));
 writeWav(path.join(AMBIENT_DIR, 'ocean.wav'), generateAmbient('ocean'));
 writeWav(path.join(AMBIENT_DIR, 'forest.wav'), generateAmbient('forest'));
+writeWav(path.join(AMBIENT_DIR, 'stream.wav'), generateStream());
+writeWav(path.join(AMBIENT_DIR, 'fire.wav'), generateFire());
+writeWav(path.join(AMBIENT_DIR, 'night.wav'), generateNight());
+writeWav(path.join(AMBIENT_DIR, 'brown.wav'), generateBrownNoise());
+writeWav(path.join(AMBIENT_DIR, 'white.wav'), generateWhiteNoise());
+writeWav(path.join(AMBIENT_DIR, 'pink.wav'), generatePink());
 writeWav(path.join(OUT_DIR, 'purr.wav'), generatePurr());
 
 // Frequency music — binaural-beat pads (stereo).
@@ -1057,6 +1222,33 @@ const deep = generateMusic({
 });
 writeWavStereo(path.join(MUSIC_DIR, 'deep.wav'), deep.left, deep.right, { targetDb: -16 });
 
+const dream = generateMusic({
+  carrierHz: 198, // soft low-mid drone
+  beatHz: 6, // theta — dreamy, meditative
+  partials: [
+    { ratio: 1.0, amp: 1.0 },
+    { ratio: 2.0, amp: 0.3 },
+    { ratio: 3.0, amp: 0.1 },
+  ],
+  noiseAmp: 0.06,
+  seed: 44,
+});
+writeWavStereo(path.join(MUSIC_DIR, 'dream.wav'), dream.left, dream.right, { targetDb: -16 });
+
+const clarity = generateMusic({
+  carrierHz: 240,
+  beatHz: 10, // alpha — relaxed, clear presence
+  partials: [
+    { ratio: 1.0, amp: 0.95 },
+    { ratio: 1.5, amp: 0.36 },
+    { ratio: 2.0, amp: 0.26 },
+    { ratio: 3.0, amp: 0.1 },
+  ],
+  noiseAmp: 0.04,
+  seed: 55,
+});
+writeWavStereo(path.join(MUSIC_DIR, 'clarity.wav'), clarity.left, clarity.right, { targetDb: -16 });
+
 const lofi = generateLoFi();
 writeWavStereo(path.join(BEATS_DIR, 'lofi.wav'), lofi.left, lofi.right);
 const liquid = generateLiquid();
@@ -1069,5 +1261,7 @@ const deephouse = generateZhu();
 writeWavStereo(path.join(BEATS_DIR, 'deephouse.wav'), deephouse.left, deephouse.right);
 const melodic = generateRufus();
 writeWavStereo(path.join(BEATS_DIR, 'melodic.wav'), melodic.left, melodic.right);
+const techno = generateTechno();
+writeWavStereo(path.join(BEATS_DIR, 'techno.wav'), techno.left, techno.right);
 
 console.log('Done.');

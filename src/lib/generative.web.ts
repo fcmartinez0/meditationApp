@@ -18,6 +18,9 @@ const SCALES: Record<string, number[]> = {
   lydian: [0, 2, 4, 6, 7, 9, 11],
   dorian: [0, 2, 3, 5, 7, 9, 10],
   aeolian: [0, 2, 3, 5, 7, 8, 10],
+  mixolydian: [0, 2, 4, 5, 7, 9, 10],
+  phrygian: [0, 1, 3, 5, 7, 8, 10],
+  harmonic_minor: [0, 2, 3, 5, 7, 8, 11],
 };
 
 const ARP_CONTOUR = [0, 2, 1, 3, 2, 4, 1, 2];
@@ -285,6 +288,15 @@ export class GenerativeEngine {
       case 'broken':
         if (s === 0 || s === 6 || s === 10) this.softKick(when, kg);
         if (s === 4 || s === 12 || s === 14) this.shaker(when, sg);
+        break;
+      case 'offbeat':
+        if (s === 0 || s === 8) this.softKick(when, kg * 0.85);
+        if (s % 4 === 2) this.shaker(when, sg * 1.2);
+        else if (s % 2 === 1) this.shaker(when, sg * 0.5);
+        break;
+      case 'tribal':
+        if (s === 0 || s === 3 || s === 6 || s === 10 || s === 13) this.softKick(when, kg * 0.7);
+        if (s === 4 || s === 12) this.shaker(when, sg);
         break;
       default:
         break;

@@ -29,10 +29,18 @@ const CATEGORY_OF: Record<AmbientSound, Category> = {
   rain: 'ambient',
   ocean: 'ambient',
   forest: 'ambient',
+  stream: 'ambient',
+  fire: 'ambient',
+  night: 'ambient',
+  brown: 'ambient',
+  white: 'ambient',
+  pink: 'ambient',
   purr: 'ambient',
   calm: 'frequency',
   focus: 'frequency',
   deep: 'frequency',
+  dream: 'frequency',
+  clarity: 'frequency',
   gen_rest: 'generative',
   gen_chill: 'generative',
   lofi: 'beats',
@@ -41,6 +49,7 @@ const CATEGORY_OF: Record<AmbientSound, Category> = {
   downtempo: 'beats',
   deephouse: 'beats',
   melodic: 'beats',
+  techno: 'beats',
 };
 
 export function categoryFor(sound: AmbientSound): Category {

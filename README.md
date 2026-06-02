@@ -16,8 +16,8 @@ A single codebase runs on both iOS and Android.
   in the Web Audio API (evolving chords, sub-bass, arpeggio, soft percussion,
   chimes and convolution reverb). **Like or rate** a piece and it **learns your
   taste** per section; see what it's learned in Settings.
-- **Ambient sounds** — rain, ocean, and forest beds, a ~25 Hz cat purr, plus
-  pure silence.
+- **Ambient sounds** — rain, ocean, forest, a babbling stream, a campfire,
+  night crickets, brown noise, a ~25 Hz cat purr, plus pure silence.
 - **Adaptive UI** — an Apple-Music/Spotify-style picker whose accent color
   follows the selected sound's category, all the way into the session.
 - **Streaks & progress** — daily streak, longest streak, total time and sessions,
@@ -26,16 +26,18 @@ A single codebase runs on both iOS and Android.
 
 ## Frequency music
 
-The three music tracks are synthesized as **binaural beats**: each ear hears a
+The frequency tracks are synthesized as **binaural beats**: each ear hears a
 carrier tone offset by the beat frequency, so the listener perceives a pulse at
 that difference. Frequencies were chosen from common brainwave-entrainment
 associations (see _Sources_):
 
-| Track  | Beat        | Carrier            | Intended state                                   |
-| ------ | ----------- | ------------------ | ------------------------------------------------ |
-| Calm   | **7.83 Hz** | 216 Hz (432-tuned) | Schumann resonance, theta/alpha — grounding calm |
-| Focus  | **14 Hz**   | 256 Hz             | Low-beta / SMR — alert, relaxed concentration    |
-| Deep   | **3 Hz**    | 144 Hz             | Delta — deep rest and sleep                      |
+| Track   | Beat        | Carrier            | Intended state                                   |
+| ------- | ----------- | ------------------ | ------------------------------------------------ |
+| Calm    | **7.83 Hz** | 216 Hz (432-tuned) | Schumann resonance, theta/alpha — grounding calm |
+| Clarity | **10 Hz**   | 240 Hz             | Alpha — relaxed, clear presence                  |
+| Focus   | **14 Hz**   | 256 Hz             | Low-beta / SMR — alert, relaxed concentration    |
+| Dream   | **6 Hz**    | 198 Hz             | Theta — dreamy and meditative                    |
+| Deep    | **3 Hz**    | 144 Hz             | Delta — deep rest and sleep                      |
 
 > Binaural beats require **headphones** and are offered as a wellness aid, not a
 > medical treatment. Scientific evidence for cognitive effects is mixed, and any
@@ -51,6 +53,7 @@ artist — an homage, not a sample of their work:
 | ------------ | ------- | ------------------------------------ | ------------------ |
 | Melodic House | 123 BPM | euphoric melodic house (sidechain pump, dotted-eighth delays, filter build, reverb wash) | RÜFÜS DU SOL       |
 | Deep House   | 122 BPM | dark, sultry, spacious deep house    | ZHU                |
+| Ambient Techno | 122 BPM | hypnotic, deep, rolling minimal techno | Jon Hopkins       |
 | Lo-Fi        | 85 BPM  | jazzy, dusty lo-fi hip-hop           | Nujabes / J Dilla  |
 | Liquid       | 172 BPM | lush, rolling liquid drum & bass     | LTJ Bukem / Netsky |
 | Chillstep    | 140 BPM | smoky 2-step / future garage         | Burial             |

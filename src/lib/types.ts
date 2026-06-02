@@ -9,16 +9,25 @@ export type AmbientSound =
   | 'rain'
   | 'ocean'
   | 'forest'
+  | 'stream'
+  | 'fire'
+  | 'night'
+  | 'brown'
+  | 'white'
+  | 'pink'
   | 'purr'
   | 'calm'
   | 'focus'
   | 'deep'
+  | 'dream'
+  | 'clarity'
   | 'lofi'
   | 'liquid'
   | 'chillstep'
   | 'downtempo'
   | 'deephouse'
   | 'melodic'
+  | 'techno'
   | GenerativeSound;
 
 /** Sounds backed by a bundled .wav (everything except silence and generative). */
@@ -30,16 +39,25 @@ export const AMBIENT_KEYS: AmbientSound[] = [
   'rain',
   'ocean',
   'forest',
+  'stream',
+  'fire',
+  'night',
+  'brown',
+  'white',
+  'pink',
   'purr',
   'calm',
   'focus',
   'deep',
+  'dream',
+  'clarity',
   'lofi',
   'liquid',
   'chillstep',
   'downtempo',
   'deephouse',
   'melodic',
+  'techno',
   'gen_rest',
   'gen_chill',
 ];
@@ -61,7 +79,14 @@ export function sectionFor(sound: GenerativeSound): Section {
  * a rating can be meaningfully attributed to it.
  */
 export type GenWave = 'sine' | 'triangle' | 'warm';
-export type GenPercussion = 'none' | 'heartbeat' | 'pulse' | 'shaker' | 'broken';
+export type GenPercussion =
+  | 'none'
+  | 'heartbeat'
+  | 'pulse'
+  | 'shaker'
+  | 'broken'
+  | 'offbeat'
+  | 'tribal';
 
 export interface PieceSpec {
   seed: number;
