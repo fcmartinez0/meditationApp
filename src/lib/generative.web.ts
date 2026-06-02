@@ -79,6 +79,7 @@ export class GenerativeEngine {
   private pulseGain: GainNode | null = null; // amplitude pump
   private filter: BiquadFilterNode | null = null;
   private bus: GainNode | null = null; // pad voices
+  private reverbSend: GainNode | null = null; // wet send into the convolver
   private voices: Voice[] = [];
   private bass: { osc: OscillatorNode; gain: GainNode } | null = null;
   private noise: AudioBuffer | null = null;
@@ -113,6 +114,18 @@ export class GenerativeEngine {
     master.gain.exponentialRampToValueAtTime(0.5, now + 4);
     master.connect(ctx.destination);
 
+    // Reverb send: a generated impulse gives a lush, spacious tail.
+    const convolver = ctx.createConvolver();
+    convolver.buffer = this.makeImpulse(ctx, 2.6, 2.6);
+    const reverbWet = ctx.createGain();
+    reverbWet.gain.value = spec.section === 'rest' ? 0.4 : 0.28;
+    convolver.connect(reverbWet).connect(master);
+    const reverbSend = ctx.createGain();
+    reverbSend.gain.value = 1;
+    reverbSend.connect(convolver);
+    this.reverbSend = reverbSend;
+    this.extras.push(convolver, reverbWet, reverbSend);
+
     const pulse = ctx.createGain();
     pulse.gain.value = 1;
     pulse.connect(master);
@@ -127,6 +140,7 @@ export class GenerativeEngine {
     const bus = ctx.createGain();
     bus.gain.value = 1;
     bus.connect(filter);
+    bus.connect(reverbSend); // pad also feeds the reverb
 
     this.master = master;
     this.pulseGain = pulse;
@@ -333,7 +347,9 @@ export class GenerativeEngine {
     g.gain.exponentialRampToValueAtTime(0.0001, when + 0.5);
     const p = ctx.createStereoPanner();
     p.pan.value = pan;
-    osc.connect(g).connect(p).connect(this.pulseGain);
+    osc.connect(g).connect(p);
+    p.connect(this.pulseGain);
+    if (this.reverbSend) p.connect(this.reverbSend);
     osc.start(when);
     osc.stop(when + 0.55);
   }
@@ -355,9 +371,21 @@ export class GenerativeEngine {
     g.gain.exponentialRampToValueAtTime(0.0001, now + 3);
     const pan = ctx.createStereoPanner();
     pan.pan.value = this.rng() * 2 - 1;
-    osc.connect(g).connect(pan).connect(this.master);
+    osc.connect(g).connect(pan);
+    pan.connect(this.master);
+    if (this.reverbSend) pan.connect(this.reverbSend);
     osc.start(now);
     osc.stop(now + 3.2);
+  }
+
+  private makeImpulse(ctx: AudioContext, seconds: number, decay: number): AudioBuffer {
+    const len = Math.floor(seconds * ctx.sampleRate);
+    const buf = ctx.createBuffer(2, len, ctx.sampleRate);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = buf.getChannelData(ch);
+      for (let i = 0; i < len; i++) d[i] = (this.rng() * 2 - 1) * Math.pow(1 - i / len, decay);
+    }
+    return buf;
   }
 
   pause(): void {
@@ -446,6 +474,7 @@ export class GenerativeEngine {
     this.filter = null;
     this.pulseGain = null;
     this.bus = null;
+    this.reverbSend = null;
     this.ctx = null;
   }
 }
