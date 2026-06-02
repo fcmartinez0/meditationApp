@@ -12,10 +12,12 @@ interface ScreenProps {
   /** Remove default horizontal padding (e.g. full-bleed session screen). */
   bare?: boolean;
   contentStyle?: ViewStyle;
+  /** A fixed element pinned below the scroll area (e.g. a sticky action bar). */
+  footer?: ReactNode;
 }
 
 /** Full-screen calming gradient background with a safe-area content area. */
-export function Screen({ children, scroll = false, bare = false, contentStyle }: ScreenProps) {
+export function Screen({ children, scroll = false, bare = false, contentStyle, footer }: ScreenProps) {
   const colors = useThemeColors();
   const padding = bare ? undefined : styles.padded;
 
@@ -32,6 +34,7 @@ export function Screen({ children, scroll = false, bare = false, contentStyle }:
         ) : (
           <View style={[styles.fill, padding, contentStyle]}>{children}</View>
         )}
+        {footer}
       </SafeAreaView>
     </LinearGradient>
   );

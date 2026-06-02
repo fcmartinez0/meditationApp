@@ -73,6 +73,10 @@ const SECTIONS: Section[] = [
   },
 ];
 
+/** Flat lookup of every sound's label + icon, for the sticky "ready" bar. */
+const SOUND_INDEX: Record<string, { label: string; icon: keyof typeof Ionicons.glyphMap }> = {};
+for (const s of SECTIONS) for (const it of s.items) SOUND_INDEX[it.key] = { label: it.label, icon: it.icon };
+
 function greeting(): string {
   const h = new Date().getHours();
   if (h < 12) return 'Good morning';
@@ -97,8 +101,46 @@ export default function MeditateScreen() {
     });
   };
 
+  const sel = SOUND_INDEX[settings.ambient] ?? { label: 'Silence', icon: 'moon-outline' as const };
+
+  // Always-visible "ready" bar so you never have to scroll to start.
+  const readyBar = (
+    <View style={[styles.bar, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+      <LinearGradient
+        colors={active.colors}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.barArt}>
+        <Ionicons name={sel.icon} size={20} color="#FFFFFF" />
+      </LinearGradient>
+      <View style={styles.barText}>
+        <AppText variant="body" numberOfLines={1}>
+          {sel.label}
+        </AppText>
+        <View style={styles.barSub}>
+          <AppText variant="caption" muted>
+            {settings.durationMin} min
+          </AppText>
+          {headphonesHelp && <Ionicons name="headset-outline" size={12} color={colors.textSecondary} />}
+        </View>
+      </View>
+      <Pressable onPress={begin} accessibilityRole="button" accessibilityLabel="Begin session">
+        <LinearGradient
+          colors={active.colors}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.barBegin}>
+          <Ionicons name="play" size={18} color="#FFFFFF" />
+          <AppText variant="label" color="#FFFFFF" style={styles.beginLabel}>
+            Begin
+          </AppText>
+        </LinearGradient>
+      </Pressable>
+    </View>
+  );
+
   return (
-    <Screen scroll>
+    <Screen scroll footer={readyBar}>
       <View style={styles.header}>
         <AppText variant="label" muted>
           {greeting().toUpperCase()}
@@ -176,27 +218,6 @@ export default function MeditateScreen() {
         </View>
       ))}
 
-      {headphonesHelp && (
-        <View style={styles.headphoneHint}>
-          <Ionicons name="headset-outline" size={14} color={colors.textSecondary} />
-          <AppText variant="caption" muted>
-            Best with headphones
-          </AppText>
-        </View>
-      )}
-
-      <Pressable onPress={begin} accessibilityRole="button" style={styles.beginWrap}>
-        <LinearGradient
-          colors={active.colors}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.beginBtn}>
-          <Ionicons name="play" size={18} color="#FFFFFF" />
-          <AppText variant="label" color="#FFFFFF" style={styles.beginLabel}>
-            Begin session
-          </AppText>
-        </LinearGradient>
-      </Pressable>
     </Screen>
   );
 }
@@ -216,14 +237,30 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   list: { gap: spacing.sm },
-  headphoneHint: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs },
-  beginWrap: { marginTop: spacing.sm },
-  beginBtn: {
+  bar: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  barArt: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.sm,
+    alignItems: 'center',
     justifyContent: 'center',
+  },
+  barText: { flex: 1, gap: 2 },
+  barSub: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  barBegin: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: spacing.sm,
-    paddingVertical: spacing.lg,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
     borderRadius: radius.pill,
   },
   beginLabel: { fontSize: 16, letterSpacing: 0.3 },
