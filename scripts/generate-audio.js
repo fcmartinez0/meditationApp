@@ -1135,10 +1135,28 @@ function generateAmbient(kind) {
 
   let raw;
   if (kind === 'rain') {
-    // Bright, steady hiss with a touch of body.
-    let n = whiteNoise(total, rng);
-    n = highPass(n, 700);
-    n = lowPass(n, 7000);
+    // A "rushing" bed (darker than static): mid noise + low body, not bright hiss.
+    let bed = lowPass(highPass(whiteNoise(total, rng), 320), 2800);
+    let body = lowPass(brownNoise(total, rng), 700);
+    const out = new Float32Array(total);
+    for (let i = 0; i < total; i++) out[i] = bed[i] * 0.5 + body[i] * 0.28;
+
+    // Droplet patter: many tiny decaying ticks scattered through the loop —
+    // this is what makes it read as rain rather than white noise.
+    for (let k = 0; k < total; k++) {
+      if (rng() < 0.0016) {
+        const len = Math.floor((0.002 + rng() * 0.01) * SAMPLE_RATE);
+        const amp = 0.12 + rng() * 0.32;
+        for (let j = 0; j < len && k + j < total; j++) {
+          out[k + j] += (rng() * 2 - 1) * amp * Math.exp(-j / (len * 0.3));
+        }
+      }
+    }
+    let n = lowPass(out, 6000); // glue the droplets into the bed
+    for (let i = 0; i < total; i++) {
+      const t = i / SAMPLE_RATE;
+      n[i] *= 0.82 + 0.18 * Math.sin(2 * Math.PI * 0.08 * t); // gentle intensity waves
+    }
     raw = n;
   } else if (kind === 'ocean') {
     // Brown noise swelling slowly like waves.
