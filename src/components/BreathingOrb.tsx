@@ -41,13 +41,14 @@ export function BreathingOrb({ active, children }: BreathingOrbProps) {
   }, [active, progress]);
 
   const coreStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: 0.82 + progress.value * 0.18 }],
-    opacity: 0.9,
+    // Gentler breath: a subtle 0.88 -> 1.0 swell rather than a big pulse.
+    transform: [{ scale: 0.88 + progress.value * 0.12 }],
+    opacity: 0.82,
   }));
 
   const haloStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: 0.9 + progress.value * 0.32 }],
-    opacity: 0.18 + progress.value * 0.22,
+    transform: [{ scale: 0.94 + progress.value * 0.2 }],
+    opacity: 0.12 + progress.value * 0.14,
   }));
 
   return (
@@ -56,7 +57,7 @@ export function BreathingOrb({ active, children }: BreathingOrbProps) {
         style={[styles.halo, { backgroundColor: colors.auroraEnd }, haloStyle]}
       />
       <Animated.View
-        style={[styles.core, { backgroundColor: colors.accent }, coreStyle]}
+        style={[styles.core, { backgroundColor: colors.accentSoft }, coreStyle]}
       />
       <View style={styles.content}>{children}</View>
     </View>

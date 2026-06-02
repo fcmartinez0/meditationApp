@@ -5,6 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/AppText';
@@ -162,7 +163,7 @@ export default function SessionScreen() {
           <Ionicons name="close" size={26} color={colors.textSecondary} />
         </Pressable>
 
-        <View style={styles.center}>
+        <Animated.View style={styles.center} entering={FadeIn.duration(1100)}>
           <BreathingOrb active={phase === 'running'}>
             <AppText variant="display" color={colors.textOnAccent} style={styles.clock}>
               {formatClock(remaining)}
@@ -170,9 +171,9 @@ export default function SessionScreen() {
           </BreathingOrb>
 
           <AppText variant="label" muted style={styles.hint}>
-            {phase === 'running' ? 'BREATHE WITH THE ORB' : 'PAUSED'}
+            {phase === 'running' ? 'Breathe with the orb' : 'Paused'}
           </AppText>
-        </View>
+        </Animated.View>
 
         <View style={styles.controls}>
           <View style={[styles.progressTrack, { backgroundColor: colors.surfaceMuted }]}>

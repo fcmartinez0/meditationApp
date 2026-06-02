@@ -16,6 +16,7 @@
  *   assets/audio/music/calm.wav   – 432 Hz-tuned drone, 7.83 Hz beat (Schumann / theta-alpha, grounding calm)
  *   assets/audio/music/focus.wav  – 256 Hz carrier, 14 Hz beat (low-beta / SMR, alert focus)
  *   assets/audio/music/deep.wav   – 144 Hz drone, 3 Hz beat (delta, deep rest / sleep)
+ *   assets/audio/music/beats.wav  – chilled drum-and-bass / lo-fi groove (100 BPM, Am-F-C-G)
  */
 
 const fs = require('fs');
@@ -156,6 +157,142 @@ function generateMusic({ carrierHz, beatHz, partials, noiseAmp, seed }) {
     left: makeSeamless(left, loopSamples, crossSamples),
     right: makeSeamless(right, loopSamples, crossSamples),
   };
+}
+
+function midiToFreq(m) {
+  return 440 * Math.pow(2, (m - 69) / 12);
+}
+
+/**
+ * Chilled drum-and-bass / lo-fi groove: synthesized kick, snare, hats, a sub
+ * bass and a soft chord pad over an Am–F–C–G progression. The loop is exactly
+ * eight bars; voice tails that cross the loop point are folded back to the
+ * start so it repeats seamlessly.
+ */
+function generateBeats() {
+  const bpm = 100;
+  const bars = 8;
+  const stepDur = 60 / bpm / 4; // one 16th note
+  const barDur = stepDur * 16;
+  const loopSamples = Math.round(bars * barDur * SAMPLE_RATE);
+  const tail = Math.round(0.7 * SAMPLE_RATE); // catch decays crossing the loop
+  const N = loopSamples + tail;
+  const L = new Float32Array(N);
+  const R = new Float32Array(N);
+  const rng = makeRng(99);
+
+  const addKick = (start) => {
+    const n = Math.floor(0.32 * SAMPLE_RATE);
+    for (let i = 0; i < n; i++) {
+      const t = i / SAMPLE_RATE;
+      const env = Math.exp(-t * 11);
+      const f = 110 * Math.exp(-t * 28) + 45; // pitch drop = punch
+      const s = Math.sin(2 * Math.PI * f * t) * env * 0.95;
+      const idx = start + i;
+      if (idx < N) { L[idx] += s; R[idx] += s; }
+    }
+  };
+
+  const addSnare = (start) => {
+    const n = Math.floor(0.22 * SAMPLE_RATE);
+    for (let i = 0; i < n; i++) {
+      const t = i / SAMPLE_RATE;
+      const env = Math.exp(-t * 18);
+      const noise = rng() * 2 - 1;
+      const tone = Math.sin(2 * Math.PI * 185 * t);
+      const s = (noise * 0.6 + tone * 0.4) * env * 0.5;
+      const idx = start + i;
+      if (idx < N) { L[idx] += s; R[idx] += s; }
+    }
+  };
+
+  const addHat = (start, open, pan) => {
+    const n = Math.floor((open ? 0.16 : 0.045) * SAMPLE_RATE);
+    let hp = 0;
+    let prev = 0;
+    for (let i = 0; i < n; i++) {
+      const t = i / SAMPLE_RATE;
+      const env = Math.exp(-t * (open ? 24 : 60));
+      const white = rng() * 2 - 1;
+      hp = 0.85 * (hp + white - prev); // crude high-pass for a crisp hat
+      prev = white;
+      const s = hp * env * 0.18;
+      const idx = start + i;
+      if (idx < N) {
+        L[idx] += s * (pan <= 0 ? 1 : 0.55);
+        R[idx] += s * (pan >= 0 ? 1 : 0.55);
+      }
+    }
+  };
+
+  const addBass = (start, freq, dur) => {
+    const n = Math.floor(dur * SAMPLE_RATE);
+    for (let i = 0; i < n; i++) {
+      const t = i / SAMPLE_RATE;
+      const env = Math.min(1, t / 0.01) * Math.exp(-t * 1.1);
+      const s =
+        (Math.sin(2 * Math.PI * freq * t) * 0.8 +
+          Math.sin(2 * Math.PI * freq * 2 * t) * 0.12) *
+        env *
+        0.5;
+      const idx = start + i;
+      if (idx < N) { L[idx] += s; R[idx] += s; }
+    }
+  };
+
+  const addPad = (start, freqs, dur) => {
+    const n = Math.floor(dur * SAMPLE_RATE);
+    for (let i = 0; i < n; i++) {
+      const t = i / SAMPLE_RATE;
+      const env = Math.min(1, t / 0.3) * Math.min(1, (dur - t) / 0.35);
+      let s = 0;
+      for (const f of freqs) s += Math.sin(2 * Math.PI * f * t);
+      s = (s / freqs.length) * env * 0.17;
+      const idx = start + i;
+      if (idx < N) { L[idx] += s; R[idx] += s; }
+    }
+  };
+
+  // Am – F – C – G, two bars each.
+  const chords = [
+    { bass: 45, pad: [57, 60, 64] },
+    { bass: 41, pad: [53, 57, 60] },
+    { bass: 48, pad: [48, 52, 55] },
+    { bass: 43, pad: [55, 59, 62] },
+  ];
+
+  for (let bar = 0; bar < bars; bar++) {
+    const barStart = Math.round(bar * barDur * SAMPLE_RATE);
+    const chord = chords[Math.floor(bar / 2) % chords.length];
+    const stepSamp = (step) => barStart + Math.round(step * stepDur * SAMPLE_RATE);
+
+    if (bar % 2 === 0) {
+      addPad(barStart, chord.pad.map(midiToFreq), 2 * barDur * 0.98);
+    }
+
+    const bf = midiToFreq(chord.bass);
+    addBass(stepSamp(0), bf, stepDur * 4);
+    addBass(stepSamp(8), bf, stepDur * 3);
+    addBass(stepSamp(11), midiToFreq(chord.bass + 7), stepDur * 2);
+
+    for (let step = 0; step < 16; step++) {
+      const s = stepSamp(step);
+      if (step === 0 || step === 8) addKick(s);
+      if (step === 4 || step === 12) addSnare(s);
+      if (step % 2 === 0) addHat(s, step === 6 || step === 14, step % 4 === 0 ? -1 : 1);
+    }
+  }
+
+  // Fold the tail back onto the head so decays wrap cleanly.
+  const left = new Float32Array(loopSamples);
+  const right = new Float32Array(loopSamples);
+  left.set(L.subarray(0, loopSamples));
+  right.set(R.subarray(0, loopSamples));
+  for (let i = 0; i < tail; i++) {
+    left[i] += L[loopSamples + i];
+    right[i] += R[loopSamples + i];
+  }
+  return { left, right };
 }
 
 /** Singing-bowl style chime: inharmonic partials with a soft beat and long decay. */
@@ -340,5 +477,8 @@ const deep = generateMusic({
   seed: 33,
 });
 writeWavStereo(path.join(MUSIC_DIR, 'deep.wav'), deep.left, deep.right);
+
+const beats = generateBeats();
+writeWavStereo(path.join(MUSIC_DIR, 'beats.wav'), beats.left, beats.right);
 
 console.log('Done.');

@@ -8,7 +8,8 @@ A single codebase runs on both iOS and Android.
 - **Meditation timer** — pick a length (3–30 min), choose a background sound, and
   follow a breathing orb. Optional start / end / interval bells.
 - **Focus & calm music** — procedurally generated binaural-beat tracks tuned to
-  brainwave-entrainment frequencies (see below).
+  brainwave-entrainment frequencies (see below), plus a chilled lo-fi
+  drum-and-bass groove.
 - **Ambient sounds** — rain, ocean, and forest beds, plus pure silence.
 - **Streaks & progress** — daily streak, longest streak, total time and sessions,
   and a weekly minutes chart. All stored locally on device.

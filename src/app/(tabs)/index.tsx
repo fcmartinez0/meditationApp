@@ -29,6 +29,7 @@ const MUSIC: {
   { key: 'calm', label: 'Calm', icon: 'heart-outline', hint: '7.83 Hz · grounding (432 Hz tuned)' },
   { key: 'focus', label: 'Focus', icon: 'bulb-outline', hint: '14 Hz · alert concentration' },
   { key: 'deep', label: 'Deep', icon: 'bed-outline', hint: '3 Hz · deep rest & sleep' },
+  { key: 'beats', label: 'Chill Beats', icon: 'musical-notes-outline', hint: '100 BPM · lo-fi drum & bass' },
 ];
 
 function greeting(): string {
@@ -187,8 +188,8 @@ export default function MeditateScreen() {
           })}
         </View>
         <AppText variant="caption" muted>
-          Binaural beats — use headphones for the full effect. A wellness aid, not medical
-          treatment.
+          Calm, Focus and Deep are binaural beats — use headphones for the full effect. A wellness
+          aid, not medical treatment.
         </AppText>
       </View>
 
