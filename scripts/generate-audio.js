@@ -403,6 +403,28 @@ function makeKit(N, seed) {
   return { L, R, kick, snare, clap, hat, shaker, sub, pad, key, crackle, atmos };
 }
 
+/**
+ * Apply send effects to a finished kit, then fold the loop: a reverb wash for
+ * space, and an optional four-on-the-floor sidechain "pump". (reverbChannel and
+ * duckEnvelope are declared below; function declarations hoist.)
+ */
+function finishTrack(kit, loopSamples, tail, opts = {}) {
+  let L = kit.L;
+  let R = kit.R;
+  if (opts.reverbMix) {
+    L = reverbChannel(L, opts.reverbMix);
+    R = reverbChannel(R, opts.reverbMix);
+  }
+  if (opts.pumpBpm) {
+    const duck = duckEnvelope(L.length, opts.pumpBpm, opts.pumpDepth ?? 0.4, 0.14);
+    for (let i = 0; i < L.length; i++) {
+      L[i] *= duck[i];
+      R[i] *= duck[i];
+    }
+  }
+  return foldTail(L, R, loopSamples, tail);
+}
+
 /** Fold voice tails that cross the loop point back onto the head for a seamless loop. */
 function foldTail(L, R, loopSamples, tail) {
   const left = new Float32Array(loopSamples);
@@ -461,7 +483,7 @@ function generateLoFi() {
       if (s % 2 === 0) kit.hat(p, { gain: 0.11, open: s === 14, pan: s % 4 === 0 ? -0.6 : 0.6 });
     }
   }
-  return foldTail(kit.L, kit.R, loopSamples, tail);
+  return finishTrack(kit, loopSamples, tail, { reverbMix: 0.12 });
 }
 
 /** Liquid drum & bass, lush and rolling like LTJ Bukem / Netsky. */
@@ -502,7 +524,7 @@ function generateLiquid() {
       if (s === 7 || s === 15) kit.snare(p, { gain: 0.16, decay: 26, noiseAmt: 0.7, tone: 200, toneAmt: 0.2 });
     }
   }
-  return foldTail(kit.L, kit.R, loopSamples, tail);
+  return finishTrack(kit, loopSamples, tail, { reverbMix: 0.22 });
 }
 
 /** Future garage / chillstep — smoky, 2-step, in the mood of Burial. */
@@ -549,7 +571,7 @@ function generateChillstep() {
       if (s === 8) kit.hat(p, { gain: 0.1, open: true });
     }
   }
-  return foldTail(kit.L, kit.R, loopSamples, tail);
+  return finishTrack(kit, loopSamples, tail, { reverbMix: 0.16 });
 }
 
 /** Dreamy downtempo with ping-pong arps, à la Tycho / Bonobo. */
@@ -598,7 +620,7 @@ function generateDowntempo() {
       if (s % 2 === 0) kit.shaker(p, { gain: 0.07, pan: s % 4 === 0 ? -0.5 : 0.5 });
     }
   }
-  return foldTail(kit.L, kit.R, loopSamples, tail);
+  return finishTrack(kit, loopSamples, tail, { reverbMix: 0.16 });
 }
 
 /** Dark, sultry deep house — spacious four-on-the-floor in the spirit of ZHU. */
@@ -642,7 +664,7 @@ function generateZhu() {
       if (s % 4 === 2) kit.sub(pos(base + s), midiToFreq(bassRoots[ci]), stepDur * 1.6, { gain: 0.5 }); // off-beat house bass
     }
   }
-  return foldTail(kit.L, kit.R, loopSamples, tail);
+  return finishTrack(kit, loopSamples, tail, { reverbMix: 0.18, pumpBpm: 122, pumpDepth: 0.45 });
 }
 
 /** Sidechain "pump" envelope: dips on every quarter-note kick and recovers. */
