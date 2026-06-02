@@ -29,7 +29,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const SAMPLE_RATE = 22050;
+const SAMPLE_RATE = 44100;
 const OUT_DIR = path.join(__dirname, '..', 'assets', 'audio');
 const AMBIENT_DIR = path.join(OUT_DIR, 'ambient');
 const MUSIC_DIR = path.join(OUT_DIR, 'music');
