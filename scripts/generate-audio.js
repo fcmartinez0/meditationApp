@@ -186,40 +186,79 @@ function makeKit(N, seed) {
     if (idx >= 0 && idx < N) { L[idx] += l; R[idx] += r; }
   };
 
+  // Punchy kick: phase-accurate pitch sweep, soft saturation, and a click transient.
   const kick = (start, o = {}) => {
-    const { gain = 0.9, pitchStart = 110, pitchEnd = 46, decay = 12, punch = 30, dur = 0.34 } = o;
+    const { gain = 0.9, pitchStart = 110, pitchEnd = 46, decay = 12, punch = 30, dur = 0.36, click = 0.25 } = o;
     const n = Math.floor(dur * SR);
+    let phase = 0;
     for (let i = 0; i < n; i++) {
       const t = i / SR;
       const env = Math.exp(-t * decay);
       const f = pitchEnd + (pitchStart - pitchEnd) * Math.exp(-t * punch);
-      const s = Math.sin(2 * Math.PI * f * t) * env * gain;
-      add(start + i, s, s);
+      phase += (2 * Math.PI * f) / SR;
+      let body = Math.tanh(Math.sin(phase) * 1.7) / Math.tanh(1.7); // soft saturation = punch
+      let s = body * env;
+      if (t < 0.006) s += Math.sin(2 * Math.PI * 1800 * t) * Math.exp(-t * 500) * click; // beater click
+      add(start + i, s * gain, s * gain);
     }
   };
 
+  // Snare/clap-ish: a tonal body plus high-passed noise with its own decay.
   const snare = (start, o = {}) => {
     const { gain = 0.45, decay = 18, noiseAmt = 0.6, tone = 185, toneAmt = 0.4 } = o;
     const n = Math.floor(0.25 * SR);
+    let hp = 0;
+    let prevN = 0;
     for (let i = 0; i < n; i++) {
       const t = i / SR;
       const env = Math.exp(-t * decay);
-      const s = ((rng() * 2 - 1) * noiseAmt + Math.sin(2 * Math.PI * tone * t) * toneAmt) * env * gain;
+      const body =
+        (Math.sin(2 * Math.PI * tone * t) + Math.sin(2 * Math.PI * tone * 1.6 * t)) *
+        0.5 *
+        Math.exp(-t * decay * 1.8);
+      const w = rng() * 2 - 1;
+      hp = 0.72 * (hp + w - prevN); // high-pass the noise = snappier
+      prevN = w;
+      const s = (body * toneAmt + hp * env * noiseAmt) * gain;
       add(start + i, s, s);
     }
   };
 
-  const hat = (start, o = {}) => {
-    const { gain = 0.16, open = false, pan = 0 } = o;
-    const n = Math.floor((open ? 0.16 : 0.045) * SR);
+  // Multi-tap clap: three quick transients then a diffuse tail (house/garage backbeat).
+  const clap = (start, o = {}) => {
+    const { gain = 0.5, pan = 0 } = o;
+    const n = Math.floor(0.24 * SR);
+    const taps = [0, 0.009, 0.018];
     let hp = 0;
     let prev = 0;
     for (let i = 0; i < n; i++) {
       const t = i / SR;
-      const env = Math.exp(-t * (open ? 22 : 60));
+      let amp = Math.exp(-t * 15) * 0.6; // tail
+      for (const tp of taps) if (t >= tp) amp += Math.exp(-(t - tp) * 230);
       const w = rng() * 2 - 1;
-      hp = 0.86 * (hp + w - prev);
+      hp = 0.6 * (hp + w - prev);
       prev = w;
+      const s = hp * amp * gain * 0.5;
+      add(start + i, s * (pan <= 0 ? 1 : 0.7), s * (pan >= 0 ? 1 : 0.7));
+    }
+  };
+
+  // Metallic 808-style hat: a cluster of square oscillators, high-passed.
+  const HAT_RATIOS = [2.0, 3.0, 4.16, 5.43, 6.79, 8.21];
+  const hat = (start, o = {}) => {
+    const { gain = 0.16, open = false, pan = 0 } = o;
+    const n = Math.floor((open ? 0.18 : 0.05) * SR);
+    const f0 = 1480;
+    let hp = 0;
+    let prev = 0;
+    for (let i = 0; i < n; i++) {
+      const t = i / SR;
+      const env = Math.exp(-t * (open ? 20 : 55));
+      let sq = 0;
+      for (const r of HAT_RATIOS) sq += Math.sign(Math.sin(2 * Math.PI * f0 * r * t));
+      sq /= HAT_RATIOS.length;
+      hp = 0.93 * (hp + sq - prev); // high-pass -> metallic sizzle
+      prev = sq;
       const s = hp * env * gain;
       add(start + i, s * (pan <= 0 ? 1 : 0.5), s * (pan >= 0 ? 1 : 0.5));
     }
@@ -241,55 +280,54 @@ function makeKit(N, seed) {
     }
   };
 
+  // Warm sub: fundamental + a touch of 2nd harmonic, gently saturated.
   const sub = (start, freq, dur, o = {}) => {
     const { gain = 0.5, attack = 0.008, release = 0.06 } = o;
     const n = Math.floor(dur * SR);
     for (let i = 0; i < n; i++) {
       const t = i / SR;
       const env = Math.min(1, t / attack) * Math.min(1, (dur - t) / release);
-      const s =
-        (Math.sin(2 * Math.PI * freq * t) * 0.85 + Math.sin(2 * Math.PI * freq * 2 * t) * 0.1) *
-        env *
-        gain;
+      const raw = Math.sin(2 * Math.PI * freq * t) * 0.9 + Math.sin(2 * Math.PI * freq * 2 * t) * 0.12;
+      const s = (Math.tanh(raw * 1.3) / Math.tanh(1.3)) * env * gain;
       add(start + i, s, s);
     }
   };
 
+  // Lush, wide pad: band-limited saw-ish voices (1/h harmonics), detuned per channel.
   const pad = (start, freqs, dur, o = {}) => {
     const { gain = 0.14, attack = 0.4, release = 0.5, detune = 6, bright = 0 } = o;
     const n = Math.floor(dur * SR);
-    const k = gain / freqs.length;
+    const harmonics = 3 + Math.round(bright * 60); // richer/brighter pads use more harmonics
+    const nyq = SR * 0.45;
+    const k = (gain / freqs.length) * 0.6;
     for (let i = 0; i < n; i++) {
       const t = i / SR;
       const env = Math.min(1, t / attack) * Math.min(1, (dur - t) / release);
       let l = 0;
       let r = 0;
       for (const f of freqs) {
-        l += Math.sin(2 * Math.PI * f * t);
-        r += Math.sin(2 * Math.PI * f * (1 + detune / 10000) * t); // detune per side = width
-        if (bright > 0) {
-          const o2 = Math.sin(2 * Math.PI * f * 2 * t) * bright;
-          l += o2;
-          r += o2;
+        const fr = f * (1 + detune / 10000);
+        for (let h = 1; h <= harmonics; h++) {
+          if (f * h > nyq) break;
+          const a = 1 / h;
+          l += a * Math.sin(2 * Math.PI * f * h * t);
+          r += a * Math.sin(2 * Math.PI * fr * h * t);
         }
       }
       add(start + i, l * k * env, r * k * env);
     }
   };
 
-  // Rhodes/pluck-style keyed voice with a bell-like decay.
+  // FM electric piano (Rhodes-ish): a fast-decaying modulator gives the tine attack.
   const key = (start, freq, dur, o = {}) => {
     const { gain = 0.2, pan = 0, decay = 3.2 } = o;
     const n = Math.floor(dur * SR);
     for (let i = 0; i < n; i++) {
       const t = i / SR;
-      const env = Math.min(1, t / 0.005) * Math.exp(-t * decay);
-      const s =
-        (Math.sin(2 * Math.PI * freq * t) * 0.7 +
-          Math.sin(2 * Math.PI * freq * 2 * t) * 0.2 +
-          Math.sin(2 * Math.PI * freq * 3 * t) * 0.07) *
-        env *
-        gain;
+      const env = Math.min(1, t / 0.004) * Math.exp(-t * decay);
+      const index = 2.4 * Math.exp(-t * 22); // bell-like attack, mellow sustain
+      const mod = Math.sin(2 * Math.PI * freq * 14 * t) * index;
+      const s = (Math.sin(2 * Math.PI * freq * t + mod) + 0.3 * Math.sin(2 * Math.PI * freq * t)) * env * gain * 0.6;
       add(start + i, s * (pan <= 0 ? 1 : 0.7), s * (pan >= 0 ? 1 : 0.7));
     }
   };
@@ -320,7 +358,7 @@ function makeKit(N, seed) {
     }
   };
 
-  return { L, R, kick, snare, hat, shaker, sub, pad, key, crackle, atmos };
+  return { L, R, kick, snare, clap, hat, shaker, sub, pad, key, crackle, atmos };
 }
 
 /** Fold voice tails that cross the loop point back onto the head for a seamless loop. */
@@ -558,7 +596,7 @@ function generateZhu() {
       const p = pos(base + s);
       if (s % 4 === 0) kit.kick(p, { gain: 0.95, pitchStart: 105, pitchEnd: 44, decay: 11 }); // four-on-floor
       if (s % 4 === 2) kit.hat(p, { gain: 0.13, open: true, pan: s % 8 === 2 ? -0.4 : 0.4 }); // off-beat open hats
-      if (s === 4 || s === 12) kit.snare(p, { gain: 0.3, decay: 22, noiseAmt: 0.7, tone: 210, toneAmt: 0.2 }); // clap
+      if (s === 4 || s === 12) kit.clap(p, { gain: 0.32 }); // backbeat clap
       if (s % 4 === 2) kit.sub(pos(base + s), midiToFreq(bassRoots[ci]), stepDur * 1.6, { gain: 0.5 }); // off-beat house bass
     }
   }
@@ -692,7 +730,7 @@ function generateRufus() {
       const p = pos(base + s);
       if (s % 4 === 0) drums.kick(p, { gain: 0.92, pitchStart: 100, pitchEnd: 46, decay: 11 });
       if (s % 4 === 2) drums.hat(p, { gain: 0.12, open: true, pan: s % 8 === 2 ? -0.4 : 0.4 });
-      if (s === 4 || s === 12) drums.snare(p, { gain: 0.3, decay: 20, noiseAmt: 0.6, tone: 200, toneAmt: 0.25 });
+      if (s === 4 || s === 12) drums.clap(p, { gain: 0.34 });
       if (s % 2 === 1) drums.shaker(p, { gain: 0.05, pan: s % 4 === 1 ? -0.5 : 0.5 });
     }
   }
