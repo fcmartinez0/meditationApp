@@ -3,29 +3,32 @@ import { StatusBar } from 'expo-status-bar';
 import { useColorScheme } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { AppDataProvider } from '@/store/AppData';
 
 export default function RootLayout() {
   const scheme = useColorScheme();
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <AppDataProvider>
-        <ThemeProvider value={scheme === 'dark' ? DarkTheme : DefaultTheme}>
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen
-              name="session"
-              options={{
-                presentation: 'fullScreenModal',
-                animation: 'fade',
-                gestureEnabled: false,
-              }}
-            />
-          </Stack>
-          <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
-        </ThemeProvider>
-      </AppDataProvider>
-    </GestureHandlerRootView>
+    <ErrorBoundary>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <AppDataProvider>
+          <ThemeProvider value={scheme === 'dark' ? DarkTheme : DefaultTheme}>
+            <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="(tabs)" />
+              <Stack.Screen
+                name="session"
+                options={{
+                  presentation: 'fullScreenModal',
+                  animation: 'fade',
+                  gestureEnabled: false,
+                }}
+              />
+            </Stack>
+            <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
+          </ThemeProvider>
+        </AppDataProvider>
+      </GestureHandlerRootView>
+    </ErrorBoundary>
   );
 }
