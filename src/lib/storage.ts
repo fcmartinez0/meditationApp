@@ -37,8 +37,15 @@ export async function loadSettings(): Promise<Settings> {
   try {
     const raw = await AsyncStorage.getItem(SETTINGS_KEY);
     if (!raw) return { ...DEFAULT_SETTINGS };
+    const stored = JSON.parse(raw) as Partial<Settings>;
     // Merge so new fields added in later versions get sane defaults.
-    const merged = { ...DEFAULT_SETTINGS, ...(JSON.parse(raw) as Partial<Settings>) };
+    const merged = { ...DEFAULT_SETTINGS, ...stored };
+    // v2 migration: bells became opt-in, so silence them once for existing users.
+    if ((stored.settingsVersion ?? 1) < 2) {
+      merged.startBell = false;
+      merged.endBell = false;
+      merged.settingsVersion = 2;
+    }
     // Drop a sound that no longer exists (e.g. a renamed/removed track).
     if (!AMBIENT_KEYS.includes(merged.ambient)) merged.ambient = 'none';
     return merged;

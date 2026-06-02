@@ -9,11 +9,12 @@ import {
   type AudioPlayer,
 } from 'expo-audio';
 
-import type { AmbientSound } from './types';
+import type { AmbientSound, FileSound } from './types';
+import { isGenerative } from './types';
 
 const BELL_SOURCE = require('@/assets/audio/bell.wav');
 
-const AMBIENT_SOURCES: Record<Exclude<AmbientSound, 'none'>, number> = {
+const AMBIENT_SOURCES: Record<FileSound, number> = {
   rain: require('@/assets/audio/ambient/rain.wav'),
   ocean: require('@/assets/audio/ambient/ocean.wav'),
   forest: require('@/assets/audio/ambient/forest.wav'),
@@ -53,7 +54,7 @@ export class SessionAudio {
     if (!this.bell) {
       this.bell = createAudioPlayer(BELL_SOURCE);
     }
-    if (ambient !== 'none') {
+    if (ambient !== 'none' && !isGenerative(ambient)) {
       this.ambient = createAudioPlayer(AMBIENT_SOURCES[ambient]);
       this.ambient.loop = true;
       // Start silent so startAmbient() can fade in and avoid a click.

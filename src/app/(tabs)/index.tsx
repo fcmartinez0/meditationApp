@@ -45,6 +45,16 @@ const BEATS: {
   { key: 'downtempo', label: 'Downtempo', icon: 'partly-sunny-outline', hint: '98 BPM · dreamy arps (Tycho vibe)' },
 ];
 
+const GENERATIVE: {
+  key: AmbientSound;
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  hint: string;
+}[] = [
+  { key: 'gen_rest', label: 'Rest', icon: 'sparkles-outline', hint: 'live generative ambient · never repeats' },
+  { key: 'gen_chill', label: 'Flow', icon: 'infinite-outline', hint: 'live generative chill · never repeats' },
+];
+
 function greeting(): string {
   const h = new Date().getHours();
   if (h < 12) return 'Good morning';
@@ -212,6 +222,20 @@ export default function MeditateScreen() {
       </View>
 
       <View style={styles.section}>
+        <View style={styles.sectionHeadRow}>
+          <AppText variant="label" muted>
+            GENERATIVE
+          </AppText>
+          <Ionicons name="sparkles" size={14} color={colors.accent} />
+        </View>
+        <TrackList items={GENERATIVE} />
+        <AppText variant="caption" muted>
+          Composed live and never the same twice. Rate a session afterward and it learns what you
+          like.
+        </AppText>
+      </View>
+
+      <View style={styles.section}>
         <AppText variant="label" muted>
           BEATS
         </AppText>
@@ -231,6 +255,7 @@ const styles = StyleSheet.create({
   streakCard: { paddingVertical: spacing.lg },
   streakRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   section: { gap: spacing.md },
+  sectionHeadRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
   durationChip: {
     width: 72,

@@ -14,11 +14,20 @@ import { BreathingOrb } from '@/components/BreathingOrb';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { SessionAudio } from '@/lib/audio';
 import { dayKey, formatClock } from '@/lib/date';
-import type { AmbientSound } from '@/lib/types';
+import { GENERATIVE_SUPPORTED, GenerativeEngine } from '@/lib/generative';
+import { loadRatings, nextSpec, recordRating } from '@/lib/preferences';
+import type { AmbientSound, FileSound, GenerativeSound, PieceSpec } from '@/lib/types';
+import { isGenerative, sectionFor } from '@/lib/types';
 import { useAppData } from '@/store/AppData';
 import { radius, spacing } from '@/theme';
 
 type Phase = 'running' | 'paused' | 'finished';
+
+// On platforms without live synthesis, generative picks fall back to a track.
+const GENERATIVE_FALLBACK: Record<GenerativeSound, FileSound> = {
+  gen_rest: 'calm',
+  gen_chill: 'lofi',
+};
 
 // Sessions shorter than this when ended early aren't worth recording.
 const MIN_RECORD_SEC = 20;
@@ -33,10 +42,22 @@ export default function SessionScreen() {
   const totalSec = Math.max(1, Number(params.duration) || settings.durationMin) * 60;
   const ambient = (params.ambient as AmbientSound) || settings.ambient;
 
+  const generative = isGenerative(ambient);
+  const useEngine = generative && GENERATIVE_SUPPORTED;
+  // What the file-based audio layer should play (silent when the engine drives it).
+  const effectiveAmbient: AmbientSound = useEngine
+    ? 'none'
+    : generative
+      ? GENERATIVE_FALLBACK[ambient as GenerativeSound]
+      : ambient;
+
   const [remaining, setRemaining] = useState(totalSec);
   const [phase, setPhase] = useState<Phase>('running');
+  const [rated, setRated] = useState<number | null>(null);
 
   const audioRef = useRef<SessionAudio | null>(null);
+  const engineRef = useRef<GenerativeEngine | null>(null);
+  const specRef = useRef<PieceSpec | null>(null);
   const endAtRef = useRef<number>(Date.now() + totalSec * 1000);
   const lastBellMarkRef = useRef(0);
   const recordedRef = useRef(false);
@@ -67,13 +88,25 @@ export default function SessionScreen() {
     audioRef.current = audio;
     let cancelled = false;
     (async () => {
-      await audio.prepare(ambient);
+      await audio.prepare(effectiveAmbient);
       if (cancelled) return;
       if (settings.startBell) audio.ringBell();
-      audio.startAmbient();
+      if (useEngine) {
+        // Choose the next piece, learning from past ratings, then play it live.
+        const ratings = await loadRatings();
+        if (cancelled) return;
+        const spec = nextSpec(sectionFor(ambient as GenerativeSound), ratings);
+        specRef.current = spec;
+        const engine = new GenerativeEngine();
+        engineRef.current = engine;
+        await engine.start(spec);
+      } else {
+        audio.startAmbient();
+      }
     })();
     return () => {
       cancelled = true;
+      engineRef.current?.stop();
       // Let the fade-out finish before tearing down, otherwise cutting the
       // audio mid-sample produces a click.
       void audio.stopAmbient();
@@ -88,6 +121,7 @@ export default function SessionScreen() {
     persist(totalSec, true);
     if (settings.endBell) audioRef.current?.ringBell();
     haptic();
+    engineRef.current?.stop();
     void audioRef.current?.stopAmbient();
   }, [persist, settings.endBell, totalSec]);
 
@@ -127,8 +161,16 @@ export default function SessionScreen() {
   const endEarly = () => {
     const elapsed = totalSec - remaining;
     persist(elapsed, false);
+    engineRef.current?.stop();
     void audioRef.current?.stopAmbient();
     router.back();
+  };
+
+  const ratePiece = (score: number) => {
+    if (rated !== null || !specRef.current) return;
+    setRated(score);
+    haptic();
+    void recordRating(specRef.current, score);
   };
 
   const progress = 1 - remaining / totalSec;
@@ -148,6 +190,46 @@ export default function SessionScreen() {
             <Ionicons name="flame" size={20} color={colors.warning} />
             <AppText variant="label">{stats.currentStreak}-day streak</AppText>
           </View>
+
+          {useEngine && specRef.current && (
+            <View style={styles.rating}>
+              {rated === null ? (
+                <>
+                  <AppText variant="body" muted center>
+                    How was this piece?
+                  </AppText>
+                  <View style={styles.rateRow}>
+                    <Pressable
+                      accessibilityLabel="Dislike this piece"
+                      onPress={() => ratePiece(-1)}
+                      style={[styles.rateBtn, { borderColor: colors.border }]}>
+                      <Ionicons name="thumbs-down-outline" size={26} color={colors.textSecondary} />
+                    </Pressable>
+                    <Pressable
+                      accessibilityLabel="Like this piece"
+                      onPress={() => ratePiece(1)}
+                      style={[styles.rateBtn, { borderColor: colors.border }]}>
+                      <Ionicons name="thumbs-up-outline" size={26} color={colors.accent} />
+                    </Pressable>
+                  </View>
+                </>
+              ) : (
+                <View style={styles.rateRow}>
+                  <Ionicons
+                    name={rated > 0 ? 'heart' : 'checkmark-circle'}
+                    size={20}
+                    color={rated > 0 ? colors.accent : colors.success}
+                  />
+                  <AppText variant="caption" muted>
+                    {rated > 0
+                      ? "Noted — I'll lean this way next time."
+                      : "Got it — I'll try something different."}
+                  </AppText>
+                </View>
+              )}
+            </View>
+          )}
+
           <Button label="Done" onPress={() => router.back()} style={styles.doneBtn} />
         </SafeAreaView>
       </LinearGradient>
@@ -234,4 +316,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(127,127,127,0.12)',
   },
   doneBtn: { alignSelf: 'stretch', marginTop: spacing.lg },
+  rating: { alignItems: 'center', gap: spacing.md },
+  rateRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
+  rateBtn: {
+    width: 56,
+    height: 56,
+    borderRadius: radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

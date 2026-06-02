@@ -1,6 +1,9 @@
 /** Shared domain types for the meditation app. */
 
-/** Background bed: silence, a nature ambience, a binaural track, or a beat track. */
+/** Live, procedurally-generated sounds (no audio file backs these). */
+export type GenerativeSound = 'gen_rest' | 'gen_chill';
+
+/** Background bed: silence, a nature ambience, a fixed track, or a generative one. */
 export type AmbientSound =
   | 'none'
   | 'rain'
@@ -14,7 +17,11 @@ export type AmbientSound =
   | 'chillstep'
   | 'downtempo'
   | 'deephouse'
-  | 'melodic';
+  | 'melodic'
+  | GenerativeSound;
+
+/** Sounds backed by a bundled .wav (everything except silence and generative). */
+export type FileSound = Exclude<AmbientSound, 'none' | GenerativeSound>;
 
 /** Every selectable sound, used to validate persisted settings. */
 export const AMBIENT_KEYS: AmbientSound[] = [
@@ -31,7 +38,52 @@ export const AMBIENT_KEYS: AmbientSound[] = [
   'downtempo',
   'deephouse',
   'melodic',
+  'gen_rest',
+  'gen_chill',
 ];
+
+export function isGenerative(sound: AmbientSound): sound is GenerativeSound {
+  return sound === 'gen_rest' || sound === 'gen_chill';
+}
+
+/** The two "sections" a generative piece can belong to (for preference learning). */
+export type Section = 'rest' | 'chill';
+
+export function sectionFor(sound: GenerativeSound): Section {
+  return sound === 'gen_rest' ? 'rest' : 'chill';
+}
+
+/**
+ * The parameters that define one generated piece. The same spec always
+ * produces the same evolving music (the seed drives every random choice), so
+ * a rating can be meaningfully attributed to it.
+ */
+export interface PieceSpec {
+  seed: number;
+  section: Section;
+  scale: string;
+  /** Root note, MIDI. */
+  root: number;
+  /** 0..1 — overall filter openness / timbre brightness. */
+  brightness: number;
+  /** Seconds between chord changes. */
+  chordChangeSec: number;
+  /** Binaural detune between L/R voices, Hz (0 = none). */
+  binauralHz: number;
+  /** 0..1 — how often gentle chimes appear. */
+  chimeDensity: number;
+  /** Gentle amplitude pulse tempo (0 = none, for "rest"). */
+  pulseBpm: number;
+}
+
+/** A user rating of a generated piece, used to learn preferences per section. */
+export interface PieceRating {
+  section: Section;
+  spec: PieceSpec;
+  /** +1 = liked, -1 = disliked. */
+  score: number;
+  at: number;
+}
 
 /** A single completed (or partially completed) meditation session. */
 export interface SessionRecord {
@@ -61,6 +113,8 @@ export interface Settings {
   /** Reminder time, 24h. */
   reminderHour: number;
   reminderMinute: number;
+  /** Schema version, for one-time migrations of stored settings. */
+  settingsVersion: number;
 }
 
 export interface Stats {
@@ -78,9 +132,11 @@ export const DEFAULT_SETTINGS: Settings = {
   durationMin: 10,
   intervalMin: 0,
   ambient: 'none',
-  startBell: true,
-  endBell: true,
+  // Bells are off by default — many people prefer silent start/end.
+  startBell: false,
+  endBell: false,
   reminderEnabled: false,
   reminderHour: 8,
   reminderMinute: 0,
+  settingsVersion: 2,
 };

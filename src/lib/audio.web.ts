@@ -12,11 +12,12 @@
 
 import { Asset } from 'expo-asset';
 
-import type { AmbientSound } from './types';
+import type { AmbientSound, FileSound } from './types';
+import { isGenerative } from './types';
 
 const BELL_SOURCE = require('@/assets/audio/bell.wav');
 
-const AMBIENT_SOURCES: Record<Exclude<AmbientSound, 'none'>, number> = {
+const AMBIENT_SOURCES: Record<FileSound, number> = {
   rain: require('@/assets/audio/ambient/rain.wav'),
   ocean: require('@/assets/audio/ambient/ocean.wav'),
   forest: require('@/assets/audio/ambient/forest.wav'),
@@ -33,6 +34,22 @@ const AMBIENT_SOURCES: Record<Exclude<AmbientSound, 'none'>, number> = {
 
 let sharedCtx: AudioContext | null = null;
 const bufferCache = new Map<number, AudioBuffer>();
+let resumeHooked = false;
+
+// Browsers suspend the audio context when the tab/app backgrounds or the screen
+// locks; resume it on the next chance so playback continues instead of dying.
+function hookResume() {
+  if (resumeHooked || typeof window === 'undefined') return;
+  resumeHooked = true;
+  const resume = () => {
+    if (sharedCtx && sharedCtx.state === 'suspended') void sharedCtx.resume().catch(() => {});
+  };
+  if (typeof document !== 'undefined') document.addEventListener('visibilitychange', resume);
+  window.addEventListener('focus', resume);
+  ['touchstart', 'mousedown', 'keydown'].forEach((e) =>
+    window.addEventListener(e, resume, { passive: true } as AddEventListenerOptions),
+  );
+}
 
 function getCtx(): AudioContext | null {
   if (typeof window === 'undefined') return null;
@@ -41,6 +58,7 @@ function getCtx(): AudioContext | null {
     (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
   if (!Ctor) return null;
   if (!sharedCtx) sharedCtx = new Ctor();
+  hookResume();
   return sharedCtx;
 }
 
@@ -78,7 +96,7 @@ export class SessionAudio {
       }
     }
     this.bellBuffer = await loadBuffer(BELL_SOURCE, this.ctx);
-    if (ambient !== 'none') {
+    if (ambient !== 'none' && !isGenerative(ambient)) {
       this.ambientBuffer = await loadBuffer(AMBIENT_SOURCES[ambient], this.ctx);
     }
   }
