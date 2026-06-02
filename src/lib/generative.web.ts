@@ -1,12 +1,13 @@
 /**
  * Live, never-repeating meditation music, synthesized in the Web Audio API.
  *
- * The engine holds a small set of oscillator "voices" that form a chord drawn
- * from a scale, and every `chordChangeSec` it glides them to a new chord. A
- * slow filter LFO adds movement, optional chimes sparkle on top, and an
- * optional gentle amplitude pulse gives "chill" a soft heartbeat. Every random
- * choice comes from the spec's seed, so a given spec always evolves the same
- * way — which is what lets a rating mean something.
+ * Layers, all driven by the spec's seed so a given spec evolves the same way:
+ *  - a pad of oscillator voices that glide to a new chord every chordChangeSec
+ *  - a slow filter LFO for movement and an optional amplitude "pump"
+ *  - an optional sub-bass drone on the root
+ *  - an optional arpeggio that picks chord tones on a tempo grid
+ *  - one of several soft percussion patterns (heartbeat / pulse / shaker / broken)
+ *  - sparse chimes on scale tones
  */
 
 import type { PieceSpec } from './types';
@@ -18,6 +19,8 @@ const SCALES: Record<string, number[]> = {
   dorian: [0, 2, 3, 5, 7, 9, 10],
   aeolian: [0, 2, 3, 5, 7, 8, 10],
 };
+
+const ARP_CONTOUR = [0, 2, 1, 3, 2, 4, 1, 2];
 
 function midiToFreq(m: number): number {
   return 440 * Math.pow(2, (m - 69) / 12);
@@ -67,20 +70,25 @@ interface Voice {
   osc: OscillatorNode;
   gain: GainNode;
   pan: StereoPannerNode;
-  side: number; // -1 left, +1 right (for binaural offset)
+  side: number;
 }
 
 export class GenerativeEngine {
   private ctx: AudioContext | null = null;
-  private bus: GainNode | null = null; // voices sum here
-  private filter: BiquadFilterNode | null = null;
-  private pulse: GainNode | null = null; // chill amplitude pulse
   private master: GainNode | null = null; // fade in/out
+  private pulseGain: GainNode | null = null; // amplitude pump
+  private filter: BiquadFilterNode | null = null;
+  private bus: GainNode | null = null; // pad voices
   private voices: Voice[] = [];
-  private extras: AudioNode[] = []; // LFOs etc. to stop/disconnect
+  private bass: { osc: OscillatorNode; gain: GainNode } | null = null;
+  private noise: AudioBuffer | null = null;
+  private extras: AudioNode[] = [];
   private timers: ReturnType<typeof setTimeout>[] = [];
   private rng: () => number = Math.random;
   private spec: PieceSpec | null = null;
+  private chordTones: number[] = [];
+  private arpIdx = 0;
+  private step = 0;
 
   async start(spec: PieceSpec): Promise<void> {
     const ctx = getCtx();
@@ -98,10 +106,11 @@ export class GenerativeEngine {
 
     const now = ctx.currentTime;
 
-    // Chain: voices -> bus -> filter -> pulse -> master(fade) -> destination
+    // Chain: pad bus -> filter -> pulse -> master -> destination.
+    // Rhythmic/bright layers route post-filter for clarity.
     const master = ctx.createGain();
     master.gain.setValueAtTime(0.0001, now);
-    master.gain.exponentialRampToValueAtTime(0.5, now + 4); // slow swell in
+    master.gain.exponentialRampToValueAtTime(0.5, now + 4);
     master.connect(ctx.destination);
 
     const pulse = ctx.createGain();
@@ -120,9 +129,15 @@ export class GenerativeEngine {
     bus.connect(filter);
 
     this.master = master;
-    this.pulse = pulse;
+    this.pulseGain = pulse;
     this.filter = filter;
     this.bus = bus;
+
+    // A noise buffer reused for shakers.
+    const noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+    const nd = noise.getChannelData(0);
+    for (let i = 0; i < nd.length; i++) nd[i] = this.rng() * 2 - 1;
+    this.noise = noise;
 
     // Slow filter movement.
     const lfo = ctx.createOscillator();
@@ -133,11 +148,25 @@ export class GenerativeEngine {
     lfo.start();
     this.extras.push(lfo, lfoGain);
 
-    // Voices.
+    // Amplitude pump.
+    if (spec.pulseDepth > 0) {
+      const pumpLfo = ctx.createOscillator();
+      pumpLfo.type = 'sine';
+      pumpLfo.frequency.value = spec.tempo / 60; // one cycle per beat
+      const depth = ctx.createGain();
+      depth.gain.value = spec.pulseDepth / 2;
+      pulse.gain.value = 1 - spec.pulseDepth / 2;
+      pumpLfo.connect(depth).connect(pulse.gain);
+      pumpLfo.start();
+      this.extras.push(pumpLfo, depth);
+    }
+
+    // Pad voices.
+    const oscType: OscillatorType = spec.wave === 'warm' ? 'sawtooth' : spec.wave;
     const voiceCount = spec.section === 'chill' ? 6 : 5;
     for (let i = 0; i < voiceCount; i++) {
       const osc = ctx.createOscillator();
-      osc.type = 'sine';
+      osc.type = oscType;
       const gain = ctx.createGain();
       gain.gain.value = 0;
       const pan = ctx.createStereoPanner();
@@ -148,12 +177,25 @@ export class GenerativeEngine {
       this.voices.push({ osc, gain, pan, side });
     }
 
+    // Sub-bass drone on the root, an octave down.
+    if (spec.bass) {
+      const osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.value = midiToFreq(spec.root - 12);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.16, now + 4);
+      osc.connect(gain).connect(pulse);
+      osc.start();
+      this.bass = { osc, gain };
+    }
+
     this.setChord(true);
     this.timers.push(
       setInterval(() => this.setChord(false), Math.max(4000, spec.chordChangeSec * 1000)),
     );
 
-    // Optional gentle chimes.
+    // Sparse chimes.
     if (spec.chimeDensity > 0.02) {
       const scheduleChime = () => {
         if (!this.ctx) return;
@@ -164,18 +206,19 @@ export class GenerativeEngine {
       this.timers.push(setTimeout(scheduleChime, 5000));
     }
 
-    // Optional "chill" amplitude pulse.
-    if (spec.pulseBpm > 0) {
-      const beat = 60 / spec.pulseBpm;
-      const lfoP = ctx.createOscillator();
-      lfoP.type = 'sine';
-      lfoP.frequency.value = 1 / beat;
-      const depth = ctx.createGain();
-      depth.gain.value = 0.18;
-      pulse.gain.value = 0.82;
-      lfoP.connect(depth).connect(pulse.gain);
-      lfoP.start();
-      this.extras.push(lfoP, depth);
+    // Step grid for arp + percussion.
+    if (spec.arp || spec.percussion !== 'none') {
+      const stepDur = 60 / spec.tempo / 4;
+      const tick = () => {
+        const c = this.ctx;
+        if (!c) return;
+        const when = c.currentTime + 0.06;
+        const s = this.step % 16;
+        if (spec.percussion !== 'none') this.triggerPercussion(s, when);
+        if (spec.arp) this.triggerArp(s, when);
+        this.step++;
+      };
+      this.timers.push(setInterval(tick, stepDur * 1000));
     }
   }
 
@@ -191,20 +234,108 @@ export class GenerativeEngine {
       const oct = 12 * Math.floor(this.rng() * 2);
       notes.push(spec.root + deg + oct);
     }
+    this.chordTones = notes;
 
     const now = ctx.currentTime;
     const glide = initial ? 2 : 6;
     this.voices.forEach((v, idx) => {
       const midi = notes[idx % notes.length];
-      // Binaural: nudge left/right voices apart by half the beat frequency.
       const detune = (spec.binauralHz / 2) * v.side;
-      const freq = midiToFreq(midi) + detune;
       v.osc.frequency.cancelScheduledValues(now);
-      v.osc.frequency.setTargetAtTime(freq, now, glide / 3);
-      const target = (0.75 / this.voices.length) * (0.7 + 0.6 * this.rng());
+      v.osc.frequency.setTargetAtTime(midiToFreq(midi) + detune, now, glide / 3);
+      const target = (0.7 / this.voices.length) * (0.7 + 0.6 * this.rng());
       v.gain.gain.cancelScheduledValues(now);
       v.gain.gain.setTargetAtTime(target, now, glide / 3);
     });
+  }
+
+  private triggerPercussion(s: number, when: number): void {
+    const rest = this.spec?.section === 'rest';
+    const kg = rest ? 0.16 : 0.3;
+    const sg = rest ? 0.05 : 0.09;
+    switch (this.spec?.percussion) {
+      case 'heartbeat':
+        if (s === 0) this.softKick(when, kg);
+        if (s === 2) this.softKick(when, kg * 0.6);
+        if (s === 8) this.softKick(when, kg * 0.8);
+        if (s === 10) this.softKick(when, kg * 0.5);
+        break;
+      case 'pulse':
+        if (s % 4 === 0) this.softKick(when, kg);
+        break;
+      case 'shaker':
+        if (s === 0 || s === 8) this.softKick(when, kg * 0.8);
+        if (s % 4 === 2) this.shaker(when, sg);
+        break;
+      case 'broken':
+        if (s === 0 || s === 6 || s === 10) this.softKick(when, kg);
+        if (s === 4 || s === 12 || s === 14) this.shaker(when, sg);
+        break;
+      default:
+        break;
+    }
+  }
+
+  private triggerArp(s: number, when: number): void {
+    if (s % 2 !== 0 || this.chordTones.length === 0) return;
+    const deg = ARP_CONTOUR[this.arpIdx % ARP_CONTOUR.length] % this.chordTones.length;
+    const midi = this.chordTones[deg] + 12;
+    const pan = this.arpIdx % 2 === 0 ? -0.6 : 0.6;
+    this.arpIdx++;
+    this.arpNote(when, midiToFreq(midi), pan, this.spec?.section === 'rest' ? 0.05 : 0.08);
+  }
+
+  private softKick(when: number, gain: number): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.master) return;
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(78, when);
+    osc.frequency.exponentialRampToValueAtTime(42, when + 0.12);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, when);
+    g.gain.exponentialRampToValueAtTime(gain, when + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + 0.28);
+    osc.connect(g).connect(this.master);
+    osc.start(when);
+    osc.stop(when + 0.32);
+  }
+
+  private shaker(when: number, gain: number): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.noise || !this.master) return;
+    const src = ctx.createBufferSource();
+    src.buffer = this.noise;
+    src.loop = true;
+    const hp = ctx.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = 6500;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, when);
+    g.gain.exponentialRampToValueAtTime(gain, when + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + 0.06);
+    const pan = ctx.createStereoPanner();
+    pan.pan.value = this.rng() * 0.6 - 0.3;
+    src.connect(hp).connect(g).connect(pan).connect(this.master);
+    src.start(when, this.rng() * 0.5);
+    src.stop(when + 0.1);
+  }
+
+  private arpNote(when: number, freq: number, pan: number, gain: number): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.pulseGain) return;
+    const osc = ctx.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.value = freq;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, when);
+    g.gain.exponentialRampToValueAtTime(gain, when + 0.006);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + 0.5);
+    const p = ctx.createStereoPanner();
+    p.pan.value = pan;
+    osc.connect(g).connect(p).connect(this.pulseGain);
+    osc.start(when);
+    osc.stop(when + 0.55);
   }
 
   private playChime(): void {
@@ -260,9 +391,10 @@ export class GenerativeEngine {
 
     const voices = this.voices;
     const extras = this.extras;
+    const bass = this.bass;
     const master = this.master;
     const filter = this.filter;
-    const pulse = this.pulse;
+    const pulse = this.pulseGain;
     const bus = this.bus;
 
     if (ctx && master) {
@@ -270,31 +402,35 @@ export class GenerativeEngine {
       try {
         master.gain.cancelScheduledValues(now);
         master.gain.setValueAtTime(Math.max(0.0001, master.gain.value), now);
-        master.gain.exponentialRampToValueAtTime(0.0001, now + 1.6); // fade out
+        master.gain.exponentialRampToValueAtTime(0.0001, now + 1.6);
       } catch {
         /* ignore */
       }
     }
 
     setTimeout(() => {
-      voices.forEach((v) => {
+      const stopNode = (n: { stop?: () => void; disconnect?: () => void }) => {
         try {
-          v.osc.stop();
+          n.stop?.();
         } catch {}
         try {
-          v.osc.disconnect();
+          n.disconnect?.();
+        } catch {}
+      };
+      voices.forEach((v) => {
+        stopNode(v.osc);
+        try {
           v.gain.disconnect();
           v.pan.disconnect();
         } catch {}
       });
-      extras.forEach((n) => {
+      if (bass) {
+        stopNode(bass.osc);
         try {
-          (n as OscillatorNode).stop?.();
+          bass.gain.disconnect();
         } catch {}
-        try {
-          n.disconnect();
-        } catch {}
-      });
+      }
+      extras.forEach((n) => stopNode(n as unknown as { stop?: () => void; disconnect?: () => void }));
       try {
         bus?.disconnect();
         filter?.disconnect();
@@ -305,9 +441,10 @@ export class GenerativeEngine {
 
     this.voices = [];
     this.extras = [];
+    this.bass = null;
     this.master = null;
     this.filter = null;
-    this.pulse = null;
+    this.pulseGain = null;
     this.bus = null;
     this.ctx = null;
   }

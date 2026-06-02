@@ -60,6 +60,9 @@ export function sectionFor(sound: GenerativeSound): Section {
  * produces the same evolving music (the seed drives every random choice), so
  * a rating can be meaningfully attributed to it.
  */
+export type GenWave = 'sine' | 'triangle' | 'warm';
+export type GenPercussion = 'none' | 'heartbeat' | 'pulse' | 'shaker' | 'broken';
+
 export interface PieceSpec {
   seed: number;
   section: Section;
@@ -74,8 +77,18 @@ export interface PieceSpec {
   binauralHz: number;
   /** 0..1 — how often gentle chimes appear. */
   chimeDensity: number;
-  /** Gentle amplitude pulse tempo (0 = none, for "rest"). */
-  pulseBpm: number;
+  /** Rhythmic grid tempo (BPM) for the arp and percussion. */
+  tempo: number;
+  /** 0..0.3 — gentle amplitude pulse depth (0 = none). */
+  pulseDepth: number;
+  /** Pad/voice timbre. */
+  wave: GenWave;
+  /** Whether a melodic arpeggio plays over the chords. */
+  arp: boolean;
+  /** Whether a sub-bass follows the chord root. */
+  bass: boolean;
+  /** Soft percussion pattern. */
+  percussion: GenPercussion;
 }
 
 /** A user rating of a generated piece, used to learn preferences per section. */
