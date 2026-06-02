@@ -10,9 +10,16 @@ A single codebase runs on both iOS and Android.
 - **Focus & calm music** — procedurally generated binaural-beat tracks tuned to
   brainwave-entrainment frequencies (see below).
 - **Beats** — a set of synthesized instrumental grooves, each modeled on a
-  recognizable artist style (see _Beats_ below).
+  recognizable artist style (see _Beats_ below). 44.1 kHz, mastered, with
+  reverb, sidechain and phrase-ending fills.
+- **Generative music** — endless, never-repeating ambient/groove composed live
+  in the Web Audio API (evolving chords, sub-bass, arpeggio, soft percussion,
+  chimes and convolution reverb). **Like or rate** a piece and it **learns your
+  taste** per section; see what it's learned in Settings.
 - **Ambient sounds** — rain, ocean, and forest beds, a ~25 Hz cat purr, plus
   pure silence.
+- **Adaptive UI** — an Apple-Music/Spotify-style picker whose accent color
+  follows the selected sound's category, all the way into the session.
 - **Streaks & progress** — daily streak, longest streak, total time and sessions,
   and a weekly minutes chart. All stored locally on device.
 - **Daily reminders** — an optional local notification at a time you choose.
