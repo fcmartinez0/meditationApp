@@ -20,6 +20,7 @@ import type { AmbientSound, FileSound, GenerativeSound, PieceSpec } from '@/lib/
 import { isGenerative, sectionFor } from '@/lib/types';
 import { useAppData } from '@/store/AppData';
 import { radius, spacing } from '@/theme';
+import { categoryStyle } from '@/theme/categories';
 
 type Phase = 'running' | 'paused' | 'finished';
 
@@ -42,6 +43,7 @@ export default function SessionScreen() {
   const totalSec = Math.max(1, Number(params.duration) || settings.durationMin) * 60;
   const ambient = (params.ambient as AmbientSound) || settings.ambient;
 
+  const cat = categoryStyle(ambient);
   const generative = isGenerative(ambient);
   const useEngine = generative && GENERATIVE_SUPPORTED;
   // What the file-based audio layer should play (silent when the engine drives it).
@@ -285,8 +287,8 @@ export default function SessionScreen() {
           style={styles.center}
           pointerEvents="box-none"
           entering={FadeIn.duration(1100)}>
-          <BreathingOrb active={phase === 'running'}>
-            <AppText variant="display" color={colors.textOnAccent} style={styles.clock}>
+          <BreathingOrb active={phase === 'running'} core={cat.accent} halo={cat.colors[0]}>
+            <AppText variant="display" color="#FFFFFF" style={styles.clock}>
               {formatClock(remaining)}
             </AppText>
           </BreathingOrb>
@@ -311,7 +313,7 @@ export default function SessionScreen() {
                 <Ionicons
                   name={liked ? 'heart' : 'heart-outline'}
                   size={22}
-                  color={liked ? colors.accent : colors.textSecondary}
+                  color={liked ? cat.accent : colors.textSecondary}
                 />
               </Pressable>
               <Pressable accessibilityLabel="Play another piece" onPress={regenerate} hitSlop={10} style={styles.npBtn}>
@@ -323,7 +325,7 @@ export default function SessionScreen() {
             <View
               style={[
                 styles.progressFill,
-                { backgroundColor: colors.accent, width: `${Math.min(100, progress * 100)}%` },
+                { backgroundColor: cat.accent, width: `${Math.min(100, progress * 100)}%` },
               ]}
             />
           </View>

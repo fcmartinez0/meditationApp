@@ -18,12 +18,17 @@ const BREATH_MS = 4000;
 interface BreathingOrbProps {
   /** When false the orb settles to a resting size (paused). */
   active: boolean;
+  /** Core / halo colors (default to the theme accent). */
+  core?: string;
+  halo?: string;
   children?: React.ReactNode;
 }
 
 /** A softly pulsing orb that paces the user's breath. */
-export function BreathingOrb({ active, children }: BreathingOrbProps) {
+export function BreathingOrb({ active, core, halo, children }: BreathingOrbProps) {
   const colors = useThemeColors();
+  const coreColor = core ?? colors.accentSoft;
+  const haloColor = halo ?? colors.auroraEnd;
   const progress = useSharedValue(0);
 
   useEffect(() => {
@@ -53,12 +58,8 @@ export function BreathingOrb({ active, children }: BreathingOrbProps) {
 
   return (
     <View style={styles.container}>
-      <Animated.View
-        style={[styles.halo, { backgroundColor: colors.auroraEnd }, haloStyle]}
-      />
-      <Animated.View
-        style={[styles.core, { backgroundColor: colors.accentSoft }, coreStyle]}
-      />
+      <Animated.View style={[styles.halo, { backgroundColor: haloColor }, haloStyle]} />
+      <Animated.View style={[styles.core, { backgroundColor: coreColor }, coreStyle]} />
       <View style={styles.content}>{children}</View>
     </View>
   );
