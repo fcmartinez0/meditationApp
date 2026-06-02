@@ -51,7 +51,8 @@ export class SessionAudio {
     if (ambient !== 'none') {
       this.ambient = createAudioPlayer(AMBIENT_SOURCES[ambient]);
       this.ambient.loop = true;
-      this.ambient.volume = 0.6;
+      // Start silent so startAmbient() can fade in and avoid a click.
+      this.ambient.volume = 0;
     }
   }
 
@@ -65,8 +66,23 @@ export class SessionAudio {
     }
   }
 
+  /** Start the loop and fade it in so it doesn't pop on the first sample. */
   startAmbient() {
-    this.ambient?.play();
+    const player = this.ambient;
+    if (!player) return;
+    player.play();
+    void (async () => {
+      const steps = 8;
+      const target = 0.6;
+      for (let i = 1; i <= steps; i++) {
+        try {
+          player.volume = (target * i) / steps;
+        } catch {
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 25));
+      }
+    })();
   }
 
   /** Fade ambient out over a few hundred ms, then pause. */

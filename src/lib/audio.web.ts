@@ -77,7 +77,10 @@ export class SessionAudio {
     src.buffer = this.ambientBuffer;
     src.loop = true; // gapless, sample-accurate loop
     const gain = this.ctx.createGain();
-    gain.gain.value = 0.6;
+    // Fade in over ~60ms so playback doesn't pop on the first sample.
+    const now = this.ctx.currentTime;
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(0.6, now + 0.06);
     src.connect(gain).connect(this.ctx.destination);
     src.start();
     this.ambientSource = src;

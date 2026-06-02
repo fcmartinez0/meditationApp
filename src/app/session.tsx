@@ -74,8 +74,10 @@ export default function SessionScreen() {
     })();
     return () => {
       cancelled = true;
+      // Let the fade-out finish before tearing down, otherwise cutting the
+      // audio mid-sample produces a click.
       void audio.stopAmbient();
-      audio.release();
+      setTimeout(() => audio.release(), 600);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
