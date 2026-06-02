@@ -1,59 +1,67 @@
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
-import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
 import { Screen } from '@/components/Screen';
+import { SoundRow, type SoundItem } from '@/components/SoundRow';
 import { useThemeColors } from '@/hooks/useThemeColors';
-import type { AmbientSound } from '@/lib/types';
 import { useAppData } from '@/store/AppData';
 import { radius, spacing } from '@/theme';
+import { categoryStyle } from '@/theme/categories';
 
 const DURATIONS = [3, 5, 10, 15, 20, 30];
 
-const AMBIENTS: { key: AmbientSound; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { key: 'none', label: 'Silence', icon: 'moon-outline' },
-  { key: 'rain', label: 'Rain', icon: 'rainy-outline' },
-  { key: 'ocean', label: 'Ocean', icon: 'water-outline' },
-  { key: 'forest', label: 'Forest', icon: 'leaf-outline' },
-];
+interface Section {
+  title: string;
+  caption?: string;
+  items: SoundItem[];
+}
 
-const MUSIC: {
-  key: AmbientSound;
-  label: string;
-  icon: keyof typeof Ionicons.glyphMap;
-  hint: string;
-}[] = [
-  { key: 'calm', label: 'Calm', icon: 'heart-outline', hint: '7.83 Hz · grounding (432 Hz tuned)' },
-  { key: 'focus', label: 'Focus', icon: 'bulb-outline', hint: '14 Hz · alert concentration' },
-  { key: 'deep', label: 'Deep', icon: 'bed-outline', hint: '3 Hz · deep rest & sleep' },
-  { key: 'purr', label: 'Cat Purr', icon: 'paw-outline', hint: "~25 Hz · a cat's calming purr" },
-];
-
-const BEATS: {
-  key: AmbientSound;
-  label: string;
-  icon: keyof typeof Ionicons.glyphMap;
-  hint: string;
-}[] = [
-  { key: 'melodic', label: 'Melodic House', icon: 'sunny-outline', hint: '123 BPM · euphoric melodic house (RÜFÜS vibe)' },
-  { key: 'deephouse', label: 'Deep House', icon: 'moon-outline', hint: '122 BPM · dark deep house (ZHU vibe)' },
-  { key: 'lofi', label: 'Lo-Fi', icon: 'cafe-outline', hint: '85 BPM · jazzy lo-fi (Nujabes vibe)' },
-  { key: 'liquid', label: 'Liquid', icon: 'water-outline', hint: '172 BPM · liquid drum & bass (LTJ Bukem)' },
-  { key: 'chillstep', label: 'Chillstep', icon: 'rainy-outline', hint: '140 BPM · future garage (Burial vibe)' },
-  { key: 'downtempo', label: 'Downtempo', icon: 'partly-sunny-outline', hint: '98 BPM · dreamy arps (Tycho vibe)' },
-];
-
-const GENERATIVE: {
-  key: AmbientSound;
-  label: string;
-  icon: keyof typeof Ionicons.glyphMap;
-  hint: string;
-}[] = [
-  { key: 'gen_rest', label: 'Rest', icon: 'sparkles-outline', hint: 'live generative ambient · never repeats' },
-  { key: 'gen_chill', label: 'Flow', icon: 'infinite-outline', hint: 'live generative chill · never repeats' },
+const SECTIONS: Section[] = [
+  {
+    title: 'Ambient',
+    items: [
+      { key: 'none', label: 'Silence', icon: 'moon-outline', hint: 'No background sound' },
+      { key: 'rain', label: 'Rain', icon: 'rainy-outline', hint: 'Steady rainfall' },
+      { key: 'ocean', label: 'Ocean', icon: 'water-outline', hint: 'Slow ocean swells' },
+      { key: 'forest', label: 'Forest', icon: 'leaf-outline', hint: 'Soft wind & forest' },
+      { key: 'purr', label: 'Cat Purr', icon: 'paw-outline', hint: "~25 Hz · a cat's calming purr" },
+    ],
+  },
+  {
+    title: 'Frequencies',
+    caption:
+      'Calm, Focus and Deep are binaural beats — use headphones for the full effect. A wellness aid, not medical treatment.',
+    items: [
+      { key: 'calm', label: 'Calm', icon: 'heart-outline', hint: '7.83 Hz · grounding (432 Hz tuned)' },
+      { key: 'focus', label: 'Focus', icon: 'bulb-outline', hint: '14 Hz · alert concentration' },
+      { key: 'deep', label: 'Deep', icon: 'bed-outline', hint: '3 Hz · deep rest & sleep' },
+    ],
+  },
+  {
+    title: 'Generative',
+    caption:
+      'Composed live and never the same twice. Like or rate a piece and it learns what you enjoy.',
+    items: [
+      { key: 'gen_rest', label: 'Rest', icon: 'sparkles-outline', hint: 'live generative ambient' },
+      { key: 'gen_chill', label: 'Flow', icon: 'infinite-outline', hint: 'live generative groove' },
+    ],
+  },
+  {
+    title: 'Beats',
+    caption: 'Instrumental grooves modeled on artists we love. Stereo — headphones recommended.',
+    items: [
+      { key: 'melodic', label: 'Melodic House', icon: 'sunny-outline', hint: '123 BPM · euphoric (RÜFÜS vibe)' },
+      { key: 'deephouse', label: 'Deep House', icon: 'moon-outline', hint: '122 BPM · dark (ZHU vibe)' },
+      { key: 'lofi', label: 'Lo-Fi', icon: 'cafe-outline', hint: '85 BPM · jazzy (Nujabes vibe)' },
+      { key: 'liquid', label: 'Liquid', icon: 'water-outline', hint: '172 BPM · liquid drum & bass' },
+      { key: 'chillstep', label: 'Chillstep', icon: 'rainy-outline', hint: '140 BPM · future garage (Burial)' },
+      { key: 'downtempo', label: 'Downtempo', icon: 'partly-sunny-outline', hint: '98 BPM · dreamy (Tycho vibe)' },
+    ],
+  },
 ];
 
 function greeting(): string {
@@ -63,48 +71,13 @@ function greeting(): string {
   return 'Good evening';
 }
 
-type Track = { key: AmbientSound; label: string; icon: keyof typeof Ionicons.glyphMap; hint: string };
-
-/** A selectable list of music/beat tracks, each with a label and a description. */
-function TrackList({ items }: { items: Track[] }) {
-  const colors = useThemeColors();
-  const { settings, updateSettings } = useAppData();
-  return (
-    <View style={styles.musicList}>
-      {items.map((m) => {
-        const selected = settings.ambient === m.key;
-        return (
-          <Pressable
-            key={m.key}
-            onPress={() => updateSettings({ ambient: m.key })}
-            style={[
-              styles.musicRow,
-              {
-                backgroundColor: selected ? colors.accent : colors.surface,
-                borderColor: selected ? colors.accent : colors.border,
-              },
-            ]}>
-            <Ionicons name={m.icon} size={22} color={selected ? colors.textOnAccent : colors.accent} />
-            <View style={{ flex: 1 }}>
-              <AppText variant="body" color={selected ? colors.textOnAccent : colors.text}>
-                {m.label}
-              </AppText>
-              <AppText variant="caption" color={selected ? colors.textOnAccent : colors.textSecondary}>
-                {m.hint}
-              </AppText>
-            </View>
-            {selected && <Ionicons name="checkmark" size={20} color={colors.textOnAccent} />}
-          </Pressable>
-        );
-      })}
-    </View>
-  );
-}
-
 export default function MeditateScreen() {
   const colors = useThemeColors();
   const router = useRouter();
   const { settings, stats, updateSettings } = useAppData();
+
+  // The app's accent follows the selected sound's category.
+  const active = categoryStyle(settings.ambient);
 
   const begin = () => {
     router.push({
@@ -127,9 +100,7 @@ export default function MeditateScreen() {
           <Ionicons name="flame" size={28} color={colors.warning} />
           <View style={{ flex: 1 }}>
             <AppText variant="heading">
-              {stats.currentStreak > 0
-                ? `${stats.currentStreak}-day streak`
-                : 'Start your streak'}
+              {stats.currentStreak > 0 ? `${stats.currentStreak}-day streak` : 'Start your streak'}
             </AppText>
             <AppText variant="caption" muted>
               {stats.meditatedToday
@@ -157,18 +128,14 @@ export default function MeditateScreen() {
                 style={[
                   styles.durationChip,
                   {
-                    backgroundColor: selected ? colors.accent : colors.surface,
-                    borderColor: selected ? colors.accent : colors.border,
+                    backgroundColor: selected ? active.accent : colors.surface,
+                    borderColor: selected ? active.accent : colors.border,
                   },
                 ]}>
-                <AppText
-                  variant="heading"
-                  color={selected ? colors.textOnAccent : colors.text}>
+                <AppText variant="heading" color={selected ? '#FFFFFF' : colors.text}>
                   {min}
                 </AppText>
-                <AppText
-                  variant="caption"
-                  color={selected ? colors.textOnAccent : colors.textSecondary}>
+                <AppText variant="caption" color={selected ? '#FFFFFF' : colors.textSecondary}>
                   min
                 </AppText>
               </Pressable>
@@ -177,76 +144,39 @@ export default function MeditateScreen() {
         </View>
       </View>
 
-      <View style={styles.section}>
-        <AppText variant="label" muted>
-          AMBIENT SOUND
-        </AppText>
-        <View style={styles.chipWrap}>
-          {AMBIENTS.map((a) => {
-            const selected = settings.ambient === a.key;
-            return (
-              <Pressable
-                key={a.key}
-                onPress={() => updateSettings({ ambient: a.key })}
-                style={[
-                  styles.ambientChip,
-                  {
-                    backgroundColor: selected ? colors.accent : colors.surface,
-                    borderColor: selected ? colors.accent : colors.border,
-                  },
-                ]}>
-                <Ionicons
-                  name={a.icon}
-                  size={20}
-                  color={selected ? colors.textOnAccent : colors.textSecondary}
-                />
-                <AppText
-                  variant="caption"
-                  color={selected ? colors.textOnAccent : colors.text}>
-                  {a.label}
-                </AppText>
-              </Pressable>
-            );
-          })}
+      {SECTIONS.map((section) => (
+        <View key={section.title} style={styles.section}>
+          <AppText variant="heading">{section.title}</AppText>
+          <View style={styles.list}>
+            {section.items.map((item) => (
+              <SoundRow
+                key={item.key}
+                item={item}
+                selected={settings.ambient === item.key}
+                onPress={() => updateSettings({ ambient: item.key })}
+              />
+            ))}
+          </View>
+          {section.caption ? (
+            <AppText variant="caption" muted>
+              {section.caption}
+            </AppText>
+          ) : null}
         </View>
-      </View>
+      ))}
 
-      <View style={styles.section}>
-        <AppText variant="label" muted>
-          FOCUS & CALM MUSIC
-        </AppText>
-        <TrackList items={MUSIC} />
-        <AppText variant="caption" muted>
-          Calm, Focus and Deep are binaural beats — use headphones for the full effect. A wellness
-          aid, not medical treatment.
-        </AppText>
-      </View>
-
-      <View style={styles.section}>
-        <View style={styles.sectionHeadRow}>
-          <AppText variant="label" muted>
-            GENERATIVE
+      <Pressable onPress={begin} accessibilityRole="button" style={styles.beginWrap}>
+        <LinearGradient
+          colors={active.colors}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.beginBtn}>
+          <Ionicons name="play" size={18} color="#FFFFFF" />
+          <AppText variant="label" color="#FFFFFF" style={styles.beginLabel}>
+            Begin session
           </AppText>
-          <Ionicons name="sparkles" size={14} color={colors.accent} />
-        </View>
-        <TrackList items={GENERATIVE} />
-        <AppText variant="caption" muted>
-          Composed live and never the same twice. Rate a session afterward and it learns what you
-          like.
-        </AppText>
-      </View>
-
-      <View style={styles.section}>
-        <AppText variant="label" muted>
-          BEATS
-        </AppText>
-        <TrackList items={BEATS} />
-        <AppText variant="caption" muted>
-          Instrumental grooves modeled on artists we love. Stereo — headphones recommended.
-        </AppText>
-      </View>
-
-      <Button label="Begin session" onPress={begin} style={styles.begin} />
+        </LinearGradient>
+      </Pressable>
     </Screen>
   );
 }
@@ -256,7 +186,6 @@ const styles = StyleSheet.create({
   streakCard: { paddingVertical: spacing.lg },
   streakRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   section: { gap: spacing.md },
-  sectionHeadRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
   durationChip: {
     width: 72,
@@ -266,24 +195,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  ambientChip: {
+  list: { gap: spacing.sm },
+  beginWrap: { marginTop: spacing.sm },
+  beginBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: spacing.sm,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
     borderRadius: radius.pill,
-    borderWidth: StyleSheet.hairlineWidth,
   },
-  musicList: { gap: spacing.md },
-  musicRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  begin: { marginTop: spacing.sm },
+  beginLabel: { fontSize: 16, letterSpacing: 0.3 },
 });
