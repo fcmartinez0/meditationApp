@@ -1,6 +1,6 @@
 /** Shared domain types for the meditation app. */
 
-/** Background bed: silence, a nature ambience, or a music track. */
+/** Background bed: silence, a nature ambience, a binaural track, or a beat track. */
 export type AmbientSound =
   | 'none'
   | 'rain'
@@ -9,7 +9,25 @@ export type AmbientSound =
   | 'calm'
   | 'focus'
   | 'deep'
-  | 'beats';
+  | 'lofi'
+  | 'liquid'
+  | 'chillstep'
+  | 'downtempo';
+
+/** Every selectable sound, used to validate persisted settings. */
+export const AMBIENT_KEYS: AmbientSound[] = [
+  'none',
+  'rain',
+  'ocean',
+  'forest',
+  'calm',
+  'focus',
+  'deep',
+  'lofi',
+  'liquid',
+  'chillstep',
+  'downtempo',
+];
 
 /** A single completed (or partially completed) meditation session. */
 export interface SessionRecord {

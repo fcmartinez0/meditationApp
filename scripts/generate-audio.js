@@ -16,7 +16,12 @@
  *   assets/audio/music/calm.wav   – 432 Hz-tuned drone, 7.83 Hz beat (Schumann / theta-alpha, grounding calm)
  *   assets/audio/music/focus.wav  – 256 Hz carrier, 14 Hz beat (low-beta / SMR, alert focus)
  *   assets/audio/music/deep.wav   – 144 Hz drone, 3 Hz beat (delta, deep rest / sleep)
- *   assets/audio/music/beats.wav  – chilled drum-and-bass / lo-fi groove (100 BPM, Am-F-C-G)
+ *
+ * Beat tracks (STEREO, looping) — synthesized grooves modeled on artist styles:
+ *   assets/audio/beats/lofi.wav       – jazzy lo-fi hip-hop (Nujabes / J Dilla)
+ *   assets/audio/beats/liquid.wav     – liquid drum & bass (LTJ Bukem / Netsky)
+ *   assets/audio/beats/chillstep.wav  – future garage / chillstep (Burial)
+ *   assets/audio/beats/downtempo.wav  – dreamy downtempo with arps (Tycho / Bonobo)
  */
 
 const fs = require('fs');
@@ -26,6 +31,7 @@ const SAMPLE_RATE = 22050;
 const OUT_DIR = path.join(__dirname, '..', 'assets', 'audio');
 const AMBIENT_DIR = path.join(OUT_DIR, 'ambient');
 const MUSIC_DIR = path.join(OUT_DIR, 'music');
+const BEATS_DIR = path.join(OUT_DIR, 'beats');
 
 // Deterministic noise so regenerating produces identical files.
 function makeRng(seed) {
@@ -164,126 +170,159 @@ function midiToFreq(m) {
 }
 
 /**
- * Chilled drum-and-bass / lo-fi groove: synthesized kick, snare, hats, a sub
- * bass and a soft chord pad over an Am–F–C–G progression. The loop is exactly
- * eight bars; voice tails that cross the loop point are folded back to the
- * start so it repeats seamlessly.
+ * A small synthesized "drum machine + synths" used by the beat tracks. Returns
+ * stereo buffers plus voice helpers that write into them. Everything is built
+ * from oscillators and filtered noise so the grooves stay royalty-free and
+ * reproducible.
  */
-function generateBeats() {
-  const bpm = 100;
-  const bars = 8;
-  const stepDur = 60 / bpm / 4; // one 16th note
-  const barDur = stepDur * 16;
-  const loopSamples = Math.round(bars * barDur * SAMPLE_RATE);
-  const tail = Math.round(0.7 * SAMPLE_RATE); // catch decays crossing the loop
-  const N = loopSamples + tail;
+function makeKit(N, seed) {
+  const SR = SAMPLE_RATE;
+  const rng = makeRng(seed);
   const L = new Float32Array(N);
   const R = new Float32Array(N);
-  const rng = makeRng(99);
+  const add = (idx, l, r) => {
+    if (idx >= 0 && idx < N) { L[idx] += l; R[idx] += r; }
+  };
 
-  const addKick = (start) => {
-    const n = Math.floor(0.32 * SAMPLE_RATE);
+  const kick = (start, o = {}) => {
+    const { gain = 0.9, pitchStart = 110, pitchEnd = 46, decay = 12, punch = 30, dur = 0.34 } = o;
+    const n = Math.floor(dur * SR);
     for (let i = 0; i < n; i++) {
-      const t = i / SAMPLE_RATE;
-      const env = Math.exp(-t * 11);
-      const f = 110 * Math.exp(-t * 28) + 45; // pitch drop = punch
-      const s = Math.sin(2 * Math.PI * f * t) * env * 0.95;
-      const idx = start + i;
-      if (idx < N) { L[idx] += s; R[idx] += s; }
+      const t = i / SR;
+      const env = Math.exp(-t * decay);
+      const f = pitchEnd + (pitchStart - pitchEnd) * Math.exp(-t * punch);
+      const s = Math.sin(2 * Math.PI * f * t) * env * gain;
+      add(start + i, s, s);
     }
   };
 
-  const addSnare = (start) => {
-    const n = Math.floor(0.22 * SAMPLE_RATE);
+  const snare = (start, o = {}) => {
+    const { gain = 0.45, decay = 18, noiseAmt = 0.6, tone = 185, toneAmt = 0.4 } = o;
+    const n = Math.floor(0.25 * SR);
     for (let i = 0; i < n; i++) {
-      const t = i / SAMPLE_RATE;
-      const env = Math.exp(-t * 18);
-      const noise = rng() * 2 - 1;
-      const tone = Math.sin(2 * Math.PI * 185 * t);
-      const s = (noise * 0.6 + tone * 0.4) * env * 0.5;
-      const idx = start + i;
-      if (idx < N) { L[idx] += s; R[idx] += s; }
+      const t = i / SR;
+      const env = Math.exp(-t * decay);
+      const s = ((rng() * 2 - 1) * noiseAmt + Math.sin(2 * Math.PI * tone * t) * toneAmt) * env * gain;
+      add(start + i, s, s);
     }
   };
 
-  const addHat = (start, open, pan) => {
-    const n = Math.floor((open ? 0.16 : 0.045) * SAMPLE_RATE);
+  const hat = (start, o = {}) => {
+    const { gain = 0.16, open = false, pan = 0 } = o;
+    const n = Math.floor((open ? 0.16 : 0.045) * SR);
     let hp = 0;
     let prev = 0;
     for (let i = 0; i < n; i++) {
-      const t = i / SAMPLE_RATE;
-      const env = Math.exp(-t * (open ? 24 : 60));
-      const white = rng() * 2 - 1;
-      hp = 0.85 * (hp + white - prev); // crude high-pass for a crisp hat
-      prev = white;
-      const s = hp * env * 0.18;
-      const idx = start + i;
-      if (idx < N) {
-        L[idx] += s * (pan <= 0 ? 1 : 0.55);
-        R[idx] += s * (pan >= 0 ? 1 : 0.55);
-      }
+      const t = i / SR;
+      const env = Math.exp(-t * (open ? 22 : 60));
+      const w = rng() * 2 - 1;
+      hp = 0.86 * (hp + w - prev);
+      prev = w;
+      const s = hp * env * gain;
+      add(start + i, s * (pan <= 0 ? 1 : 0.5), s * (pan >= 0 ? 1 : 0.5));
     }
   };
 
-  const addBass = (start, freq, dur) => {
-    const n = Math.floor(dur * SAMPLE_RATE);
+  const shaker = (start, o = {}) => {
+    const { gain = 0.08, pan = 0 } = o;
+    const n = Math.floor(0.045 * SR);
+    let hp = 0;
+    let prev = 0;
     for (let i = 0; i < n; i++) {
-      const t = i / SAMPLE_RATE;
-      const env = Math.min(1, t / 0.01) * Math.exp(-t * 1.1);
+      const t = i / SR;
+      const env = Math.exp(-t * 65);
+      const w = rng() * 2 - 1;
+      hp = 0.9 * (hp + w - prev);
+      prev = w;
+      const s = hp * env * gain;
+      add(start + i, s * (pan <= 0 ? 1 : 0.6), s * (pan >= 0 ? 1 : 0.6));
+    }
+  };
+
+  const sub = (start, freq, dur, o = {}) => {
+    const { gain = 0.5, attack = 0.008, release = 0.06 } = o;
+    const n = Math.floor(dur * SR);
+    for (let i = 0; i < n; i++) {
+      const t = i / SR;
+      const env = Math.min(1, t / attack) * Math.min(1, (dur - t) / release);
       const s =
-        (Math.sin(2 * Math.PI * freq * t) * 0.8 +
-          Math.sin(2 * Math.PI * freq * 2 * t) * 0.12) *
+        (Math.sin(2 * Math.PI * freq * t) * 0.85 + Math.sin(2 * Math.PI * freq * 2 * t) * 0.1) *
         env *
-        0.5;
-      const idx = start + i;
-      if (idx < N) { L[idx] += s; R[idx] += s; }
+        gain;
+      add(start + i, s, s);
     }
   };
 
-  const addPad = (start, freqs, dur) => {
-    const n = Math.floor(dur * SAMPLE_RATE);
+  const pad = (start, freqs, dur, o = {}) => {
+    const { gain = 0.14, attack = 0.4, release = 0.5, detune = 6, bright = 0 } = o;
+    const n = Math.floor(dur * SR);
+    const k = gain / freqs.length;
     for (let i = 0; i < n; i++) {
-      const t = i / SAMPLE_RATE;
-      const env = Math.min(1, t / 0.3) * Math.min(1, (dur - t) / 0.35);
-      let s = 0;
-      for (const f of freqs) s += Math.sin(2 * Math.PI * f * t);
-      s = (s / freqs.length) * env * 0.17;
-      const idx = start + i;
-      if (idx < N) { L[idx] += s; R[idx] += s; }
+      const t = i / SR;
+      const env = Math.min(1, t / attack) * Math.min(1, (dur - t) / release);
+      let l = 0;
+      let r = 0;
+      for (const f of freqs) {
+        l += Math.sin(2 * Math.PI * f * t);
+        r += Math.sin(2 * Math.PI * f * (1 + detune / 10000) * t); // detune per side = width
+        if (bright > 0) {
+          const o2 = Math.sin(2 * Math.PI * f * 2 * t) * bright;
+          l += o2;
+          r += o2;
+        }
+      }
+      add(start + i, l * k * env, r * k * env);
     }
   };
 
-  // Am – F – C – G, two bars each.
-  const chords = [
-    { bass: 45, pad: [57, 60, 64] },
-    { bass: 41, pad: [53, 57, 60] },
-    { bass: 48, pad: [48, 52, 55] },
-    { bass: 43, pad: [55, 59, 62] },
-  ];
-
-  for (let bar = 0; bar < bars; bar++) {
-    const barStart = Math.round(bar * barDur * SAMPLE_RATE);
-    const chord = chords[Math.floor(bar / 2) % chords.length];
-    const stepSamp = (step) => barStart + Math.round(step * stepDur * SAMPLE_RATE);
-
-    if (bar % 2 === 0) {
-      addPad(barStart, chord.pad.map(midiToFreq), 2 * barDur * 0.98);
+  // Rhodes/pluck-style keyed voice with a bell-like decay.
+  const key = (start, freq, dur, o = {}) => {
+    const { gain = 0.2, pan = 0, decay = 3.2 } = o;
+    const n = Math.floor(dur * SR);
+    for (let i = 0; i < n; i++) {
+      const t = i / SR;
+      const env = Math.min(1, t / 0.005) * Math.exp(-t * decay);
+      const s =
+        (Math.sin(2 * Math.PI * freq * t) * 0.7 +
+          Math.sin(2 * Math.PI * freq * 2 * t) * 0.2 +
+          Math.sin(2 * Math.PI * freq * 3 * t) * 0.07) *
+        env *
+        gain;
+      add(start + i, s * (pan <= 0 ? 1 : 0.7), s * (pan >= 0 ? 1 : 0.7));
     }
+  };
 
-    const bf = midiToFreq(chord.bass);
-    addBass(stepSamp(0), bf, stepDur * 4);
-    addBass(stepSamp(8), bf, stepDur * 3);
-    addBass(stepSamp(11), midiToFreq(chord.bass + 7), stepDur * 2);
-
-    for (let step = 0; step < 16; step++) {
-      const s = stepSamp(step);
-      if (step === 0 || step === 8) addKick(s);
-      if (step === 4 || step === 12) addSnare(s);
-      if (step % 2 === 0) addHat(s, step === 6 || step === 14, step % 4 === 0 ? -1 : 1);
+  // Vinyl hiss + occasional crackle across the whole loop.
+  const crackle = (o = {}) => {
+    const { gain = 0.6, density = 0.0008 } = o;
+    for (let i = 0; i < N; i++) {
+      let s = (rng() * 2 - 1) * 0.01;
+      if (rng() < density) s += (rng() * 2 - 1) * 0.5;
+      L[i] += s * gain;
+      R[i] += s * gain;
     }
-  }
+  };
 
-  // Fold the tail back onto the head so decays wrap cleanly.
+  // Airy filtered-noise wash that slowly swells.
+  const atmos = (o = {}) => {
+    const { gain = 0.05, cutoff = 1200, swellHz = 0.06 } = o;
+    const tmp = new Float32Array(N);
+    for (let i = 0; i < N; i++) tmp[i] = rng() * 2 - 1;
+    const filtered = lowPass(highPass(tmp, 250), cutoff);
+    for (let i = 0; i < N; i++) {
+      const t = i / SR;
+      const sw = 0.5 + 0.5 * Math.sin(2 * Math.PI * swellHz * t);
+      const s = filtered[i] * sw * gain;
+      L[i] += s;
+      R[i] += s;
+    }
+  };
+
+  return { L, R, kick, snare, hat, shaker, sub, pad, key, crackle, atmos };
+}
+
+/** Fold voice tails that cross the loop point back onto the head for a seamless loop. */
+function foldTail(L, R, loopSamples, tail) {
   const left = new Float32Array(loopSamples);
   const right = new Float32Array(loopSamples);
   left.set(L.subarray(0, loopSamples));
@@ -293,6 +332,191 @@ function generateBeats() {
     right[i] += R[loopSamples + i];
   }
   return { left, right };
+}
+
+/** Lo-fi hip-hop, in the jazzy, dusty spirit of Nujabes / J Dilla. */
+function generateLoFi() {
+  const bpm = 85;
+  const bars = 8;
+  const swing = 0.2; // laid-back shuffle
+  const stepDur = 60 / bpm / 4;
+  const totalSteps = bars * 16;
+  const loopSamples = Math.round(totalSteps * stepDur * SAMPLE_RATE);
+  const tail = Math.round(0.9 * SAMPLE_RATE);
+  const N = loopSamples + tail;
+  const kit = makeKit(N, 101);
+  const pos = (step) => {
+    const t = step * stepDur + (step % 2 === 1 ? swing * stepDur : 0);
+    return Math.round(t * SAMPLE_RATE);
+  };
+  // Fmaj7 – Em7 – Dm7 – G7, two bars each.
+  const chords = [
+    [53, 57, 60, 64],
+    [52, 55, 59, 62],
+    [50, 53, 57, 60],
+    [55, 59, 62, 65],
+  ];
+  const bassRoots = [41, 40, 38, 43];
+
+  kit.crackle({ gain: 0.6, density: 0.0008 });
+  for (let bar = 0; bar < bars; bar++) {
+    const ci = Math.floor(bar / 2) % 4;
+    const chord = chords[ci];
+    const base = bar * 16;
+    if (bar % 2 === 0) {
+      kit.pad(pos(base), chord.map(midiToFreq), 2 * 16 * stepDur * 0.98, {
+        gain: 0.12, attack: 0.5, release: 0.6, detune: 6, bright: 0.05,
+      });
+    }
+    // Rhodes chord stabs on beat 1 and the swung "and" of beat 2.
+    for (const st of [0, 6]) for (const m of chord) kit.key(pos(base + st), midiToFreq(m), 0.55, { gain: 0.12 });
+    kit.sub(pos(base + 0), midiToFreq(bassRoots[ci]), stepDur * 6, { gain: 0.5 });
+    kit.sub(pos(base + 10), midiToFreq(bassRoots[ci]), stepDur * 3, { gain: 0.42 });
+    for (let s = 0; s < 16; s++) {
+      const p = pos(base + s);
+      if (s === 0 || s === 10) kit.kick(p, { gain: 0.9, pitchStart: 100, pitchEnd: 48, decay: 12 });
+      if (s === 4 || s === 12) kit.snare(p, { gain: 0.42, decay: 16, noiseAmt: 0.5, tone: 180, toneAmt: 0.3 });
+      if (s % 2 === 0) kit.hat(p, { gain: 0.11, open: s === 14, pan: s % 4 === 0 ? -0.6 : 0.6 });
+    }
+  }
+  return foldTail(kit.L, kit.R, loopSamples, tail);
+}
+
+/** Liquid drum & bass, lush and rolling like LTJ Bukem / Netsky. */
+function generateLiquid() {
+  const bpm = 172;
+  const bars = 8;
+  const stepDur = 60 / bpm / 4;
+  const totalSteps = bars * 16;
+  const loopSamples = Math.round(totalSteps * stepDur * SAMPLE_RATE);
+  const tail = Math.round(0.6 * SAMPLE_RATE);
+  const N = loopSamples + tail;
+  const kit = makeKit(N, 202);
+  const pos = (step) => Math.round(step * stepDur * SAMPLE_RATE);
+  // Am9 then Fmaj7, four bars each.
+  const chords = [
+    [57, 60, 64, 67, 71],
+    [53, 57, 60, 64],
+  ];
+  const bassRoots = [33, 29]; // deep sub
+
+  kit.atmos({ gain: 0.045, cutoff: 1300, swellHz: 0.05 });
+  for (let bar = 0; bar < bars; bar++) {
+    const ci = Math.floor(bar / 4) % 2;
+    const chord = chords[ci];
+    const base = bar * 16;
+    if (bar % 4 === 0) {
+      kit.pad(pos(base), chord.map(midiToFreq), 4 * 16 * stepDur * 0.99, {
+        gain: 0.1, attack: 0.8, release: 1.0, detune: 7, bright: 0.06,
+      });
+    }
+    kit.sub(pos(base + 0), midiToFreq(bassRoots[ci]), stepDur * 6, { gain: 0.5 });
+    kit.sub(pos(base + 10), midiToFreq(bassRoots[ci]), stepDur * 4, { gain: 0.45 });
+    for (let s = 0; s < 16; s++) {
+      const p = pos(base + s);
+      if (s === 0 || s === 10) kit.kick(p, { gain: 0.9, pitchStart: 120, pitchEnd: 50, decay: 14 });
+      if (s === 4 || s === 12) kit.snare(p, { gain: 0.5, decay: 20, noiseAmt: 0.6, tone: 190, toneAmt: 0.35 });
+      kit.hat(p, { gain: s % 2 === 0 ? 0.12 : 0.07, open: s === 6 || s === 14, pan: s % 2 === 0 ? -0.5 : 0.5 });
+      if (s === 7 || s === 15) kit.snare(p, { gain: 0.16, decay: 26, noiseAmt: 0.7, tone: 200, toneAmt: 0.2 });
+    }
+  }
+  return foldTail(kit.L, kit.R, loopSamples, tail);
+}
+
+/** Future garage / chillstep — smoky, 2-step, in the mood of Burial. */
+function generateChillstep() {
+  const bpm = 140;
+  const bars = 8;
+  const swing = 0.12;
+  const stepDur = 60 / bpm / 4;
+  const totalSteps = bars * 16;
+  const loopSamples = Math.round(totalSteps * stepDur * SAMPLE_RATE);
+  const tail = Math.round(0.8 * SAMPLE_RATE);
+  const N = loopSamples + tail;
+  const kit = makeKit(N, 303);
+  const pos = (step) => {
+    const t = step * stepDur + (step % 2 === 1 ? swing * stepDur : 0);
+    return Math.round(t * SAMPLE_RATE);
+  };
+  // Em – C – G – D, two bars each.
+  const chords = [
+    [52, 55, 59],
+    [48, 52, 55],
+    [55, 59, 62],
+    [50, 54, 57],
+  ];
+  const bassRoots = [40, 36, 43, 38];
+
+  kit.crackle({ gain: 0.45, density: 0.001 });
+  kit.atmos({ gain: 0.05, cutoff: 2400, swellHz: 0.08 }); // rain-like air
+  for (let bar = 0; bar < bars; bar++) {
+    const ci = Math.floor(bar / 2) % 4;
+    const chord = chords[ci];
+    const base = bar * 16;
+    if (bar % 2 === 0) {
+      kit.pad(pos(base), chord.map(midiToFreq), 2 * 16 * stepDur * 0.98, {
+        gain: 0.11, attack: 0.7, release: 0.8, detune: 8, bright: 0.04,
+      });
+    }
+    kit.sub(pos(base + 0), midiToFreq(bassRoots[ci]), stepDur * 8, { gain: 0.46 });
+    for (let s = 0; s < 16; s++) {
+      const p = pos(base + s);
+      if (s === 0 || s === 11) kit.kick(p, { gain: 0.85, pitchStart: 95, pitchEnd: 46, decay: 11 });
+      if (s === 4 || s === 12) kit.snare(p, { gain: 0.4, decay: 17, noiseAmt: 0.55, tone: 175, toneAmt: 0.3 });
+      if (s === 2 || s === 6 || s === 10 || s === 14) kit.shaker(p, { gain: 0.09, pan: s % 4 === 2 ? -0.6 : 0.6 });
+      if (s === 8) kit.hat(p, { gain: 0.1, open: true });
+    }
+  }
+  return foldTail(kit.L, kit.R, loopSamples, tail);
+}
+
+/** Dreamy downtempo with ping-pong arps, à la Tycho / Bonobo. */
+function generateDowntempo() {
+  const bpm = 98;
+  const bars = 8;
+  const stepDur = 60 / bpm / 4;
+  const totalSteps = bars * 16;
+  const loopSamples = Math.round(totalSteps * stepDur * SAMPLE_RATE);
+  const tail = Math.round(0.8 * SAMPLE_RATE);
+  const N = loopSamples + tail;
+  const kit = makeKit(N, 404);
+  const pos = (step) => Math.round(step * stepDur * SAMPLE_RATE);
+  // D – A – Bm – G, two bars each.
+  const chords = [
+    [50, 54, 57],
+    [57, 61, 64],
+    [59, 62, 66],
+    [55, 59, 62],
+  ];
+  const bassRoots = [38, 45, 47, 43];
+
+  kit.atmos({ gain: 0.04, cutoff: 1700, swellHz: 0.05 });
+  for (let bar = 0; bar < bars; bar++) {
+    const ci = Math.floor(bar / 2) % 4;
+    const chord = chords[ci];
+    const base = bar * 16;
+    if (bar % 2 === 0) {
+      kit.pad(pos(base), chord.map(midiToFreq), 2 * 16 * stepDur * 0.98, {
+        gain: 0.1, attack: 0.6, release: 0.7, detune: 7, bright: 0.07,
+      });
+    }
+    kit.sub(pos(base + 0), midiToFreq(bassRoots[ci]), stepDur * 6, { gain: 0.46 });
+    kit.sub(pos(base + 8), midiToFreq(bassRoots[ci]), stepDur * 4, { gain: 0.4 });
+    // Ping-pong 8th-note arpeggio an octave up.
+    const arp = [chord[0] + 12, chord[1] + 12, chord[2] + 12, chord[1] + 12];
+    for (let e = 0; e < 8; e++) {
+      kit.key(pos(base + e * 2), midiToFreq(arp[e % arp.length]), stepDur * 2.2, {
+        gain: 0.1, pan: e % 2 === 0 ? -0.8 : 0.8, decay: 4,
+      });
+    }
+    for (let s = 0; s < 16; s++) {
+      const p = pos(base + s);
+      if (s === 0 || s === 8) kit.kick(p, { gain: 0.8, pitchStart: 90, pitchEnd: 46, decay: 11 });
+      if (s === 4 || s === 12) kit.snare(p, { gain: 0.34, decay: 15, noiseAmt: 0.45, tone: 185, toneAmt: 0.3 });
+      if (s % 2 === 0) kit.shaker(p, { gain: 0.07, pan: s % 4 === 0 ? -0.5 : 0.5 });
+    }
+  }
+  return foldTail(kit.L, kit.R, loopSamples, tail);
 }
 
 /** Singing-bowl style chime: inharmonic partials with a soft beat and long decay. */
@@ -478,7 +702,13 @@ const deep = generateMusic({
 });
 writeWavStereo(path.join(MUSIC_DIR, 'deep.wav'), deep.left, deep.right);
 
-const beats = generateBeats();
-writeWavStereo(path.join(MUSIC_DIR, 'beats.wav'), beats.left, beats.right);
+const lofi = generateLoFi();
+writeWavStereo(path.join(BEATS_DIR, 'lofi.wav'), lofi.left, lofi.right);
+const liquid = generateLiquid();
+writeWavStereo(path.join(BEATS_DIR, 'liquid.wav'), liquid.left, liquid.right);
+const chillstep = generateChillstep();
+writeWavStereo(path.join(BEATS_DIR, 'chillstep.wav'), chillstep.left, chillstep.right);
+const downtempo = generateDowntempo();
+writeWavStereo(path.join(BEATS_DIR, 'downtempo.wav'), downtempo.left, downtempo.right);
 
 console.log('Done.');

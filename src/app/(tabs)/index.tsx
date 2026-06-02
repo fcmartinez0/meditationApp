@@ -29,7 +29,18 @@ const MUSIC: {
   { key: 'calm', label: 'Calm', icon: 'heart-outline', hint: '7.83 Hz · grounding (432 Hz tuned)' },
   { key: 'focus', label: 'Focus', icon: 'bulb-outline', hint: '14 Hz · alert concentration' },
   { key: 'deep', label: 'Deep', icon: 'bed-outline', hint: '3 Hz · deep rest & sleep' },
-  { key: 'beats', label: 'Chill Beats', icon: 'musical-notes-outline', hint: '100 BPM · lo-fi drum & bass' },
+];
+
+const BEATS: {
+  key: AmbientSound;
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  hint: string;
+}[] = [
+  { key: 'lofi', label: 'Lo-Fi', icon: 'cafe-outline', hint: '85 BPM · jazzy lo-fi (Nujabes vibe)' },
+  { key: 'liquid', label: 'Liquid', icon: 'water-outline', hint: '172 BPM · liquid drum & bass (LTJ Bukem)' },
+  { key: 'chillstep', label: 'Chillstep', icon: 'rainy-outline', hint: '140 BPM · future garage (Burial vibe)' },
+  { key: 'downtempo', label: 'Downtempo', icon: 'partly-sunny-outline', hint: '98 BPM · dreamy arps (Tycho vibe)' },
 ];
 
 function greeting(): string {
@@ -37,6 +48,44 @@ function greeting(): string {
   if (h < 12) return 'Good morning';
   if (h < 18) return 'Good afternoon';
   return 'Good evening';
+}
+
+type Track = { key: AmbientSound; label: string; icon: keyof typeof Ionicons.glyphMap; hint: string };
+
+/** A selectable list of music/beat tracks, each with a label and a description. */
+function TrackList({ items }: { items: Track[] }) {
+  const colors = useThemeColors();
+  const { settings, updateSettings } = useAppData();
+  return (
+    <View style={styles.musicList}>
+      {items.map((m) => {
+        const selected = settings.ambient === m.key;
+        return (
+          <Pressable
+            key={m.key}
+            onPress={() => updateSettings({ ambient: m.key })}
+            style={[
+              styles.musicRow,
+              {
+                backgroundColor: selected ? colors.accent : colors.surface,
+                borderColor: selected ? colors.accent : colors.border,
+              },
+            ]}>
+            <Ionicons name={m.icon} size={22} color={selected ? colors.textOnAccent : colors.accent} />
+            <View style={{ flex: 1 }}>
+              <AppText variant="body" color={selected ? colors.textOnAccent : colors.text}>
+                {m.label}
+              </AppText>
+              <AppText variant="caption" color={selected ? colors.textOnAccent : colors.textSecondary}>
+                {m.hint}
+              </AppText>
+            </View>
+            {selected && <Ionicons name="checkmark" size={20} color={colors.textOnAccent} />}
+          </Pressable>
+        );
+      })}
+    </View>
+  );
 }
 
 export default function MeditateScreen() {
@@ -153,43 +202,20 @@ export default function MeditateScreen() {
         <AppText variant="label" muted>
           FOCUS & CALM MUSIC
         </AppText>
-        <View style={styles.musicList}>
-          {MUSIC.map((m) => {
-            const selected = settings.ambient === m.key;
-            return (
-              <Pressable
-                key={m.key}
-                onPress={() => updateSettings({ ambient: m.key })}
-                style={[
-                  styles.musicRow,
-                  {
-                    backgroundColor: selected ? colors.accent : colors.surface,
-                    borderColor: selected ? colors.accent : colors.border,
-                  },
-                ]}>
-                <Ionicons
-                  name={m.icon}
-                  size={22}
-                  color={selected ? colors.textOnAccent : colors.accent}
-                />
-                <View style={{ flex: 1 }}>
-                  <AppText variant="body" color={selected ? colors.textOnAccent : colors.text}>
-                    {m.label}
-                  </AppText>
-                  <AppText
-                    variant="caption"
-                    color={selected ? colors.textOnAccent : colors.textSecondary}>
-                    {m.hint}
-                  </AppText>
-                </View>
-                {selected && <Ionicons name="checkmark" size={20} color={colors.textOnAccent} />}
-              </Pressable>
-            );
-          })}
-        </View>
+        <TrackList items={MUSIC} />
         <AppText variant="caption" muted>
           Calm, Focus and Deep are binaural beats — use headphones for the full effect. A wellness
           aid, not medical treatment.
+        </AppText>
+      </View>
+
+      <View style={styles.section}>
+        <AppText variant="label" muted>
+          BEATS
+        </AppText>
+        <TrackList items={BEATS} />
+        <AppText variant="caption" muted>
+          Instrumental grooves modeled on artists we love. Stereo — headphones recommended.
         </AppText>
       </View>
 

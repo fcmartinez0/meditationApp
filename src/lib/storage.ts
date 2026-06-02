@@ -2,7 +2,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { DEFAULT_SETTINGS, type SessionRecord, type Settings } from './types';
+import { AMBIENT_KEYS, DEFAULT_SETTINGS, type SessionRecord, type Settings } from './types';
 
 const SESSIONS_KEY = 'mc.sessions.v1';
 const SETTINGS_KEY = 'mc.settings.v1';
@@ -38,7 +38,10 @@ export async function loadSettings(): Promise<Settings> {
     const raw = await AsyncStorage.getItem(SETTINGS_KEY);
     if (!raw) return { ...DEFAULT_SETTINGS };
     // Merge so new fields added in later versions get sane defaults.
-    return { ...DEFAULT_SETTINGS, ...(JSON.parse(raw) as Partial<Settings>) };
+    const merged = { ...DEFAULT_SETTINGS, ...(JSON.parse(raw) as Partial<Settings>) };
+    // Drop a sound that no longer exists (e.g. a renamed/removed track).
+    if (!AMBIENT_KEYS.includes(merged.ambient)) merged.ambient = 'none';
+    return merged;
   } catch {
     return { ...DEFAULT_SETTINGS };
   }

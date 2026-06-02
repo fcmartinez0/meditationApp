@@ -8,8 +8,9 @@ A single codebase runs on both iOS and Android.
 - **Meditation timer** — pick a length (3–30 min), choose a background sound, and
   follow a breathing orb. Optional start / end / interval bells.
 - **Focus & calm music** — procedurally generated binaural-beat tracks tuned to
-  brainwave-entrainment frequencies (see below), plus a chilled lo-fi
-  drum-and-bass groove.
+  brainwave-entrainment frequencies (see below).
+- **Beats** — a set of synthesized instrumental grooves, each modeled on a
+  recognizable artist style (see _Beats_ below).
 - **Ambient sounds** — rain, ocean, and forest beds, plus pure silence.
 - **Streaks & progress** — daily streak, longest streak, total time and sessions,
   and a weekly minutes chart. All stored locally on device.
@@ -31,6 +32,19 @@ associations (see _Sources_):
 > Binaural beats require **headphones** and are offered as a wellness aid, not a
 > medical treatment. Scientific evidence for cognitive effects is mixed, and any
 > benefit may come from the calming music itself as much as the specific beat.
+
+## Beats
+
+Four synthesized instrumental loops (drums, bass, chords and textures built from
+oscillators and filtered noise), each modeled on the signature style of an
+artist — an homage, not a sample of their work:
+
+| Track     | Tempo   | Style                          | Modeled on        |
+| --------- | ------- | ------------------------------ | ----------------- |
+| Lo-Fi     | 85 BPM  | jazzy, dusty lo-fi hip-hop     | Nujabes / J Dilla |
+| Liquid    | 172 BPM | lush, rolling liquid drum&bass | LTJ Bukem / Netsky |
+| Chillstep | 140 BPM | smoky 2-step / future garage   | Burial            |
+| Downtempo | 98 BPM  | dreamy, ping-pong arps         | Tycho / Bonobo    |
 
 All audio is generated procedurally — no third-party assets — so it is fully
 reproducible:

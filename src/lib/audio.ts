@@ -20,7 +20,10 @@ const AMBIENT_SOURCES: Record<Exclude<AmbientSound, 'none'>, number> = {
   calm: require('@/assets/audio/music/calm.wav'),
   focus: require('@/assets/audio/music/focus.wav'),
   deep: require('@/assets/audio/music/deep.wav'),
-  beats: require('@/assets/audio/music/beats.wav'),
+  lofi: require('@/assets/audio/beats/lofi.wav'),
+  liquid: require('@/assets/audio/beats/liquid.wav'),
+  chillstep: require('@/assets/audio/beats/chillstep.wav'),
+  downtempo: require('@/assets/audio/beats/downtempo.wav'),
 };
 
 let configured = false;
