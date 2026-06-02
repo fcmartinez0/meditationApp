@@ -173,6 +173,33 @@ export default function SettingsScreen() {
 
       <Card style={styles.card}>
         <AppText variant="label" muted>
+          SOUND
+        </AppText>
+        <Row label="Volume" hint={`${Math.round(settings.volume * 100)}%`}>
+          <View style={styles.timeAdjust}>
+            <Pressable
+              onPress={() => updateSettings({ volume: Math.max(0, Math.round((settings.volume - 0.1) * 10) / 10) })}
+              style={styles.stepBtn}
+              hitSlop={8}>
+              <Ionicons name="volume-low-outline" size={24} color={colors.accent} />
+            </Pressable>
+            <View style={[styles.volumeTrack, { backgroundColor: colors.surfaceMuted }]}>
+              <View
+                style={[styles.volumeFill, { backgroundColor: colors.accent, width: `${settings.volume * 100}%` }]}
+              />
+            </View>
+            <Pressable
+              onPress={() => updateSettings({ volume: Math.min(1, Math.round((settings.volume + 0.1) * 10) / 10) })}
+              style={styles.stepBtn}
+              hitSlop={8}>
+              <Ionicons name="volume-high-outline" size={24} color={colors.accent} />
+            </Pressable>
+          </View>
+        </Row>
+      </Card>
+
+      <Card style={styles.card}>
+        <AppText variant="label" muted>
           BELLS
         </AppText>
         <Row label="Starting bell" hint="Ring when a session begins">
@@ -274,6 +301,8 @@ const styles = StyleSheet.create({
   rowText: { flex: 1, gap: 2 },
   divider: { height: StyleSheet.hairlineWidth, marginVertical: spacing.xs },
   timeAdjust: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  volumeTrack: { width: 90, height: 6, borderRadius: radius.pill, overflow: 'hidden' },
+  volumeFill: { height: '100%', borderRadius: radius.pill },
   timeLabel: { minWidth: 96, textAlign: 'center' },
   stepBtn: { padding: spacing.xs },
   minuteRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm },

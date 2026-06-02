@@ -13,6 +13,8 @@ export const GENERATIVE_SUPPORTED = false;
 export class GenerativeEngine {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async start(_spec: PieceSpec): Promise<void> {}
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  setVolume(_v: number): void {}
   pause(): void {}
   resume(): void {}
   stop(): void {}

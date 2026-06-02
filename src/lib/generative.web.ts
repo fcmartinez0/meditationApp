@@ -87,6 +87,7 @@ export class GenerativeEngine {
   private timers: ReturnType<typeof setTimeout>[] = [];
   private rng: () => number = Math.random;
   private spec: PieceSpec | null = null;
+  private targetGain = 0.5;
   private chordTones: number[] = [];
   private arpIdx = 0;
   private step = 0;
@@ -111,7 +112,7 @@ export class GenerativeEngine {
     // Rhythmic/bright layers route post-filter for clarity.
     const master = ctx.createGain();
     master.gain.setValueAtTime(0.0001, now);
-    master.gain.exponentialRampToValueAtTime(0.5, now + 4);
+    master.gain.exponentialRampToValueAtTime(this.targetGain, now + 4);
     master.connect(ctx.destination);
 
     // Reverb send: a generated impulse gives a lush, spacious tail.
@@ -388,6 +389,17 @@ export class GenerativeEngine {
     return buf;
   }
 
+  setVolume(v: number): void {
+    this.targetGain = 0.5 * Math.max(0, Math.min(1, v));
+    const ctx = this.ctx;
+    const master = this.master;
+    if (!ctx || !master) return;
+    const now = ctx.currentTime;
+    master.gain.cancelScheduledValues(now);
+    master.gain.setValueAtTime(Math.max(0.0001, master.gain.value), now);
+    master.gain.exponentialRampToValueAtTime(Math.max(0.0001, this.targetGain), now + 0.2);
+  }
+
   pause(): void {
     const ctx = this.ctx;
     const master = this.master;
@@ -406,7 +418,7 @@ export class GenerativeEngine {
     const now = ctx.currentTime;
     master.gain.cancelScheduledValues(now);
     master.gain.setValueAtTime(Math.max(0.0001, master.gain.value), now);
-    master.gain.exponentialRampToValueAtTime(0.5, now + 0.4);
+    master.gain.exponentialRampToValueAtTime(Math.max(0.0001, this.targetGain), now + 0.4);
   }
 
   stop(): void {

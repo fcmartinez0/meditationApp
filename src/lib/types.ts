@@ -128,6 +128,8 @@ export interface Settings {
   /** Reminder time, 24h. */
   reminderHour: number;
   reminderMinute: number;
+  /** Background sound volume, 0..1. */
+  volume: number;
   /** Schema version, for one-time migrations of stored settings. */
   settingsVersion: number;
 }
@@ -153,5 +155,6 @@ export const DEFAULT_SETTINGS: Settings = {
   reminderEnabled: false,
   reminderHour: 8,
   reminderMinute: 0,
+  volume: 0.85,
   settingsVersion: 2,
 };

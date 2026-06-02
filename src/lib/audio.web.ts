@@ -85,6 +85,20 @@ export class SessionAudio {
   private ambientBuffer: AudioBuffer | null = null;
   private ambientSource: AudioBufferSourceNode | null = null;
   private ambientGain: GainNode | null = null;
+  private targetVol = TARGET_VOLUME;
+
+  /** Set the background volume (0..1). */
+  setVolume(v: number) {
+    this.targetVol = TARGET_VOLUME * Math.max(0, Math.min(1, v));
+    const ctx = this.ctx;
+    const gain = this.ambientGain;
+    if (ctx && gain) {
+      const now = ctx.currentTime;
+      gain.gain.cancelScheduledValues(now);
+      gain.gain.setValueAtTime(Math.max(SILENCE, gain.gain.value), now);
+      gain.gain.exponentialRampToValueAtTime(Math.max(SILENCE, this.targetVol), now + 0.1);
+    }
+  }
 
   async prepare(ambient: AmbientSound) {
     this.ctx = getCtx();
@@ -125,7 +139,7 @@ export class SessionAudio {
     const gain = ctx.createGain();
     const now = ctx.currentTime;
     gain.gain.setValueAtTime(SILENCE, now);
-    gain.gain.exponentialRampToValueAtTime(TARGET_VOLUME, now + 0.5); // smooth fade in
+    gain.gain.exponentialRampToValueAtTime(Math.max(SILENCE, this.targetVol), now + 0.5); // smooth fade in
     src.connect(gain).connect(ctx.destination);
     src.start();
     this.ambientSource = src;
@@ -151,7 +165,7 @@ export class SessionAudio {
     const now = ctx.currentTime;
     gain.gain.cancelScheduledValues(now);
     gain.gain.setValueAtTime(Math.max(SILENCE, gain.gain.value), now);
-    gain.gain.exponentialRampToValueAtTime(TARGET_VOLUME, now + 0.3);
+    gain.gain.exponentialRampToValueAtTime(Math.max(SILENCE, this.targetVol), now + 0.3);
   }
 
   async stopAmbient() {

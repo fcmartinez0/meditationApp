@@ -49,6 +49,19 @@ async function ensureAudioMode() {
 export class SessionAudio {
   private bell: AudioPlayer | null = null;
   private ambient: AudioPlayer | null = null;
+  private targetVol = 0.6;
+
+  /** Set the background volume (0..1). */
+  setVolume(v: number) {
+    this.targetVol = 0.6 * Math.max(0, Math.min(1, v));
+    if (this.ambient) {
+      try {
+        this.ambient.volume = this.targetVol;
+      } catch {
+        // ignore
+      }
+    }
+  }
 
   async prepare(ambient: AmbientSound) {
     await ensureAudioMode();
@@ -80,7 +93,7 @@ export class SessionAudio {
     player.play();
     void (async () => {
       const steps = 8;
-      const target = 0.6;
+      const target = this.targetVol;
       for (let i = 1; i <= steps; i++) {
         try {
           player.volume = (target * i) / steps;

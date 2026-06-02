@@ -94,6 +94,7 @@ export default function SessionScreen() {
     (async () => {
       await audio.prepare(effectiveAmbient);
       if (cancelled) return;
+      audio.setVolume(settings.volume);
       if (settings.startBell) audio.ringBell();
       if (useEngine) {
         // Choose the next piece, learning from past ratings, then play it live.
@@ -105,6 +106,7 @@ export default function SessionScreen() {
         const engine = new GenerativeEngine();
         engineRef.current = engine;
         await engine.start(spec);
+        engine.setVolume(settings.volume);
       } else {
         audio.startAmbient();
       }
@@ -203,6 +205,7 @@ export default function SessionScreen() {
       const engine = new GenerativeEngine();
       engineRef.current = engine;
       await engine.start(spec);
+      engine.setVolume(settings.volume);
     })();
   };
 

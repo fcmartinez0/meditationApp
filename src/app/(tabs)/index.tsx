@@ -10,7 +10,7 @@ import { SoundRow, type SoundItem } from '@/components/SoundRow';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useAppData } from '@/store/AppData';
 import { radius, spacing } from '@/theme';
-import { categoryStyle } from '@/theme/categories';
+import { categoryFor, categoryStyle } from '@/theme/categories';
 
 const DURATIONS = [3, 5, 10, 15, 20, 30];
 
@@ -78,6 +78,8 @@ export default function MeditateScreen() {
 
   // The app's accent follows the selected sound's category.
   const active = categoryStyle(settings.ambient);
+  const cat = categoryFor(settings.ambient);
+  const headphonesHelp = cat === 'frequency' || cat === 'generative' || settings.ambient === 'purr';
 
   const begin = () => {
     router.push({
@@ -165,6 +167,15 @@ export default function MeditateScreen() {
         </View>
       ))}
 
+      {headphonesHelp && (
+        <View style={styles.headphoneHint}>
+          <Ionicons name="headset-outline" size={14} color={colors.textSecondary} />
+          <AppText variant="caption" muted>
+            Best with headphones
+          </AppText>
+        </View>
+      )}
+
       <Pressable onPress={begin} accessibilityRole="button" style={styles.beginWrap}>
         <LinearGradient
           colors={active.colors}
@@ -196,6 +207,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   list: { gap: spacing.sm },
+  headphoneHint: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs },
   beginWrap: { marginTop: spacing.sm },
   beginBtn: {
     flexDirection: 'row',
