@@ -96,7 +96,7 @@ function master(channels, { targetDb = -14, thresholdDb = -18, ratio = 3, air = 
 }
 
 function writeWav(filePath, samples, opts = {}) {
-  if (opts.master !== false) master([samples], { targetDb: opts.targetDb ?? -16 });
+  if (opts.master !== false) master([samples], { targetDb: opts.targetDb ?? -16, air: opts.air ?? 0 });
   // Normalize to avoid clipping, leaving a little headroom.
   let peak = 0;
   for (let i = 0; i < samples.length; i++) {
@@ -136,7 +136,7 @@ function writeWav(filePath, samples, opts = {}) {
 
 function writeWavStereo(filePath, left, right, opts = {}) {
   const n = Math.min(left.length, right.length);
-  if (opts.master !== false) master([left, right], { targetDb: opts.targetDb ?? -14 });
+  if (opts.master !== false) master([left, right], { targetDb: opts.targetDb ?? -14, air: opts.air ?? 0 });
   // Joint normalization keeps the stereo image balanced.
   let peak = 0;
   for (let i = 0; i < n; i++) {
