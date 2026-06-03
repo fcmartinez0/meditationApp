@@ -116,6 +116,8 @@ export interface PieceSpec {
   percussion: GenPercussion;
   /** Index into the chord-progression table (harmonic movement). */
   progression: number;
+  /** Whether a sparse melodic lead plays phrases over the chords. */
+  melody: boolean;
 }
 
 /** Number of chord progressions the generative engine can choose from. */

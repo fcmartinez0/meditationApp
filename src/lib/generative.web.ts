@@ -267,6 +267,11 @@ export class GenerativeEngine {
       };
       this.timers.push(setInterval(tick, stepDur * 1000));
     }
+
+    // Sparse melodic lead.
+    if (spec.melody) {
+      this.timers.push(setTimeout(() => this.scheduleMelody(), 6000));
+    }
   }
 
   private setChord(initial: boolean): void {
@@ -388,6 +393,66 @@ export class GenerativeEngine {
     src.connect(hp).connect(g).connect(pan).connect(this.master);
     src.start(when, this.rng() * 0.5);
     src.stop(when + 0.1);
+  }
+
+  /** A singing lead note with gentle vibrato, routed through the reverb. */
+  private leadNote(when: number, freq: number, dur: number, pan: number, gain: number): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.pulseGain) return;
+    const osc = ctx.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(freq, when);
+    // Gentle vibrato.
+    const vib = ctx.createOscillator();
+    vib.frequency.value = 5;
+    const vibGain = ctx.createGain();
+    vibGain.gain.value = freq * 0.006;
+    vib.connect(vibGain).connect(osc.frequency);
+    vib.start(when);
+    vib.stop(when + dur + 0.2);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, when);
+    g.gain.exponentialRampToValueAtTime(gain, when + 0.05);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+    const p = ctx.createStereoPanner();
+    p.pan.value = pan;
+    osc.connect(g).connect(p);
+    p.connect(this.pulseGain);
+    if (this.reverbSend) p.connect(this.reverbSend);
+    osc.start(when);
+    osc.stop(when + dur + 0.06);
+  }
+
+  /** Play a short melodic phrase, then schedule the next after a rest. */
+  private scheduleMelody(): void {
+    const ctx = this.ctx;
+    const spec = this.spec;
+    if (!ctx || !spec) return;
+    const scale = SCALES[spec.scale] ?? SCALES.major_pentatonic;
+    const L = scale.length;
+    const deg = (x: number) => 12 * Math.floor(x / L) + scale[((x % L) + L) % L];
+
+    const beat = 60 / spec.tempo;
+    const noteLen = beat * (this.rng() < 0.5 ? 1 : 0.5);
+    const notes = 3 + Math.floor(this.rng() * 4);
+    const gain = spec.section === 'rest' ? 0.1 : 0.13;
+    let t = ctx.currentTime + 0.1;
+    let degIdx = L + Math.floor(this.rng() * L); // sit ~an octave above the root
+    const start = t;
+    for (let i = 0; i < notes; i++) {
+      if (this.rng() < 0.18) {
+        t += noteLen; // a rest
+      } else {
+        const midi = spec.root + deg(degIdx) + 12;
+        this.leadNote(t, midiToFreq(midi), noteLen * (0.8 + this.rng() * 0.7), this.rng() * 0.4 - 0.2, gain);
+        t += noteLen;
+      }
+      // Mostly stepwise motion, occasional small leap, kept in a singable range.
+      degIdx += this.rng() < 0.7 ? (this.rng() < 0.5 ? 1 : -1) : this.rng() < 0.5 ? 2 : -2;
+      degIdx = Math.max(L - 1, Math.min(2 * L + 2, degIdx));
+    }
+    const wait = t - start + (2 + this.rng() * 4); // rest between phrases
+    this.timers.push(setTimeout(() => this.scheduleMelody(), wait * 1000));
   }
 
   private arpNote(when: number, freq: number, pan: number, gain: number): void {

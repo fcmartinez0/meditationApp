@@ -146,6 +146,7 @@ function randomSpec(section: Section): PieceSpec {
     bass: Math.random() < r.bassChance,
     percussion: pick(r.percussion),
     progression: Math.floor(Math.random() * PROGRESSION_COUNT),
+    melody: Math.random() < (section === 'rest' ? 0.5 : 0.6),
   };
 }
 
@@ -207,6 +208,7 @@ export function nextSpec(section: Section, ratings: PieceRating[]): PieceSpec {
     bass: likedMajority((s) => s.bass, r.bassChance),
     percussion: bestBy((s) => s.percussion, pick(r.percussion)),
     progression: bestBy((s) => s.progression, Math.floor(Math.random() * PROGRESSION_COUNT)),
+    melody: likedMajority((s) => s.melody, section === 'rest' ? 0.5 : 0.6),
   };
 }
 
@@ -216,6 +218,7 @@ const NOTE_NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A'
 export function describeSpec(spec: PieceSpec): string {
   const note = NOTE_NAMES[(((spec.root % 12) + 12) % 12)];
   const parts = [`${note} ${spec.scale.replace('_', ' ')}`];
+  if (spec.melody) parts.push('melody');
   if (spec.wave === 'bell' || spec.wave === 'glass') parts.push(spec.wave);
   if (spec.percussion !== 'none') parts.push(spec.percussion);
   else if (spec.arp) parts.push('arp');
