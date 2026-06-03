@@ -23,6 +23,15 @@ const SCALES: Record<string, number[]> = {
   harmonic_minor: [0, 2, 3, 5, 7, 8, 11],
 };
 
+// Four-note chord voicings as scale-degree offsets from the chord root.
+const VOICINGS = [
+  [0, 2, 4, 6], // 7th
+  [0, 1, 4, 6], // sus2
+  [0, 3, 4, 6], // sus4
+  [0, 2, 4, 8], // add9
+  [0, 4, 6, 8], // open / quartal
+];
+
 const ARP_PATTERNS = [
   [0, 2, 1, 3, 2, 4, 1, 2],
   [0, 1, 2, 3, 4, 3, 2, 1], // up & down
@@ -129,6 +138,7 @@ export class GenerativeEngine {
   private chordStep = 0;
   private arpPattern: number[] = ARP_PATTERNS[0];
   private arpEvery = 2;
+  private voicing: number[] = VOICINGS[0];
 
   async start(spec: PieceSpec): Promise<void> {
     const ctx = getCtx();
@@ -255,7 +265,8 @@ export class GenerativeEngine {
       this.extras.push(pumpLfo, depth);
     }
 
-    // Per-piece arpeggio pattern and rate, chosen deterministically from the seed.
+    // Per-piece voicing, arpeggio pattern and rate, chosen from the seed.
+    this.voicing = VOICINGS[Math.floor(this.rng() * VOICINGS.length)];
     this.arpPattern = ARP_PATTERNS[Math.floor(this.rng() * ARP_PATTERNS.length)];
     this.arpEvery = [2, 2, 2, 1, 4][Math.floor(this.rng() * 5)];
 
@@ -350,7 +361,7 @@ export class GenerativeEngine {
     const prog = PROGRESSIONS[spec.progression % PROGRESSIONS.length];
     const base = prog[this.chordStep % prog.length];
     if (!initial) this.chordStep++;
-    const chord = [deg(base), deg(base + 2), deg(base + 4), deg(base + 6)];
+    const chord = this.voicing.map((o) => deg(base + o));
 
     const notes: number[] = [spec.root + chord[0], spec.root + chord[0] + 12];
     for (let i = 0; i < this.voices.length - 2; i++) {
