@@ -78,7 +78,7 @@ export function sectionFor(sound: GenerativeSound): Section {
  * produces the same evolving music (the seed drives every random choice), so
  * a rating can be meaningfully attributed to it.
  */
-export type GenWave = 'sine' | 'triangle' | 'warm';
+export type GenWave = 'sine' | 'triangle' | 'warm' | 'bell' | 'glass';
 export type GenPercussion =
   | 'none'
   | 'heartbeat'
@@ -114,7 +114,12 @@ export interface PieceSpec {
   bass: boolean;
   /** Soft percussion pattern. */
   percussion: GenPercussion;
+  /** Index into the chord-progression table (harmonic movement). */
+  progression: number;
 }
+
+/** Number of chord progressions the generative engine can choose from. */
+export const PROGRESSION_COUNT = 8;
 
 /** A user rating of a generated piece, used to learn preferences per section. */
 export interface PieceRating {

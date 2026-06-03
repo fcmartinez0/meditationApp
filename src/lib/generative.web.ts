@@ -25,8 +25,33 @@ const SCALES: Record<string, number[]> = {
 
 const ARP_CONTOUR = [0, 2, 1, 3, 2, 4, 1, 2];
 
+// Chord-root movement as scale-degree sequences (index 0 is a static drone).
+const PROGRESSIONS = [
+  [0, 0, 0, 0], // drone — no movement
+  [0, 3, 4, 0], // I – IV – V – I
+  [0, 5, 3, 4], // I – vi – IV – V
+  [0, 4, 5, 3], // I – V – vi – IV
+  [0, 2, 4, 5],
+  [0, 5, 1, 4],
+  [0, 6, 4, 5],
+  [0, 3, 0, 4],
+];
+
 function midiToFreq(m: number): number {
   return 440 * Math.pow(2, (m - 69) / 12);
+}
+
+// Custom timbres so pieces sound like different instruments, not just a sine pad.
+function makeWave(ctx: AudioContext, kind: string): PeriodicWave | null {
+  if (kind === 'bell') {
+    const imag = new Float32Array([0, 1, 0.6, 0.25, 0.0, 0.12, 0, 0.05]);
+    return ctx.createPeriodicWave(new Float32Array(imag.length), imag);
+  }
+  if (kind === 'glass') {
+    const imag = new Float32Array([0, 1, 0, 0.5, 0, 0.33, 0, 0.2, 0, 0.14]);
+    return ctx.createPeriodicWave(new Float32Array(imag.length), imag);
+  }
+  return null;
 }
 
 function makeRng(seed: number): () => number {
@@ -94,6 +119,7 @@ export class GenerativeEngine {
   private chordTones: number[] = [];
   private arpIdx = 0;
   private step = 0;
+  private chordStep = 0;
 
   async start(spec: PieceSpec): Promise<void> {
     const ctx = getCtx();
@@ -179,12 +205,15 @@ export class GenerativeEngine {
       this.extras.push(pumpLfo, depth);
     }
 
-    // Pad voices.
-    const oscType: OscillatorType = spec.wave === 'warm' ? 'sawtooth' : spec.wave;
+    // Pad voices — basic oscillator type, or a custom bell/glass timbre.
+    const periodicWave = makeWave(ctx, spec.wave);
+    const oscType: OscillatorType =
+      spec.wave === 'warm' ? 'sawtooth' : spec.wave === 'triangle' ? 'triangle' : 'sine';
     const voiceCount = spec.section === 'chill' ? 6 : 5;
     for (let i = 0; i < voiceCount; i++) {
       const osc = ctx.createOscillator();
-      osc.type = oscType;
+      if (periodicWave) osc.setPeriodicWave(periodicWave);
+      else osc.type = oscType;
       const gain = ctx.createGain();
       gain.gain.value = 0;
       const pan = ctx.createStereoPanner();
@@ -245,12 +274,19 @@ export class GenerativeEngine {
     const spec = this.spec;
     if (!ctx || !spec || this.voices.length === 0) return;
     const scale = SCALES[spec.scale] ?? SCALES.major_pentatonic;
+    const L = scale.length;
+    // Semitone offset for an (extended) scale degree, wrapping octaves.
+    const deg = (x: number) => 12 * Math.floor(x / L) + scale[((x % L) + L) % L];
 
-    const notes: number[] = [spec.root, spec.root + 12];
+    // Advance through the chosen progression and build a diatonic triad on it.
+    const prog = PROGRESSIONS[spec.progression % PROGRESSIONS.length];
+    const base = prog[this.chordStep % prog.length];
+    if (!initial) this.chordStep++;
+    const triad = [deg(base), deg(base + 2), deg(base + 4)];
+
+    const notes: number[] = [spec.root + triad[0], spec.root + triad[0] + 12];
     for (let i = 0; i < this.voices.length - 2; i++) {
-      const deg = scale[Math.floor(this.rng() * scale.length)];
-      const oct = 12 * Math.floor(this.rng() * 2);
-      notes.push(spec.root + deg + oct);
+      notes.push(spec.root + triad[i % 3] + (i >= 3 ? 12 : 0));
     }
     this.chordTones = notes;
 
@@ -265,6 +301,12 @@ export class GenerativeEngine {
       v.gain.gain.cancelScheduledValues(now);
       v.gain.gain.setTargetAtTime(target, now, glide / 3);
     });
+
+    // Move the sub-bass with the chord root.
+    if (this.bass) {
+      this.bass.osc.frequency.cancelScheduledValues(now);
+      this.bass.osc.frequency.setTargetAtTime(midiToFreq(spec.root + triad[0] - 12), now, glide / 3);
+    }
   }
 
   private triggerPercussion(s: number, when: number): void {

@@ -17,6 +17,7 @@ import type {
   PieceSpec,
   Section,
 } from './types';
+import { PROGRESSION_COUNT } from './types';
 
 const RATINGS_KEY = 'mc.ratings.v1';
 const MAX_RATINGS = 300;
@@ -33,7 +34,7 @@ const SCALES = [
   'harmonic_minor',
 ] as const;
 
-const WAVES: GenWave[] = ['sine', 'triangle', 'warm'];
+const WAVES: GenWave[] = ['sine', 'triangle', 'warm', 'bell', 'glass'];
 
 interface Range {
   rootMin: number;
@@ -144,6 +145,7 @@ function randomSpec(section: Section): PieceSpec {
     arp: Math.random() < r.arpChance,
     bass: Math.random() < r.bassChance,
     percussion: pick(r.percussion),
+    progression: Math.floor(Math.random() * PROGRESSION_COUNT),
   };
 }
 
@@ -204,6 +206,7 @@ export function nextSpec(section: Section, ratings: PieceRating[]): PieceSpec {
     arp: likedMajority((s) => s.arp, r.arpChance),
     bass: likedMajority((s) => s.bass, r.bassChance),
     percussion: bestBy((s) => s.percussion, pick(r.percussion)),
+    progression: bestBy((s) => s.progression, Math.floor(Math.random() * PROGRESSION_COUNT)),
   };
 }
 
@@ -213,6 +216,7 @@ const NOTE_NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A'
 export function describeSpec(spec: PieceSpec): string {
   const note = NOTE_NAMES[(((spec.root % 12) + 12) % 12)];
   const parts = [`${note} ${spec.scale.replace('_', ' ')}`];
+  if (spec.wave === 'bell' || spec.wave === 'glass') parts.push(spec.wave);
   if (spec.percussion !== 'none') parts.push(spec.percussion);
   else if (spec.arp) parts.push('arp');
   return parts.join(' · ');
