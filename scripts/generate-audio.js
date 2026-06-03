@@ -238,7 +238,8 @@ function makeKit(N, seed) {
 
   // Punchy kick: phase-accurate pitch sweep, soft saturation, and a click transient.
   const kick = (start, o = {}) => {
-    const { gain = 0.9, pitchStart = 110, pitchEnd = 46, decay = 12, punch = 30, dur = 0.36, click = 0.25 } = o;
+    let { gain = 0.9, pitchStart = 110, pitchEnd = 46, decay = 12, punch = 30, dur = 0.36, click = 0.25 } = o;
+    gain *= 0.9 + rng() * 0.1;
     const n = Math.floor(dur * SR);
     let phase = 0;
     for (let i = 0; i < n; i++) {
@@ -255,7 +256,9 @@ function makeKit(N, seed) {
 
   // Snare/clap-ish: a tonal body plus high-passed noise with its own decay.
   const snare = (start, o = {}) => {
-    const { gain = 0.45, decay = 18, noiseAmt = 0.6, tone = 185, toneAmt = 0.4 } = o;
+    let { gain = 0.45, decay = 18, noiseAmt = 0.6, tone = 185, toneAmt = 0.4 } = o;
+    gain *= 0.9 + rng() * 0.1;
+    start += Math.round((rng() - 0.5) * 0.004 * SR);
     const n = Math.floor(0.25 * SR);
     let hp = 0;
     let prevN = 0;
@@ -276,7 +279,9 @@ function makeKit(N, seed) {
 
   // Multi-tap clap: three quick transients then a diffuse tail (house/garage backbeat).
   const clap = (start, o = {}) => {
-    const { gain = 0.5, pan = 0 } = o;
+    let { gain = 0.5, pan = 0 } = o;
+    gain *= 0.9 + rng() * 0.1;
+    start += Math.round((rng() - 0.5) * 0.004 * SR);
     const n = Math.floor(0.24 * SR);
     const taps = [0, 0.009, 0.018];
     let hp = 0;
@@ -296,7 +301,9 @@ function makeKit(N, seed) {
   // Metallic 808-style hat: a cluster of square oscillators, high-passed.
   const HAT_RATIOS = [2.0, 3.0, 4.16, 5.43, 6.79, 8.21];
   const hat = (start, o = {}) => {
-    const { gain = 0.16, open = false, pan = 0 } = o;
+    let { gain = 0.16, open = false, pan = 0 } = o;
+    gain *= 0.9 + rng() * 0.1;
+    start += Math.round((rng() - 0.5) * 0.004 * SR);
     const n = Math.floor((open ? 0.18 : 0.05) * SR);
     const f0 = 1480;
     let hp = 0;
@@ -315,7 +322,9 @@ function makeKit(N, seed) {
   };
 
   const shaker = (start, o = {}) => {
-    const { gain = 0.08, pan = 0 } = o;
+    let { gain = 0.08, pan = 0 } = o;
+    gain *= 0.9 + rng() * 0.1;
+    start += Math.round((rng() - 0.5) * 0.004 * SR);
     const n = Math.floor(0.045 * SR);
     let hp = 0;
     let prev = 0;
