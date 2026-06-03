@@ -108,6 +108,7 @@ export class GenerativeEngine {
   private filter: BiquadFilterNode | null = null;
   private bus: GainNode | null = null; // pad voices
   private reverbSend: GainNode | null = null; // wet send into the convolver
+  private delaySend: GainNode | null = null; // tempo-synced echo send
   private voices: Voice[] = [];
   private bass: { osc: OscillatorNode; gain: GainNode } | null = null;
   private noise: AudioBuffer | null = null;
@@ -142,7 +143,33 @@ export class GenerativeEngine {
     const master = ctx.createGain();
     master.gain.setValueAtTime(0.0001, now);
     master.gain.exponentialRampToValueAtTime(this.targetGain, now + 4);
-    master.connect(ctx.destination);
+    // Master glue: a gentle compressor for an even, polished level.
+    const comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = -22;
+    comp.knee.value = 24;
+    comp.ratio.value = 3;
+    comp.attack.value = 0.01;
+    comp.release.value = 0.25;
+    master.connect(comp).connect(ctx.destination);
+    this.extras.push(comp);
+
+    // Tempo-synced feedback delay (dotted-eighth) for space and movement.
+    const delay = ctx.createDelay(2);
+    delay.delayTime.value = (60 / spec.tempo) * 0.75;
+    const delayFb = ctx.createGain();
+    delayFb.gain.value = 0.34;
+    const delayLp = ctx.createBiquadFilter();
+    delayLp.type = 'lowpass';
+    delayLp.frequency.value = 2600;
+    delay.connect(delayLp).connect(delayFb).connect(delay);
+    const delayWet = ctx.createGain();
+    delayWet.gain.value = 0.3;
+    delay.connect(delayWet).connect(master);
+    const delaySend = ctx.createGain();
+    delaySend.gain.value = 1;
+    delaySend.connect(delay);
+    this.delaySend = delaySend;
+    this.extras.push(delay, delayLp, delayFb, delayWet, delaySend);
 
     // Reverb send: a generated impulse gives a lush, spacious tail.
     const convolver = ctx.createConvolver();
@@ -171,6 +198,21 @@ export class GenerativeEngine {
     bus.gain.value = 1;
     bus.connect(filter);
     bus.connect(reverbSend); // pad also feeds the reverb
+
+    // Chorus: a slowly-modulated short delay thickens and widens the pad.
+    const chorus = ctx.createDelay(0.05);
+    chorus.delayTime.value = 0.022;
+    const chorusLfo = ctx.createOscillator();
+    chorusLfo.frequency.value = 0.22;
+    const chorusDepth = ctx.createGain();
+    chorusDepth.gain.value = 0.004;
+    chorusLfo.connect(chorusDepth).connect(chorus.delayTime);
+    chorusLfo.start();
+    const chorusWet = ctx.createGain();
+    chorusWet.gain.value = 0.5;
+    bus.connect(chorus);
+    chorus.connect(chorusWet).connect(filter);
+    this.extras.push(chorus, chorusLfo, chorusDepth, chorusWet);
 
     this.master = master;
     this.pulseGain = pulse;
@@ -419,6 +461,7 @@ export class GenerativeEngine {
     osc.connect(g).connect(p);
     p.connect(this.pulseGain);
     if (this.reverbSend) p.connect(this.reverbSend);
+    if (this.delaySend) p.connect(this.delaySend);
     osc.start(when);
     osc.stop(when + dur + 0.06);
   }
@@ -470,6 +513,7 @@ export class GenerativeEngine {
     osc.connect(g).connect(p);
     p.connect(this.pulseGain);
     if (this.reverbSend) p.connect(this.reverbSend);
+    if (this.delaySend) p.connect(this.delaySend);
     osc.start(when);
     osc.stop(when + 0.55);
   }
@@ -606,6 +650,7 @@ export class GenerativeEngine {
     this.pulseGain = null;
     this.bus = null;
     this.reverbSend = null;
+    this.delaySend = null;
     this.ctx = null;
   }
 }

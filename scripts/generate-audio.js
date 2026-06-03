@@ -58,12 +58,20 @@ const softClip = (x, ceiling) => ceiling * Math.tanh(x / ceiling);
  * a soft limiter. Channels are gain-linked so stereo / binaural imaging (and
  * the binaural beat) is preserved.
  */
-function master(channels, { targetDb = -14, thresholdDb = -18, ratio = 3 } = {}) {
+function master(channels, { targetDb = -14, thresholdDb = -18, ratio = 3, air = 0 } = {}) {
   const n = channels[0].length;
   const thr = dbToLin(thresholdDb);
   const atk = Math.exp(-1 / (0.005 * SAMPLE_RATE));
   const rel = Math.exp(-1 / (0.12 * SAMPLE_RATE));
   let env = 0;
+
+  // 0) "Air" — a gentle high-shelf lift for a more produced top end.
+  if (air > 0) {
+    for (const ch of channels) {
+      const hp = highPass(ch, 7000);
+      for (let i = 0; i < n; i++) ch[i] += air * hp[i];
+    }
+  }
 
   // 1) Linked compressor.
   for (let i = 0; i < n; i++) {
@@ -1268,18 +1276,18 @@ const clarity = generateMusic({
 writeWavStereo(path.join(MUSIC_DIR, 'clarity.wav'), clarity.left, clarity.right, { targetDb: -16 });
 
 const lofi = generateLoFi();
-writeWavStereo(path.join(BEATS_DIR, 'lofi.wav'), lofi.left, lofi.right);
+writeWavStereo(path.join(BEATS_DIR, 'lofi.wav'), lofi.left, lofi.right, { air: 0.3 });
 const liquid = generateLiquid();
-writeWavStereo(path.join(BEATS_DIR, 'liquid.wav'), liquid.left, liquid.right);
+writeWavStereo(path.join(BEATS_DIR, 'liquid.wav'), liquid.left, liquid.right, { air: 0.3 });
 const chillstep = generateChillstep();
-writeWavStereo(path.join(BEATS_DIR, 'chillstep.wav'), chillstep.left, chillstep.right);
+writeWavStereo(path.join(BEATS_DIR, 'chillstep.wav'), chillstep.left, chillstep.right, { air: 0.3 });
 const downtempo = generateDowntempo();
-writeWavStereo(path.join(BEATS_DIR, 'downtempo.wav'), downtempo.left, downtempo.right);
+writeWavStereo(path.join(BEATS_DIR, 'downtempo.wav'), downtempo.left, downtempo.right, { air: 0.3 });
 const deephouse = generateZhu();
-writeWavStereo(path.join(BEATS_DIR, 'deephouse.wav'), deephouse.left, deephouse.right);
+writeWavStereo(path.join(BEATS_DIR, 'deephouse.wav'), deephouse.left, deephouse.right, { air: 0.3 });
 const melodic = generateRufus();
-writeWavStereo(path.join(BEATS_DIR, 'melodic.wav'), melodic.left, melodic.right);
+writeWavStereo(path.join(BEATS_DIR, 'melodic.wav'), melodic.left, melodic.right, { air: 0.3 });
 const techno = generateTechno();
-writeWavStereo(path.join(BEATS_DIR, 'techno.wav'), techno.left, techno.right);
+writeWavStereo(path.join(BEATS_DIR, 'techno.wav'), techno.left, techno.right, { air: 0.3 });
 
 console.log('Done.');
