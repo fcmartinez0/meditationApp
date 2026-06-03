@@ -23,7 +23,13 @@ const SCALES: Record<string, number[]> = {
   harmonic_minor: [0, 2, 3, 5, 7, 8, 11],
 };
 
-const ARP_CONTOUR = [0, 2, 1, 3, 2, 4, 1, 2];
+const ARP_PATTERNS = [
+  [0, 2, 1, 3, 2, 4, 1, 2],
+  [0, 1, 2, 3, 4, 3, 2, 1], // up & down
+  [0, 2, 4, 2, 1, 3, 1, 0],
+  [0, 3, 1, 4, 2, 0, 3, 1], // wider leaps
+  [4, 3, 2, 1, 0, 1, 2, 3], // descending
+];
 
 // Chord-root movement as scale-degree sequences (index 0 is a static drone).
 const PROGRESSIONS = [
@@ -121,6 +127,8 @@ export class GenerativeEngine {
   private arpIdx = 0;
   private step = 0;
   private chordStep = 0;
+  private arpPattern: number[] = ARP_PATTERNS[0];
+  private arpEvery = 2;
 
   async start(spec: PieceSpec): Promise<void> {
     const ctx = getCtx();
@@ -247,6 +255,10 @@ export class GenerativeEngine {
       this.extras.push(pumpLfo, depth);
     }
 
+    // Per-piece arpeggio pattern and rate, chosen deterministically from the seed.
+    this.arpPattern = ARP_PATTERNS[Math.floor(this.rng() * ARP_PATTERNS.length)];
+    this.arpEvery = [2, 2, 2, 1, 4][Math.floor(this.rng() * 5)];
+
     // Pad voices — basic oscillator type, or a custom bell/glass timbre.
     const periodicWave = makeWave(ctx, spec.wave);
     const oscType: OscillatorType =
@@ -261,6 +273,15 @@ export class GenerativeEngine {
       const pan = ctx.createStereoPanner();
       const side = i % 2 === 0 ? -1 : 1;
       pan.pan.value = side * (0.3 + this.rng() * 0.5);
+      // Slow analog drift on the tuning for warmth.
+      const drift = ctx.createOscillator();
+      drift.type = 'sine';
+      drift.frequency.value = 0.04 + this.rng() * 0.1;
+      const driftGain = ctx.createGain();
+      driftGain.gain.value = 4 + this.rng() * 5; // cents
+      drift.connect(driftGain).connect(osc.detune);
+      drift.start();
+      this.extras.push(drift, driftGain);
       osc.connect(gain).connect(pan).connect(bus);
       osc.start();
       this.voices.push({ osc, gain, pan, side });
@@ -325,15 +346,15 @@ export class GenerativeEngine {
     // Semitone offset for an (extended) scale degree, wrapping octaves.
     const deg = (x: number) => 12 * Math.floor(x / L) + scale[((x % L) + L) % L];
 
-    // Advance through the chosen progression and build a diatonic triad on it.
+    // Advance through the progression and build a lush diatonic 7th chord on it.
     const prog = PROGRESSIONS[spec.progression % PROGRESSIONS.length];
     const base = prog[this.chordStep % prog.length];
     if (!initial) this.chordStep++;
-    const triad = [deg(base), deg(base + 2), deg(base + 4)];
+    const chord = [deg(base), deg(base + 2), deg(base + 4), deg(base + 6)];
 
-    const notes: number[] = [spec.root + triad[0], spec.root + triad[0] + 12];
+    const notes: number[] = [spec.root + chord[0], spec.root + chord[0] + 12];
     for (let i = 0; i < this.voices.length - 2; i++) {
-      notes.push(spec.root + triad[i % 3] + (i >= 3 ? 12 : 0));
+      notes.push(spec.root + chord[i % 4] + (i >= 4 ? 12 : 0));
     }
     this.chordTones = notes;
 
@@ -352,7 +373,7 @@ export class GenerativeEngine {
     // Move the sub-bass with the chord root.
     if (this.bass) {
       this.bass.osc.frequency.cancelScheduledValues(now);
-      this.bass.osc.frequency.setTargetAtTime(midiToFreq(spec.root + triad[0] - 12), now, glide / 3);
+      this.bass.osc.frequency.setTargetAtTime(midiToFreq(spec.root + chord[0] - 12), now, glide / 3);
     }
   }
 
@@ -393,8 +414,8 @@ export class GenerativeEngine {
   }
 
   private triggerArp(s: number, when: number): void {
-    if (s % 2 !== 0 || this.chordTones.length === 0) return;
-    const deg = ARP_CONTOUR[this.arpIdx % ARP_CONTOUR.length] % this.chordTones.length;
+    if (s % this.arpEvery !== 0 || this.chordTones.length === 0) return;
+    const deg = this.arpPattern[this.arpIdx % this.arpPattern.length] % this.chordTones.length;
     const midi = this.chordTones[deg] + 12;
     const pan = this.arpIdx % 2 === 0 ? -0.6 : 0.6;
     this.arpIdx++;
