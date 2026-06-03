@@ -24,6 +24,10 @@ export default function RootLayout() {
                   gestureEnabled: false,
                 }}
               />
+              <Stack.Screen
+                name="breathe"
+                options={{ presentation: 'fullScreenModal', animation: 'fade' }}
+              />
               <Stack.Screen name="legal" options={{ presentation: 'modal' }} />
             </Stack>
             <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />

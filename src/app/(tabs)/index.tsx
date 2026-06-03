@@ -167,6 +167,19 @@ export default function MeditateScreen() {
         </View>
       </Card>
 
+      <Pressable onPress={() => router.push('/breathe')} accessibilityRole="button">
+        <Card style={styles.breatheCard}>
+          <Ionicons name="ellipse-outline" size={26} color={colors.accent} />
+          <View style={{ flex: 1 }}>
+            <AppText variant="heading">Breathing exercises</AppText>
+            <AppText variant="caption" muted>
+              Box · 4-7-8 · Calm · Coherent
+            </AppText>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+        </Card>
+      </Pressable>
+
       <View style={styles.section}>
         <AppText variant="label" muted>
           SESSION LENGTH
@@ -225,6 +238,7 @@ export default function MeditateScreen() {
 const styles = StyleSheet.create({
   header: { gap: spacing.xs, marginTop: spacing.sm },
   streakCard: { paddingVertical: spacing.lg },
+  breatheCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.lg },
   streakRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   section: { gap: spacing.md },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
