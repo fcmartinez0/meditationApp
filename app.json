@@ -9,9 +9,11 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.fcmartinez0.stillness"
     },
     "android": {
+      "package": "com.fcmartinez0.stillness",
       "adaptiveIcon": {
         "backgroundColor": "#0E1020",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

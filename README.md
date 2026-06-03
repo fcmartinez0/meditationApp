@@ -84,6 +84,18 @@ npx expo run:ios
 npx expo run:android
 ```
 
+### Cloud builds & store submission (EAS)
+
+`eas.json` defines `development`, `preview`, and `production` profiles, and the
+bundle identifier is `com.fcmartinez0.stillness` (iOS & Android). No Mac
+required:
+
+```bash
+npm i -g eas-cli && eas login
+eas build -p ios --profile preview     # installable build via link
+eas submit -p ios                       # TestFlight / App Store (needs an Apple Developer account)
+```
+
 ## Project structure
 
 ```
