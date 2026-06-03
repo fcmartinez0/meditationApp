@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { BreathingOrb } from '@/components/BreathingOrb';
+import { TideTimer } from '@/components/TideTimer';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { SessionAudio } from '@/lib/audio';
 import { dayKey, formatClock } from '@/lib/date';
@@ -290,14 +291,32 @@ export default function SessionScreen() {
           style={styles.center}
           pointerEvents="box-none"
           entering={FadeIn.duration(1100)}>
-          <BreathingOrb active={phase === 'running'} core={cat.accent} halo={cat.colors[0]}>
-            <AppText variant="display" color="#FFFFFF" style={styles.clock}>
+          {settings.timerStyle === 'tide' ? (
+            <TideTimer active={phase === 'running'} progress={progress} color={cat.accent}>
+              <AppText variant="display" color="#FFFFFF" style={styles.clock}>
+                {formatClock(remaining)}
+              </AppText>
+            </TideTimer>
+          ) : settings.timerStyle === 'minimal' ? (
+            <AppText variant="display" color={cat.accent} style={styles.clockMinimal}>
               {formatClock(remaining)}
             </AppText>
-          </BreathingOrb>
+          ) : (
+            <BreathingOrb active={phase === 'running'} core={cat.accent} halo={cat.colors[0]}>
+              <AppText variant="display" color="#FFFFFF" style={styles.clock}>
+                {formatClock(remaining)}
+              </AppText>
+            </BreathingOrb>
+          )}
 
           <AppText variant="label" muted style={styles.hint}>
-            {phase === 'running' ? 'Breathe with the orb' : 'Paused'}
+            {phase === 'running'
+              ? settings.timerStyle === 'orb'
+                ? 'Breathe with the orb'
+                : settings.timerStyle === 'tide'
+                  ? 'Let it fill'
+                  : 'Be still'
+              : 'Paused'}
           </AppText>
         </Animated.View>
 
@@ -357,6 +376,7 @@ const styles = StyleSheet.create({
   },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.xl },
   clock: { fontSize: 52, fontWeight: '200' },
+  clockMinimal: { fontSize: 76, fontWeight: '100' },
   hint: { marginTop: spacing.sm },
   controls: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xl, gap: spacing.lg },
   nowPlaying: {

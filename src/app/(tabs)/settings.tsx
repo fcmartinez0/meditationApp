@@ -14,7 +14,7 @@ import {
   scheduleDailyReminder,
 } from '@/lib/notifications';
 import { clearRatings, loadRatings, summarizePreference } from '@/lib/preferences';
-import type { PieceRating } from '@/lib/types';
+import type { PieceRating, TimerStyle } from '@/lib/types';
 import { useAppData } from '@/store/AppData';
 import { radius, spacing } from '@/theme';
 import { CATEGORY_STYLES } from '@/theme/categories';
@@ -25,6 +25,12 @@ const INTERVALS = [
   { value: 2, label: '2 min' },
   { value: 5, label: '5 min' },
   { value: 10, label: '10 min' },
+];
+
+const TIMER_STYLES: { value: TimerStyle; label: string }[] = [
+  { value: 'orb', label: 'Breathing orb' },
+  { value: 'tide', label: 'Tide' },
+  { value: 'minimal', label: 'Minimal' },
 ];
 
 /** A labelled row with a control on the right. */
@@ -197,6 +203,26 @@ export default function SettingsScreen() {
             </Pressable>
           </View>
         </Row>
+        <View style={[styles.divider, { backgroundColor: colors.border }]} />
+        <AppText variant="body">Session visual</AppText>
+        <View style={styles.chipWrap}>
+          {TIMER_STYLES.map((opt) => {
+            const selected = settings.timerStyle === opt.value;
+            return (
+              <Pressable
+                key={opt.value}
+                onPress={() => updateSettings({ timerStyle: opt.value })}
+                style={[
+                  styles.intervalChip,
+                  { backgroundColor: selected ? colors.accent : colors.surfaceMuted },
+                ]}>
+                <AppText variant="caption" color={selected ? colors.textOnAccent : colors.text}>
+                  {opt.label}
+                </AppText>
+              </Pressable>
+            );
+          })}
+        </View>
       </Card>
 
       <Card style={styles.card}>

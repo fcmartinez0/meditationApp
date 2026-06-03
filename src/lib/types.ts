@@ -130,6 +130,9 @@ export interface PieceRating {
   at: number;
 }
 
+/** The visual shown during a session. */
+export type TimerStyle = 'orb' | 'tide' | 'minimal';
+
 /** A single completed (or partially completed) meditation session. */
 export interface SessionRecord {
   /** Unix epoch ms when the session ended. */
@@ -160,6 +163,8 @@ export interface Settings {
   reminderMinute: number;
   /** Background sound volume, 0..1. */
   volume: number;
+  /** Visual shown during a session. */
+  timerStyle: TimerStyle;
   /** Schema version, for one-time migrations of stored settings. */
   settingsVersion: number;
 }
@@ -186,5 +191,6 @@ export const DEFAULT_SETTINGS: Settings = {
   reminderHour: 8,
   reminderMinute: 0,
   volume: 0.85,
+  timerStyle: 'orb',
   settingsVersion: 2,
 };
