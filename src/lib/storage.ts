@@ -46,6 +46,11 @@ export async function loadSettings(): Promise<Settings> {
       merged.endBell = false;
       merged.settingsVersion = 2;
     }
+    // v3: don't show onboarding to anyone who already has saved settings.
+    if ((stored.settingsVersion ?? 1) < 3) {
+      merged.onboarded = true;
+      merged.settingsVersion = 3;
+    }
     // Drop a sound that no longer exists (e.g. a renamed/removed track).
     if (!AMBIENT_KEYS.includes(merged.ambient)) merged.ambient = 'none';
     return merged;

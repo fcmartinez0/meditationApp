@@ -167,6 +167,8 @@ export interface Settings {
   volume: number;
   /** Visual shown during a session. */
   timerStyle: TimerStyle;
+  /** Whether the first-run intro has been completed. */
+  onboarded: boolean;
   /** Schema version, for one-time migrations of stored settings. */
   settingsVersion: number;
 }
@@ -194,5 +196,6 @@ export const DEFAULT_SETTINGS: Settings = {
   reminderMinute: 0,
   volume: 0.85,
   timerStyle: 'orb',
-  settingsVersion: 2,
+  onboarded: false,
+  settingsVersion: 3,
 };

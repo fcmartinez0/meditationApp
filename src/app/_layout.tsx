@@ -4,7 +4,14 @@ import { useColorScheme } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { AppDataProvider } from '@/store/AppData';
+import { Onboarding } from '@/components/Onboarding';
+import { AppDataProvider, useAppData } from '@/store/AppData';
+
+function OnboardingGate() {
+  const { ready, settings } = useAppData();
+  if (!ready || settings.onboarded) return null;
+  return <Onboarding />;
+}
 
 export default function RootLayout() {
   const scheme = useColorScheme();
@@ -30,6 +37,7 @@ export default function RootLayout() {
               />
               <Stack.Screen name="legal" options={{ presentation: 'modal' }} />
             </Stack>
+            <OnboardingGate />
             <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
           </ThemeProvider>
         </AppDataProvider>
