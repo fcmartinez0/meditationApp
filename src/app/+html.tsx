@@ -19,6 +19,7 @@ const CSP = [
   "font-src 'self' data:",
   "media-src 'self' blob: data:", // bundled audio is same-origin
   "connect-src 'self'", // the app makes no cross-origin requests
+  "worker-src 'self'", // the offline service worker
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
@@ -45,7 +46,15 @@ export default function Root({ children }: PropsWithChildren) {
         <meta name="apple-mobile-web-app-title" content="Stillness" />
         <ScrollViewStyleReset />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/meditationApp/sw.js',{scope:'/meditationApp/'}).catch(function(){});});}",
+          }}
+        />
+      </body>
     </html>
   );
 }
