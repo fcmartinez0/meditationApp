@@ -326,25 +326,29 @@ export class GenerativeEngine {
       this.timers.push(setTimeout(strum, 300));
     }
 
-    // Sub-bass drone on the root, an octave down.
+    // Sub-bass drone on the root, an octave down — entering at a varied time.
     if (spec.bass) {
+      const bassEntry = this.rng() * 8;
       const osc = ctx.createOscillator();
       osc.type = 'sine';
       osc.frequency.value = midiToFreq(spec.root - 12);
       const gain = ctx.createGain();
-      gain.gain.setValueAtTime(0.0001, now);
-      gain.gain.exponentialRampToValueAtTime(0.16, now + 4);
+      gain.gain.setValueAtTime(0.0001, now + bassEntry);
+      gain.gain.exponentialRampToValueAtTime(0.16, now + bassEntry + 4);
       osc.connect(gain).connect(pulse);
       osc.start();
       this.bass = { osc, gain };
     }
 
+    // Open at a random point in the progression so pieces don't all start on
+    // the tonic chord.
+    this.chordStep = Math.floor(this.rng() * PROGRESSIONS[spec.progression % PROGRESSIONS.length].length);
     this.setChord(true);
     this.timers.push(
       setInterval(() => this.setChord(false), Math.max(4000, spec.chordChangeSec * 1000)),
     );
 
-    // Sparse chimes.
+    // Sparse chimes — first one at a varied time.
     if (spec.chimeDensity > 0.02) {
       const scheduleChime = () => {
         if (!this.ctx) return;
@@ -352,10 +356,10 @@ export class GenerativeEngine {
         const gap = (5 + this.rng() * 12) / Math.max(0.05, spec.chimeDensity);
         this.timers.push(setTimeout(scheduleChime, gap * 1000));
       };
-      this.timers.push(setTimeout(scheduleChime, 5000));
+      this.timers.push(setTimeout(scheduleChime, (3 + this.rng() * 16) * 1000));
     }
 
-    // Step grid for arp + percussion.
+    // Step grid for arp + percussion — the groove builds in after a varied delay.
     if (spec.arp || spec.percussion !== 'none') {
       const stepDur = 60 / spec.tempo / 4;
       const tick = () => {
@@ -367,12 +371,15 @@ export class GenerativeEngine {
         if (spec.arp) this.triggerArp(s, when);
         this.step++;
       };
-      this.timers.push(setInterval(tick, stepDur * 1000));
+      const grooveEntry = (sustained ? this.rng() * 14 : this.rng() * 8) * 1000;
+      this.timers.push(
+        setTimeout(() => this.timers.push(setInterval(tick, stepDur * 1000)), grooveEntry),
+      );
     }
 
-    // Sparse melodic lead.
+    // Sparse melodic lead — enters at a varied time.
     if (spec.melody) {
-      this.timers.push(setTimeout(() => this.scheduleMelody(), 6000));
+      this.timers.push(setTimeout(() => this.scheduleMelody(), (4 + this.rng() * 18) * 1000));
     }
   }
 
