@@ -37,9 +37,8 @@ export function SoundRow({
       style={({ pressed }) => [
         styles.row,
         {
-          backgroundColor: selected ? withAlpha(cat.accent, 0.12) : colors.surface,
-          borderColor: selected ? cat.accent : colors.border,
-          opacity: pressed ? 0.85 : 1,
+          backgroundColor: selected ? withAlpha(cat.accent, 0.14) : 'transparent',
+          opacity: pressed ? 0.6 : 1,
         },
       ]}>
       <LinearGradient
@@ -71,15 +70,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    padding: spacing.sm,
-    paddingRight: spacing.lg,
-    borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.lg,
   },
   art: {
-    width: 48,
-    height: 48,
-    borderRadius: radius.sm,
+    width: 46,
+    height: 46,
+    borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
   },

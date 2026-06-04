@@ -4,7 +4,6 @@ import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
-import { Card } from '@/components/Card';
 import { Screen } from '@/components/Screen';
 import { SoundRow, type SoundItem } from '@/components/SoundRow';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -103,39 +102,63 @@ export default function MeditateScreen() {
 
   const sel = SOUND_INDEX[settings.ambient] ?? { label: 'Silence', icon: 'moon-outline' as const };
 
-  // Always-visible "ready" bar so you never have to scroll to start.
+  // Always-visible "ready" bar — pick length and start without scrolling.
   const readyBar = (
     <View style={[styles.bar, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
-      <LinearGradient
-        colors={active.colors}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.barArt}>
-        <Ionicons name={sel.icon} size={20} color="#FFFFFF" />
-      </LinearGradient>
-      <View style={styles.barText}>
-        <AppText variant="body" numberOfLines={1}>
-          {sel.label}
-        </AppText>
-        <View style={styles.barSub}>
-          <AppText variant="caption" muted>
-            {settings.durationMin} min
-          </AppText>
-          {headphonesHelp && <Ionicons name="headset-outline" size={12} color={colors.textSecondary} />}
-        </View>
+      <View style={styles.durationRow}>
+        {DURATIONS.map((min) => {
+          const selected = settings.durationMin === min;
+          return (
+            <Pressable
+              key={min}
+              onPress={() => updateSettings({ durationMin: min })}
+              accessibilityLabel={`${min} minutes`}
+              style={[
+                styles.durationPill,
+                { backgroundColor: selected ? active.accent : colors.surfaceMuted },
+              ]}>
+              <AppText variant="caption" color={selected ? '#FFFFFF' : colors.textSecondary}>
+                {min}
+              </AppText>
+            </Pressable>
+          );
+        })}
       </View>
-      <Pressable onPress={begin} accessibilityRole="button" accessibilityLabel="Begin session">
+
+      <View style={styles.beginRow}>
         <LinearGradient
           colors={active.colors}
           start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.barBegin}>
-          <Ionicons name="play" size={18} color="#FFFFFF" />
-          <AppText variant="label" color="#FFFFFF" style={styles.beginLabel}>
-            Begin
-          </AppText>
+          end={{ x: 1, y: 1 }}
+          style={styles.barArt}>
+          <Ionicons name={sel.icon} size={20} color="#FFFFFF" />
         </LinearGradient>
-      </Pressable>
+        <View style={styles.barText}>
+          <AppText variant="body" numberOfLines={1}>
+            {sel.label}
+          </AppText>
+          <View style={styles.barSub}>
+            <AppText variant="caption" muted>
+              {settings.durationMin} min
+            </AppText>
+            {headphonesHelp && (
+              <Ionicons name="headset-outline" size={12} color={colors.textSecondary} />
+            )}
+          </View>
+        </View>
+        <Pressable onPress={begin} accessibilityRole="button" accessibilityLabel="Begin session">
+          <LinearGradient
+            colors={active.colors}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.barBegin}>
+            <Ionicons name="play" size={18} color="#FFFFFF" />
+            <AppText variant="label" color="#FFFFFF" style={styles.beginLabel}>
+              Begin
+            </AppText>
+          </LinearGradient>
+        </Pressable>
+      </View>
     </View>
   );
 
@@ -148,67 +171,38 @@ export default function MeditateScreen() {
         <AppText variant="title">Take a moment to breathe</AppText>
       </View>
 
-      <Card style={styles.streakCard}>
-        <View style={styles.streakRow}>
-          <Ionicons name="flame" size={28} color={colors.warning} />
-          <View style={{ flex: 1 }}>
-            <AppText variant="heading">
-              {stats.currentStreak > 0 ? `${stats.currentStreak}-day streak` : 'Start your streak'}
-            </AppText>
-            <AppText variant="caption" muted>
-              {stats.meditatedToday
-                ? "You've meditated today. Beautiful."
-                : 'A few minutes is all it takes.'}
-            </AppText>
-          </View>
-          {stats.meditatedToday && (
-            <Ionicons name="checkmark-circle" size={24} color={colors.success} />
-          )}
+      <View style={styles.streakRow}>
+        <Ionicons name="flame" size={26} color={colors.warning} />
+        <View style={{ flex: 1 }}>
+          <AppText variant="heading">
+            {stats.currentStreak > 0 ? `${stats.currentStreak}-day streak` : 'Start your streak'}
+          </AppText>
+          <AppText variant="caption" muted>
+            {stats.meditatedToday
+              ? "You've meditated today. Beautiful."
+              : 'A few minutes is all it takes.'}
+          </AppText>
         </View>
-      </Card>
+        {stats.meditatedToday && (
+          <Ionicons name="checkmark-circle" size={24} color={colors.success} />
+        )}
+      </View>
 
-      <Pressable onPress={() => router.push('/breathe')} accessibilityRole="button">
-        <Card style={styles.breatheCard}>
-          <Ionicons name="ellipse-outline" size={26} color={colors.accent} />
-          <View style={{ flex: 1 }}>
-            <AppText variant="heading">Breathing exercises</AppText>
-            <AppText variant="caption" muted>
-              Box · 4-7-8 · Calm · Coherent
-            </AppText>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
-        </Card>
+      <Pressable
+        onPress={() => router.push('/breathe')}
+        accessibilityRole="button"
+        style={({ pressed }) => [styles.breatheRow, { opacity: pressed ? 0.6 : 1 }]}>
+        <Ionicons name="ellipse-outline" size={24} color={colors.accent} />
+        <View style={{ flex: 1 }}>
+          <AppText variant="heading">Breathing exercises</AppText>
+          <AppText variant="caption" muted>
+            Box · 4-7-8 · Calm · Coherent
+          </AppText>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
       </Pressable>
 
-      <View style={styles.section}>
-        <AppText variant="label" muted>
-          SESSION LENGTH
-        </AppText>
-        <View style={styles.chipWrap}>
-          {DURATIONS.map((min) => {
-            const selected = settings.durationMin === min;
-            return (
-              <Pressable
-                key={min}
-                onPress={() => updateSettings({ durationMin: min })}
-                style={[
-                  styles.durationChip,
-                  {
-                    backgroundColor: selected ? active.accent : colors.surface,
-                    borderColor: selected ? active.accent : colors.border,
-                  },
-                ]}>
-                <AppText variant="heading" color={selected ? '#FFFFFF' : colors.text}>
-                  {min}
-                </AppText>
-                <AppText variant="caption" color={selected ? '#FFFFFF' : colors.textSecondary}>
-                  min
-                </AppText>
-              </Pressable>
-            );
-          })}
-        </View>
-      </View>
+      <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
       {SECTIONS.map((section) => (
         <View key={section.title} style={styles.section}>
@@ -237,33 +231,30 @@ export default function MeditateScreen() {
 
 const styles = StyleSheet.create({
   header: { gap: spacing.xs, marginTop: spacing.sm },
-  streakCard: { paddingVertical: spacing.lg },
-  breatheCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.lg },
-  streakRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  section: { gap: spacing.md },
-  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
-  durationChip: {
-    width: 72,
-    height: 72,
-    borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  list: { gap: spacing.sm },
+  streakRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.xs },
+  breatheRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.xs },
+  divider: { height: StyleSheet.hairlineWidth, marginVertical: spacing.xs },
+  section: { gap: spacing.sm },
+  list: { gap: spacing.xs },
   bar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
     paddingBottom: spacing.md,
+    gap: spacing.md,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
+  durationRow: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.xs },
+  durationPill: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.pill,
+    alignItems: 'center',
+  },
+  beginRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   barArt: {
     width: 44,
     height: 44,
-    borderRadius: radius.sm,
+    borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
