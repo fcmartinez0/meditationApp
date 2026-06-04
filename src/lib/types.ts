@@ -79,6 +79,8 @@ export function sectionFor(sound: GenerativeSound): Section {
  * a rating can be meaningfully attributed to it.
  */
 export type GenWave = 'sine' | 'triangle' | 'warm' | 'bell' | 'glass';
+/** The instrument character / articulation of a generated piece. */
+export type GenInstrument = 'pad' | 'choir' | 'bells' | 'pluck' | 'keys';
 export type GenPercussion =
   | 'none'
   | 'heartbeat'
@@ -106,8 +108,10 @@ export interface PieceSpec {
   tempo: number;
   /** 0..0.3 — gentle amplitude pulse depth (0 = none). */
   pulseDepth: number;
-  /** Pad/voice timbre. */
+  /** Pad/voice timbre (used by the sustained 'pad' instrument). */
   wave: GenWave;
+  /** Instrument character — sustained pad/choir vs plucked bells/harp/keys. */
+  instrument: GenInstrument;
   /** Whether a melodic arpeggio plays over the chords. */
   arp: boolean;
   /** Whether a sub-bass follows the chord root. */

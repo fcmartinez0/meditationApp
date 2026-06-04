@@ -155,12 +155,15 @@ export class GenerativeEngine {
     }
 
     const now = ctx.currentTime;
+    // Sustained pad/choir vs. plucked bells/harp/keys — the main character lever.
+    const sustained = spec.instrument === 'pad' || spec.instrument === 'choir';
+    const fadeIn = sustained ? 2.5 + this.rng() * 3 : 1.4; // varied, shorter for plucked
 
     // Chain: pad bus -> filter -> pulse -> master -> destination.
     // Rhythmic/bright layers route post-filter for clarity.
     const master = ctx.createGain();
     master.gain.setValueAtTime(0.0001, now);
-    master.gain.exponentialRampToValueAtTime(this.targetGain, now + 4);
+    master.gain.exponentialRampToValueAtTime(this.targetGain, now + fadeIn);
     // Master glue: a gentle compressor for an even, polished level.
     const comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -22;
@@ -270,32 +273,57 @@ export class GenerativeEngine {
     this.arpPattern = ARP_PATTERNS[Math.floor(this.rng() * ARP_PATTERNS.length)];
     this.arpEvery = [2, 2, 2, 1, 4][Math.floor(this.rng() * 5)];
 
-    // Pad voices — basic oscillator type, or a custom bell/glass timbre.
-    const periodicWave = makeWave(ctx, spec.wave);
-    const oscType: OscillatorType =
-      spec.wave === 'warm' ? 'sawtooth' : spec.wave === 'triangle' ? 'triangle' : 'sine';
     const voiceCount = spec.section === 'chill' ? 6 : 5;
-    for (let i = 0; i < voiceCount; i++) {
-      const osc = ctx.createOscillator();
-      if (periodicWave) osc.setPeriodicWave(periodicWave);
-      else osc.type = oscType;
-      const gain = ctx.createGain();
-      gain.gain.value = 0;
-      const pan = ctx.createStereoPanner();
-      const side = i % 2 === 0 ? -1 : 1;
-      pan.pan.value = side * (0.3 + this.rng() * 0.5);
-      // Slow analog drift on the tuning for warmth.
-      const drift = ctx.createOscillator();
-      drift.type = 'sine';
-      drift.frequency.value = 0.04 + this.rng() * 0.1;
-      const driftGain = ctx.createGain();
-      driftGain.gain.value = 4 + this.rng() * 5; // cents
-      drift.connect(driftGain).connect(osc.detune);
-      drift.start();
-      this.extras.push(drift, driftGain);
-      osc.connect(gain).connect(pan).connect(bus);
-      osc.start();
-      this.voices.push({ osc, gain, pan, side });
+
+    if (sustained) {
+      // Sustained pad / choir: held oscillators that glide between chords.
+      const choir = spec.instrument === 'choir';
+      const periodicWave = choir ? null : makeWave(ctx, spec.wave);
+      const oscType: OscillatorType = choir
+        ? 'sawtooth' // airy ensemble
+        : spec.wave === 'warm'
+          ? 'sawtooth'
+          : spec.wave === 'triangle'
+            ? 'triangle'
+            : 'sine';
+      for (let i = 0; i < voiceCount; i++) {
+        const osc = ctx.createOscillator();
+        if (periodicWave) osc.setPeriodicWave(periodicWave);
+        else osc.type = oscType;
+        const gain = ctx.createGain();
+        gain.gain.value = 0;
+        const pan = ctx.createStereoPanner();
+        const side = i % 2 === 0 ? -1 : 1;
+        pan.pan.value = side * (0.3 + this.rng() * 0.5);
+        // Slow analog drift on the tuning for warmth (wider for choir).
+        const drift = ctx.createOscillator();
+        drift.type = 'sine';
+        drift.frequency.value = 0.04 + this.rng() * 0.1;
+        const driftGain = ctx.createGain();
+        driftGain.gain.value = (choir ? 7 : 4) + this.rng() * 5; // cents
+        drift.connect(driftGain).connect(osc.detune);
+        drift.start();
+        this.extras.push(drift, driftGain);
+        osc.connect(gain).connect(pan).connect(bus);
+        osc.start();
+        this.voices.push({ osc, gain, pan, side });
+      }
+    } else {
+      // Plucked archetypes: re-strum the chord on a slow grid (bells / harp / keys).
+      const beat = 60 / spec.tempo;
+      const every = [beat * 2, beat * 3, beat * 4][Math.floor(this.rng() * 3)];
+      const bellWave = spec.instrument === 'bells' ? makeWave(ctx, 'bell') : null;
+      const strum = () => {
+        if (!this.ctx) return;
+        const when = this.ctx.currentTime + 0.06;
+        const tones = this.chordTones;
+        const order = this.rng() < 0.5 ? tones : [...tones].reverse();
+        order.forEach((m, i) => {
+          this.compNote(when + i * 0.05, midiToFreq(m), spec.instrument, bellWave, i % 2 ? 0.4 : -0.4);
+        });
+        this.timers.push(setTimeout(strum, every * 1000));
+      };
+      this.timers.push(setTimeout(strum, 300));
     }
 
     // Sub-bass drone on the root, an octave down.
@@ -351,7 +379,7 @@ export class GenerativeEngine {
   private setChord(initial: boolean): void {
     const ctx = this.ctx;
     const spec = this.spec;
-    if (!ctx || !spec || this.voices.length === 0) return;
+    if (!ctx || !spec) return;
     const scale = SCALES[spec.scale] ?? SCALES.major_pentatonic;
     const L = scale.length;
     // Semitone offset for an (extended) scale degree, wrapping octaves.
@@ -363,23 +391,27 @@ export class GenerativeEngine {
     if (!initial) this.chordStep++;
     const chord = this.voicing.map((o) => deg(base + o));
 
-    const notes: number[] = [spec.root + chord[0], spec.root + chord[0] + 12];
-    for (let i = 0; i < this.voices.length - 2; i++) {
-      notes.push(spec.root + chord[i % 4] + (i >= 4 ? 12 : 0));
-    }
-    this.chordTones = notes;
+    // The chord's notes — used by the arp, the plucked strum, and the melody.
+    this.chordTones = chord.map((c) => spec.root + c);
 
     const now = ctx.currentTime;
     const glide = initial ? 2 : 6;
-    this.voices.forEach((v, idx) => {
-      const midi = notes[idx % notes.length];
-      const detune = (spec.binauralHz / 2) * v.side;
-      v.osc.frequency.cancelScheduledValues(now);
-      v.osc.frequency.setTargetAtTime(midiToFreq(midi) + detune, now, glide / 3);
-      const target = (0.7 / this.voices.length) * (0.7 + 0.6 * this.rng());
-      v.gain.gain.cancelScheduledValues(now);
-      v.gain.gain.setTargetAtTime(target, now, glide / 3);
-    });
+    if (this.voices.length) {
+      // Spread the chord across the sustained voices (with an octave on top).
+      const notes: number[] = [spec.root + chord[0], spec.root + chord[0] + 12];
+      for (let i = 0; i < this.voices.length - 2; i++) {
+        notes.push(spec.root + chord[i % 4] + (i >= 4 ? 12 : 0));
+      }
+      this.voices.forEach((v, idx) => {
+        const midi = notes[idx % notes.length];
+        const detune = (spec.binauralHz / 2) * v.side;
+        v.osc.frequency.cancelScheduledValues(now);
+        v.osc.frequency.setTargetAtTime(midiToFreq(midi) + detune, now, glide / 3);
+        const target = (0.7 / this.voices.length) * (0.7 + 0.6 * this.rng());
+        v.gain.gain.cancelScheduledValues(now);
+        v.gain.gain.setTargetAtTime(target, now, glide / 3);
+      });
+    }
 
     // Move the sub-bass with the chord root.
     if (this.bass) {
@@ -548,6 +580,55 @@ export class GenerativeEngine {
     if (this.delaySend) p.connect(this.delaySend);
     osc.start(when);
     osc.stop(when + 0.55);
+  }
+
+  /** A plucked/struck chord tone for the bells / harp / keys archetypes. */
+  private compNote(
+    when: number,
+    freq: number,
+    instrument: string,
+    bellWave: PeriodicWave | null,
+    pan: number,
+  ): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.pulseGain) return;
+    const osc = ctx.createOscillator();
+    let dur: number;
+    if (instrument === 'keys') {
+      // FM electric piano: a fast-decaying modulator gives the tine attack.
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      const mod = ctx.createOscillator();
+      mod.type = 'sine';
+      mod.frequency.value = freq * 14;
+      const modG = ctx.createGain();
+      modG.gain.setValueAtTime(freq * 2.2, when);
+      modG.gain.exponentialRampToValueAtTime(freq * 0.1, when + 0.4);
+      mod.connect(modG).connect(osc.frequency);
+      mod.start(when);
+      mod.stop(when + 1.6);
+      dur = 1.4;
+    } else if (instrument === 'bells' && bellWave) {
+      osc.setPeriodicWave(bellWave);
+      osc.frequency.value = freq;
+      dur = 2.6;
+    } else {
+      osc.type = 'triangle'; // harp-ish pluck
+      osc.frequency.value = freq;
+      dur = 1.2;
+    }
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, when);
+    g.gain.exponentialRampToValueAtTime(0.1, when + 0.006);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+    const p = ctx.createStereoPanner();
+    p.pan.value = pan;
+    osc.connect(g).connect(p);
+    p.connect(this.pulseGain);
+    if (this.reverbSend) p.connect(this.reverbSend);
+    if (this.delaySend) p.connect(this.delaySend);
+    osc.start(when);
+    osc.stop(when + dur + 0.1);
   }
 
   private playChime(): void {
