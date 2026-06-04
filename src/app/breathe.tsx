@@ -83,7 +83,7 @@ export default function BreatheScreen() {
         {patternKey ? (
           <BreathingRunner pattern={PATTERNS[patternKey]} onEnd={() => router.back()} />
         ) : (
-          <View style={styles.select}>
+          <View style={styles.select} pointerEvents="box-none">
             <View style={styles.selectHead}>
               <AppText variant="label" muted>
                 BREATHE
@@ -166,7 +166,7 @@ function BreathingRunner({ pattern, onEnd }: { pattern: { label: string; phases:
   }));
 
   return (
-    <View style={styles.runner}>
+    <View style={styles.runner} pointerEvents="box-none">
       <View style={styles.orbArea}>
         <Animated.View style={[styles.halo, { backgroundColor: colors.auroraEnd }, haloStyle]} />
         <Animated.View style={[styles.circle, { backgroundColor: colors.accent }, circleStyle]} />
