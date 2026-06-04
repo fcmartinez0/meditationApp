@@ -197,7 +197,7 @@ const styles = StyleSheet.create({
   close: {
     position: 'absolute',
     top: Platform.select({ ios: 6, default: 14 }),
-    left: spacing.sm,
+    right: spacing.lg,
     zIndex: 20,
     width: 48,
     height: 48,
