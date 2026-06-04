@@ -72,11 +72,12 @@ export default function BreatheScreen() {
     <LinearGradient colors={colors.gradient} style={styles.fill}>
       <SafeAreaView style={styles.fill}>
         <Pressable
+          accessibilityRole="button"
           accessibilityLabel="Close"
           onPress={() => (patternKey ? setPatternKey(null) : router.back())}
-          hitSlop={16}
+          hitSlop={20}
           style={styles.close}>
-          <Ionicons name={patternKey ? 'chevron-back' : 'close'} size={26} color={colors.textSecondary} />
+          <Ionicons name={patternKey ? 'chevron-back' : 'close'} size={28} color={colors.textSecondary} />
         </Pressable>
 
         {patternKey ? (
@@ -195,10 +196,13 @@ const styles = StyleSheet.create({
   fill: { flex: 1 },
   close: {
     position: 'absolute',
-    top: Platform.select({ ios: 8, default: 16 }),
-    left: spacing.lg,
-    zIndex: 10,
-    padding: spacing.sm,
+    top: Platform.select({ ios: 6, default: 14 }),
+    left: spacing.sm,
+    zIndex: 20,
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   select: { flex: 1, paddingHorizontal: spacing.xl, paddingTop: spacing.xxxl, gap: spacing.md },
   selectHead: { gap: spacing.xs, marginBottom: spacing.md },
