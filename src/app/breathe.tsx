@@ -4,7 +4,7 @@ import { useKeepAwake } from 'expo-keep-awake';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -71,19 +71,21 @@ export default function BreatheScreen() {
   return (
     <LinearGradient colors={colors.gradient} style={styles.fill}>
       <SafeAreaView style={styles.fill}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Close"
-          onPress={() => (patternKey ? setPatternKey(null) : router.back())}
-          hitSlop={20}
-          style={styles.close}>
-          <Ionicons name={patternKey ? 'chevron-back' : 'close'} size={28} color={colors.textSecondary} />
-        </Pressable>
+        <View style={styles.header}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+            onPress={() => (patternKey ? setPatternKey(null) : router.back())}
+            hitSlop={16}
+            style={styles.close}>
+            <Ionicons name={patternKey ? 'chevron-back' : 'close'} size={28} color={colors.textSecondary} />
+          </Pressable>
+        </View>
 
         {patternKey ? (
           <BreathingRunner pattern={PATTERNS[patternKey]} onEnd={() => router.back()} />
         ) : (
-          <View style={styles.select} pointerEvents="box-none">
+          <View style={styles.select}>
             <View style={styles.selectHead}>
               <AppText variant="label" muted>
                 BREATHE
@@ -166,7 +168,7 @@ function BreathingRunner({ pattern, onEnd }: { pattern: { label: string; phases:
   }));
 
   return (
-    <View style={styles.runner} pointerEvents="box-none">
+    <View style={styles.runner}>
       <View style={styles.orbArea}>
         <Animated.View style={[styles.halo, { backgroundColor: colors.auroraEnd }, haloStyle]} />
         <Animated.View style={[styles.circle, { backgroundColor: colors.accent }, circleStyle]} />
@@ -194,17 +196,21 @@ const SIZE = 240;
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    paddingHorizontal: spacing.sm,
+    paddingTop: spacing.xs,
+    minHeight: 48,
+  },
   close: {
-    position: 'absolute',
-    top: Platform.select({ ios: 6, default: 14 }),
-    right: spacing.lg,
-    zIndex: 20,
     width: 48,
     height: 48,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  select: { flex: 1, paddingHorizontal: spacing.xl, paddingTop: spacing.xxxl, gap: spacing.md },
+  select: { flex: 1, paddingHorizontal: spacing.xl, paddingTop: spacing.md, gap: spacing.md },
   selectHead: { gap: spacing.xs, marginBottom: spacing.md },
   row: {
     flexDirection: 'row',
