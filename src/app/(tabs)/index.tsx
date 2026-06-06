@@ -1,12 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
 import { Screen } from '@/components/Screen';
 import { SoundRow, type SoundItem } from '@/components/SoundRow';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import type { AmbientSound } from '@/lib/types';
 import { useAppData } from '@/store/AppData';
 import { radius, spacing } from '@/theme';
 import { categoryFor, categoryStyle } from '@/theme/categories';
@@ -93,7 +95,20 @@ export default function MeditateScreen() {
   const cat = categoryFor(settings.ambient);
   const headphonesHelp = cat === 'frequency' || cat === 'generative' || settings.ambient === 'purr';
 
+  const tap = () => Haptics.selectionAsync().catch(() => {});
+
+  const selectSound = (key: AmbientSound) => {
+    tap();
+    updateSettings({ ambient: key });
+  };
+
+  const selectDuration = (min: number) => {
+    tap();
+    updateSettings({ durationMin: min });
+  };
+
   const begin = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     router.push({
       pathname: '/session',
       params: { duration: String(settings.durationMin), ambient: settings.ambient },
@@ -111,7 +126,7 @@ export default function MeditateScreen() {
           return (
             <Pressable
               key={min}
-              onPress={() => updateSettings({ durationMin: min })}
+              onPress={() => selectDuration(min)}
               accessibilityLabel={`${min} minutes`}
               style={[
                 styles.durationPill,
@@ -189,7 +204,7 @@ export default function MeditateScreen() {
       </View>
 
       <Pressable
-        onPress={() => router.push('/breathe')}
+        onPress={() => { tap(); router.push('/breathe'); }}
         accessibilityRole="button"
         style={({ pressed }) => [styles.breatheRow, { opacity: pressed ? 0.6 : 1 }]}>
         <Ionicons name="ellipse-outline" size={24} color={colors.accent} />
@@ -213,7 +228,7 @@ export default function MeditateScreen() {
                 key={item.key}
                 item={item}
                 selected={settings.ambient === item.key}
-                onPress={() => updateSettings({ ambient: item.key })}
+                onPress={() => selectSound(item.key)}
               />
             ))}
           </View>
