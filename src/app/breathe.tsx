@@ -72,7 +72,7 @@ export default function BreatheScreen() {
   return (
     <LinearGradient colors={colors.gradient} style={styles.fill}>
       <SafeAreaView style={styles.fill} edges={['left', 'right', 'bottom']}>
-        <View style={[styles.header, { paddingTop: insets.top + spacing.xs }]}>
+        <View style={[styles.header, { paddingTop: Math.max(insets.top, 44) + spacing.xs }]}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Close"
