@@ -4,9 +4,9 @@ import { useKeepAwake } from 'expo-keep-awake';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
@@ -37,6 +37,7 @@ const MIN_RECORD_SEC = 20;
 export default function SessionScreen() {
   useKeepAwake();
   const colors = useThemeColors();
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { settings, recordSession, stats } = useAppData();
   const params = useLocalSearchParams<{ duration?: string; ambient?: string }>();
@@ -275,13 +276,13 @@ export default function SessionScreen() {
 
   return (
     <LinearGradient colors={colors.gradient} style={styles.fill}>
-      <SafeAreaView style={styles.fill}>
+      <SafeAreaView style={styles.fill} edges={['left', 'right', 'bottom']}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="End session"
           onPress={endEarly}
           hitSlop={16}
-          style={styles.close}>
+          style={[styles.close, { top: Math.max(insets.top, 44) }]}>
           <Ionicons name="close" size={26} color={colors.textSecondary} />
         </Pressable>
 
@@ -369,10 +370,12 @@ const styles = StyleSheet.create({
   fill: { flex: 1 },
   close: {
     position: 'absolute',
-    top: Platform.select({ ios: 8, default: 16 }),
-    right: spacing.lg,
+    right: spacing.sm,
     zIndex: 10,
-    padding: spacing.sm,
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.xl },
   clock: { fontSize: 52, fontWeight: '200' },
