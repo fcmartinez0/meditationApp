@@ -128,9 +128,12 @@ export default function MeditateScreen() {
               key={min}
               onPress={() => selectDuration(min)}
               accessibilityLabel={`${min} minutes`}
-              style={[
+              style={({ pressed }) => [
                 styles.durationPill,
-                { backgroundColor: selected ? active.accent : colors.surfaceMuted },
+                {
+                  backgroundColor: selected ? active.accent : colors.surfaceMuted,
+                  transform: [{ scale: pressed ? 0.94 : 1 }],
+                },
               ]}>
               <AppText variant="caption" color={selected ? '#FFFFFF' : colors.textSecondary}>
                 {min}
@@ -161,7 +164,11 @@ export default function MeditateScreen() {
             )}
           </View>
         </View>
-        <Pressable onPress={begin} accessibilityRole="button" accessibilityLabel="Begin session">
+        <Pressable
+          onPress={begin}
+          accessibilityRole="button"
+          accessibilityLabel="Begin session"
+          style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.96 : 1 }], opacity: pressed ? 0.92 : 1 })}>
           <LinearGradient
             colors={active.colors}
             start={{ x: 0, y: 0 }}

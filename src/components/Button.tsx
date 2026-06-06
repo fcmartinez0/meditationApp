@@ -31,7 +31,11 @@ export function Button({ label, onPress, variant = 'primary', disabled, style }:
       accessibilityRole="button"
       style={({ pressed }) => [
         styles.button,
-        { backgroundColor, opacity: disabled ? 0.4 : pressed ? 0.85 : 1 },
+        {
+          backgroundColor,
+          opacity: disabled ? 0.4 : pressed ? 0.85 : 1,
+          transform: [{ scale: pressed && !disabled ? 0.97 : 1 }],
+        },
         variant === 'ghost' && styles.ghost,
         style,
       ]}>

@@ -39,6 +39,7 @@ export function SoundRow({
         {
           backgroundColor: selected ? withAlpha(cat.accent, 0.14) : 'transparent',
           opacity: pressed ? 0.6 : 1,
+          transform: [{ scale: pressed ? 0.98 : 1 }],
         },
       ]}>
       <LinearGradient

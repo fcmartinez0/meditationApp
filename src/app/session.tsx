@@ -159,6 +159,7 @@ export default function SessionScreen() {
   }, [phase, totalSec, settings.intervalMin, finish]);
 
   const togglePause = () => {
+    Haptics.selectionAsync().catch(() => {});
     if (phase === 'running') {
       setPhase('paused');
       audioRef.current?.pauseAmbient();
@@ -197,6 +198,7 @@ export default function SessionScreen() {
   // Swap to a freshly generated piece without ending the session.
   const regenerate = () => {
     if (!useEngine) return;
+    Haptics.selectionAsync().catch(() => {});
     engineRef.current?.stop();
     setLiked(false);
     void (async () => {

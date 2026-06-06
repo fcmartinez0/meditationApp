@@ -4,6 +4,7 @@ import Animated, {
   Easing,
   cancelAnimation,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withRepeat,
   withTiming,
@@ -30,8 +31,15 @@ export function BreathingOrb({ active, core, halo, children }: BreathingOrbProps
   const coreColor = core ?? colors.accentSoft;
   const haloColor = halo ?? colors.auroraEnd;
   const progress = useSharedValue(0);
+  const reduced = useReducedMotion();
 
   useEffect(() => {
+    // Honor "Reduce Motion": hold a calm, half-open orb instead of pulsing.
+    if (reduced) {
+      cancelAnimation(progress);
+      progress.value = withTiming(0.5, { duration: 600 });
+      return;
+    }
     if (active) {
       progress.value = withRepeat(
         withTiming(1, { duration: BREATH_MS, easing: Easing.inOut(Easing.ease) }),
@@ -43,7 +51,7 @@ export function BreathingOrb({ active, core, halo, children }: BreathingOrbProps
       progress.value = withTiming(0.15, { duration: 600 });
     }
     return () => cancelAnimation(progress);
-  }, [active, progress]);
+  }, [active, reduced, progress]);
 
   const coreStyle = useAnimatedStyle(() => ({
     // Gentler breath: a subtle 0.88 -> 1.0 swell rather than a big pulse.

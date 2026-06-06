@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withRepeat,
   withTiming,
@@ -25,9 +26,11 @@ export function TideTimer({
   children?: React.ReactNode;
 }) {
   const bob = useSharedValue(0.5);
+  const reduced = useReducedMotion();
 
   useEffect(() => {
-    if (active) {
+    // Honor "Reduce Motion": keep the water surface still (level still fills).
+    if (active && !reduced) {
       bob.value = withRepeat(
         withTiming(1, { duration: 3000, easing: Easing.inOut(Easing.ease) }),
         -1,
@@ -36,7 +39,7 @@ export function TideTimer({
     } else {
       bob.value = withTiming(0.5);
     }
-  }, [active, bob]);
+  }, [active, reduced, bob]);
 
   // Gentle "tide" bob on the water surface.
   const fillStyle = useAnimatedStyle(() => ({ transform: [{ translateY: (bob.value - 0.5) * 7 }] }));
