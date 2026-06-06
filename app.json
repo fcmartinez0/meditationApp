@@ -51,6 +51,13 @@
       "expo-audio",
       "expo-notifications",
       [
+        "react-native-audio-api",
+        {
+          "iosBackgroundMode": true,
+          "disableFFmpeg": true
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "backgroundColor": "#5B6CF0",
