@@ -11,7 +11,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
@@ -66,12 +66,13 @@ const PATTERNS: Record<string, { label: string; hint: string; phases: Phase[] }>
 export default function BreatheScreen() {
   const colors = useThemeColors();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [patternKey, setPatternKey] = useState<string | null>(null);
 
   return (
     <LinearGradient colors={colors.gradient} style={styles.fill}>
-      <SafeAreaView style={styles.fill}>
-        <View style={styles.header}>
+      <SafeAreaView style={styles.fill} edges={['left', 'right', 'bottom']}>
+        <View style={[styles.header, { paddingTop: insets.top + spacing.xs }]}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Close"
