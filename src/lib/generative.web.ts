@@ -140,9 +140,9 @@ export class GenerativeEngine {
   private arpEvery = 2;
   private voicing: number[] = VOICINGS[0];
 
-  async start(spec: PieceSpec): Promise<void> {
+  async start(spec: PieceSpec): Promise<boolean> {
     const ctx = getCtx();
-    if (!ctx) return;
+    if (!ctx) return false;
     this.ctx = ctx;
     this.spec = spec;
     this.rng = makeRng(spec.seed);
@@ -381,6 +381,7 @@ export class GenerativeEngine {
     if (spec.melody) {
       this.timers.push(setTimeout(() => this.scheduleMelody(), (4 + this.rng() * 18) * 1000));
     }
+    return true;
   }
 
   private setChord(initial: boolean): void {

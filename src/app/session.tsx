@@ -109,10 +109,22 @@ export default function SessionScreen() {
         setComposing(true);
         const engine = new GenerativeEngine();
         engineRef.current = engine;
-        await engine.start(spec);
+        let ok = false;
+        try {
+          ok = await engine.start(spec);
+        } finally {
+          if (!cancelled) setComposing(false);
+        }
         if (cancelled) return;
-        engine.setVolume(settings.volume);
-        setComposing(false);
+        if (ok) {
+          engine.setVolume(settings.volume);
+        } else {
+          // Render failed — fall back to a bundled track so it's never silent.
+          await audio.prepare(GENERATIVE_FALLBACK[ambient as GenerativeSound]);
+          if (cancelled) return;
+          audio.setVolume(settings.volume);
+          audio.startAmbient();
+        }
       } else {
         audio.startAmbient();
       }
@@ -213,9 +225,13 @@ export default function SessionScreen() {
       setComposing(true);
       const engine = new GenerativeEngine();
       engineRef.current = engine;
-      await engine.start(spec);
-      engine.setVolume(settings.volume);
-      setComposing(false);
+      let ok = false;
+      try {
+        ok = await engine.start(spec);
+      } finally {
+        setComposing(false);
+      }
+      if (ok) engine.setVolume(settings.volume);
     })();
   };
 

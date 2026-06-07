@@ -70,12 +70,14 @@ const PROGRESSIONS = [
   [0, 3, 0, 4],
 ];
 
-// Loop length and seamless-crossfade window. Kept modest to bound memory
-// (~45s stereo ≈ 17 MB at 48 kHz) while still feeling non-repetitive.
-const LOOP_SECONDS = 45;
+// Loop length and seamless-crossfade window.
+const LOOP_SECONDS = 40;
 const XFADE_SECONDS = 4;
 const RENDER_SECONDS = LOOP_SECONDS + XFADE_SECONDS;
-const IMPULSE_SECONDS = 1.6;
+const IMPULSE_SECONDS = 1.2;
+// Render at a reduced rate — ambient content has little above ~10 kHz, and
+// halving the rate roughly halves render time. Playback resamples to device.
+const RENDER_SR = 24000;
 // The offline mix is baked at this level; the player's master scales on top.
 const MIX_GAIN = 0.5;
 
@@ -104,14 +106,6 @@ function makeRng(seed: number): () => number {
     s >>>= 0;
     return s / 0xffffffff;
   };
-}
-
-function deviceSampleRate(): number {
-  try {
-    return AudioManager.getDevicePreferredSampleRate() || 44100;
-  } catch {
-    return 44100;
-  }
 }
 
 let sharedCtx: AudioContext | null = null;
@@ -681,7 +675,7 @@ function foldLoop(rendered: AudioBuffer, loopSamples: number, xfSamples: number)
 async function renderLoop(
   spec: PieceSpec,
 ): Promise<{ data: Float32Array[]; length: number; sampleRate: number } | null> {
-  const sr = deviceSampleRate();
+  const sr = RENDER_SR;
   const offline = new OfflineAudioContext(2, Math.ceil(RENDER_SECONDS * sr), sr);
   const rendered = await new Composer(offline, spec).render();
   const loopSamples = Math.floor(LOOP_SECONDS * sr);
@@ -697,52 +691,70 @@ export class GenerativeEngine {
   private targetGain = 0.85;
   private stopped = false;
 
-  async start(spec: PieceSpec): Promise<void> {
+  /** Returns true once the loop is rendered and playing; false on any failure. */
+  async start(spec: PieceSpec): Promise<boolean> {
     this.stopped = false;
-    configureSession();
     try {
-      await AudioManager.setAudioSessionActivity(true);
-    } catch {
-      /* may already be active */
-    }
-
-    let loop: Awaited<ReturnType<typeof renderLoop>> = null;
-    try {
-      loop = await renderLoop(spec);
-    } catch {
-      loop = null;
-    }
-    if (this.stopped || !loop) return;
-
-    const ctx = getCtx();
-    if (!ctx) return;
-    this.ctx = ctx;
-    if (ctx.state === 'suspended') {
+      configureSession();
       try {
-        await ctx.resume();
-      } catch {
-        /* resumes when possible */
+        await AudioManager.setAudioSessionActivity(true);
+      } catch (e) {
+        console.warn('[generative] audio session activate failed', e);
       }
+
+      const t0 = Date.now();
+      let loop: Awaited<ReturnType<typeof renderLoop>> = null;
+      try {
+        loop = await renderLoop(spec);
+      } catch (e) {
+        console.warn('[generative] offline render threw', e);
+        return false;
+      }
+      console.log('[generative] rendered in', Date.now() - t0, 'ms, samples', loop?.length);
+      if (this.stopped) return false;
+      if (!loop) {
+        console.warn('[generative] render returned null');
+        return false;
+      }
+
+      const ctx = getCtx();
+      if (!ctx) {
+        console.warn('[generative] no realtime AudioContext');
+        return false;
+      }
+      this.ctx = ctx;
+      if (ctx.state === 'suspended') {
+        try {
+          await ctx.resume();
+        } catch {
+          /* resumes when possible */
+        }
+      }
+
+      const buffer = ctx.createBuffer(2, loop.length, loop.sampleRate);
+      buffer.copyToChannel(loop.data[0], 0);
+      buffer.copyToChannel(loop.data[1], 1);
+
+      const now = ctx.currentTime;
+      const master = ctx.createGain();
+      master.gain.setValueAtTime(0.0001, now);
+      master.gain.exponentialRampToValueAtTime(this.targetGain, now + 2.5);
+      master.connect(ctx.destination);
+
+      const src = ctx.createBufferSource();
+      src.buffer = buffer;
+      src.loop = true;
+      src.connect(master);
+      src.start();
+
+      this.master = master;
+      this.source = src;
+      console.log('[generative] playing loop');
+      return true;
+    } catch (e) {
+      console.warn('[generative] start failed', e);
+      return false;
     }
-
-    const buffer = ctx.createBuffer(2, loop.length, loop.sampleRate);
-    buffer.copyToChannel(loop.data[0], 0);
-    buffer.copyToChannel(loop.data[1], 1);
-
-    const now = ctx.currentTime;
-    const master = ctx.createGain();
-    master.gain.setValueAtTime(0.0001, now);
-    master.gain.exponentialRampToValueAtTime(this.targetGain, now + 2.5);
-    master.connect(ctx.destination);
-
-    const src = ctx.createBufferSource();
-    src.buffer = buffer;
-    src.loop = true;
-    src.connect(master);
-    src.start();
-
-    this.master = master;
-    this.source = src;
   }
 
   setVolume(v: number): void {
