@@ -70,6 +70,17 @@ function midiToFreq(m: number): number {
   return 440 * Math.pow(2, (m - 69) / 12);
 }
 
+// --- Native real-time tuning -------------------------------------------------
+// Phones are far less forgiving than a browser tab. Two knobs matter most:
+//   LOOKAHEAD  — how far ahead we schedule each event. A bigger window absorbs
+//                JS-thread jitter so events never land in the past (which the
+//                native engine renders as a click/pop).
+//   The graph weight — fewer always-on nodes and a shorter reverb tail keep the
+//                audio render thread under its deadline, avoiding the dropouts
+//                ("sound going in and out") that come from buffer underruns.
+const LOOKAHEAD = 0.14;
+const IMPULSE_SECONDS = 1.6;
+
 // Custom timbres so pieces sound like different instruments, not just a sine pad.
 function makeWave(ctx: AudioContext, kind: string): PeriodicWave | null {
   if (kind === 'bell') {
@@ -208,7 +219,7 @@ export class GenerativeEngine {
 
     // Reverb send: a generated impulse gives a lush, spacious tail.
     const convolver = ctx.createConvolver();
-    convolver.buffer = this.makeImpulse(ctx, 2.6, 2.6);
+    convolver.buffer = this.makeImpulse(ctx, IMPULSE_SECONDS, 2.4);
     const reverbWet = ctx.createGain();
     reverbWet.gain.value = spec.section === 'rest' ? 0.4 : 0.28;
     convolver.connect(reverbWet).connect(master);
@@ -288,7 +299,8 @@ export class GenerativeEngine {
     this.arpPattern = ARP_PATTERNS[Math.floor(this.rng() * ARP_PATTERNS.length)];
     this.arpEvery = [2, 2, 2, 1, 4][Math.floor(this.rng() * 5)];
 
-    const voiceCount = spec.section === 'chill' ? 6 : 5;
+    // Fewer voices than web (6/5) — a phone's audio thread is the bottleneck.
+    const voiceCount = spec.section === 'chill' ? 5 : 4;
 
     if (sustained) {
       // Sustained pad / choir: held oscillators that glide between chords.
@@ -301,6 +313,16 @@ export class GenerativeEngine {
           : spec.wave === 'triangle'
             ? 'triangle'
             : 'sine';
+      // One shared analog-drift LFO for warmth instead of one per voice — same
+      // shimmer, far fewer always-running oscillators.
+      const drift = ctx.createOscillator();
+      drift.type = 'sine';
+      drift.frequency.value = 0.05 + this.rng() * 0.08;
+      const driftGain = ctx.createGain();
+      driftGain.gain.value = (choir ? 7 : 4) + this.rng() * 4; // cents
+      drift.connect(driftGain);
+      drift.start();
+      this.extras.push(drift, driftGain);
       for (let i = 0; i < voiceCount; i++) {
         const osc = ctx.createOscillator();
         if (periodicWave) osc.setPeriodicWave(periodicWave);
@@ -310,15 +332,7 @@ export class GenerativeEngine {
         const pan = ctx.createStereoPanner();
         const side = i % 2 === 0 ? -1 : 1;
         pan.pan.value = side * (0.3 + this.rng() * 0.5);
-        // Slow analog drift on the tuning for warmth (wider for choir).
-        const drift = ctx.createOscillator();
-        drift.type = 'sine';
-        drift.frequency.value = 0.04 + this.rng() * 0.1;
-        const driftGain = ctx.createGain();
-        driftGain.gain.value = (choir ? 7 : 4) + this.rng() * 5; // cents
-        drift.connect(driftGain).connect(osc.detune);
-        drift.start();
-        this.extras.push(drift, driftGain);
+        driftGain.connect(osc.detune);
         osc.connect(gain).connect(pan).connect(bus);
         osc.start();
         this.voices.push({ osc, gain, pan, side });
@@ -330,7 +344,7 @@ export class GenerativeEngine {
       const bellWave = spec.instrument === 'bells' ? makeWave(ctx, 'bell') : null;
       const strum = () => {
         if (!this.ctx) return;
-        const when = this.ctx.currentTime + 0.06;
+        const when = this.ctx.currentTime + LOOKAHEAD;
         const tones = this.chordTones;
         const order = this.rng() < 0.5 ? tones : [...tones].reverse();
         order.forEach((m, i) => {
@@ -380,7 +394,7 @@ export class GenerativeEngine {
       const tick = () => {
         const c = this.ctx;
         if (!c) return;
-        const when = c.currentTime + 0.06;
+        const when = c.currentTime + LOOKAHEAD;
         const s = this.step % 16;
         if (spec.percussion !== 'none') this.triggerPercussion(s, when);
         if (spec.arp) this.triggerArp(s, when);
