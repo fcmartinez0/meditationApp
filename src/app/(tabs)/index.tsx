@@ -5,6 +5,7 @@ import * as Haptics from 'expo-haptics';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
+import { FeaturedCard } from '@/components/FeaturedCard';
 import { Screen } from '@/components/Screen';
 import { SoundCard } from '@/components/SoundCard';
 import type { SoundItem } from '@/components/SoundRow';
@@ -86,6 +87,23 @@ function greeting(): string {
   return 'Good evening';
 }
 
+// A gently-rotating "featured today" pick, stable within a day.
+const FEATURED: { key: AmbientSound; blurb: string }[] = [
+  { key: 'gen_rest', blurb: 'A fresh, never-repeating ambient piece — composed live, just for now.' },
+  { key: 'rain', blurb: 'Steady rainfall to soften the edges of a busy day.' },
+  { key: 'calm', blurb: '7.83 Hz grounding tones, tuned to 432 Hz. Best with headphones.' },
+  { key: 'fire', blurb: 'A warm, crackling fire for slow, cozy stillness.' },
+  { key: 'melodic', blurb: 'Euphoric melodic house to lift a flat afternoon.' },
+  { key: 'ocean', blurb: 'Slow ocean swells to pace a long, easy exhale.' },
+  { key: 'gen_chill', blurb: 'A live generative groove that drifts and quietly evolves.' },
+];
+
+function dayOfYear(): number {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), 0, 0);
+  return Math.floor((now.getTime() - start.getTime()) / 86_400_000);
+}
+
 export default function MeditateScreen() {
   const colors = useThemeColors();
   const router = useRouter();
@@ -115,6 +133,19 @@ export default function MeditateScreen() {
       params: { duration: String(settings.durationMin), ambient: settings.ambient },
     });
   };
+
+  // Start straight into a session with a specific sound (used by the hero card).
+  const beginWith = (key: AmbientSound) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    updateSettings({ ambient: key });
+    router.push({
+      pathname: '/session',
+      params: { duration: String(settings.durationMin), ambient: key },
+    });
+  };
+
+  const featuredPick = FEATURED[dayOfYear() % FEATURED.length];
+  const featuredMeta = SOUND_INDEX[featuredPick.key] ?? { label: 'Rest', icon: 'sparkles-outline' as const };
 
   const sel = SOUND_INDEX[settings.ambient] ?? { label: 'Silence', icon: 'moon-outline' as const };
 
@@ -193,6 +224,15 @@ export default function MeditateScreen() {
         </AppText>
         <AppText variant="title">Take a moment to breathe</AppText>
       </View>
+
+      <FeaturedCard
+        accentKey={featuredPick.key}
+        icon={featuredMeta.icon}
+        label={featuredMeta.label}
+        blurb={featuredPick.blurb}
+        onPress={() => selectSound(featuredPick.key)}
+        onPlay={() => beginWith(featuredPick.key)}
+      />
 
       <View style={styles.streakRow}>
         <Ionicons name="flame" size={26} color={colors.warning} />
