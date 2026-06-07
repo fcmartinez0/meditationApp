@@ -161,6 +161,7 @@ export class GenerativeEngine {
   private chordTones: number[] = [];
   private arpIdx = 0;
   private step = 0;
+  private nextStepTime = 0; // steady musical clock for the groove (seconds)
   private chordStep = 0;
   private arpPattern: number[] = ARP_PATTERNS[0];
   private arpEvery = 2;
@@ -389,20 +390,35 @@ export class GenerativeEngine {
     }
 
     // Step grid for arp + percussion — the groove builds in after a varied delay.
+    // Rather than firing one note per JS tick (which makes the rhythm wobble
+    // and pop when the thread is busy), we poll often and schedule every step
+    // whose time falls inside a short look-ahead window. Note times come from a
+    // steady accumulator (nextStepTime), so the groove stays metronomic even if
+    // the polling itself is late — the "Tale of Two Clocks" pattern.
     if (spec.arp || spec.percussion !== 'none') {
       const stepDur = 60 / spec.tempo / 4;
-      const tick = () => {
+      const scheduleAhead = 0.2; // schedule events up to 200ms into the future
+      const pump = () => {
         const c = this.ctx;
         if (!c) return;
-        const when = c.currentTime + LOOKAHEAD;
-        const s = this.step % 16;
-        if (spec.percussion !== 'none') this.triggerPercussion(s, when);
-        if (spec.arp) this.triggerArp(s, when);
-        this.step++;
+        // If the JS thread stalled and we fell behind, resync instead of firing
+        // a burst of past-due notes (which would cluster and pop).
+        if (this.nextStepTime < c.currentTime) this.nextStepTime = c.currentTime + LOOKAHEAD;
+        while (this.nextStepTime < c.currentTime + scheduleAhead) {
+          const s = this.step % 16;
+          if (spec.percussion !== 'none') this.triggerPercussion(s, this.nextStepTime);
+          if (spec.arp) this.triggerArp(s, this.nextStepTime);
+          this.step++;
+          this.nextStepTime += stepDur;
+        }
       };
       const grooveEntry = (sustained ? this.rng() * 14 : this.rng() * 8) * 1000;
       this.timers.push(
-        setTimeout(() => this.timers.push(setInterval(tick, stepDur * 1000)), grooveEntry),
+        setTimeout(() => {
+          if (!this.ctx) return;
+          this.nextStepTime = this.ctx.currentTime + LOOKAHEAD;
+          this.timers.push(setInterval(pump, 25));
+        }, grooveEntry),
       );
     }
 
