@@ -60,6 +60,7 @@ export default function SessionScreen() {
   const [rated, setRated] = useState<number | null>(null);
   const [specLabel, setSpecLabel] = useState<string | null>(null);
   const [liked, setLiked] = useState(false);
+  const [composing, setComposing] = useState(false);
 
   const audioRef = useRef<SessionAudio | null>(null);
   const engineRef = useRef<GenerativeEngine | null>(null);
@@ -105,10 +106,13 @@ export default function SessionScreen() {
         const spec = nextSpec(sectionFor(ambient as GenerativeSound), ratings);
         specRef.current = spec;
         setSpecLabel(describeSpec(spec));
+        setComposing(true);
         const engine = new GenerativeEngine();
         engineRef.current = engine;
         await engine.start(spec);
+        if (cancelled) return;
         engine.setVolume(settings.volume);
+        setComposing(false);
       } else {
         audio.startAmbient();
       }
@@ -206,10 +210,12 @@ export default function SessionScreen() {
       const spec = nextSpec(sectionFor(ambient as GenerativeSound), ratings);
       specRef.current = spec;
       setSpecLabel(describeSpec(spec));
+      setComposing(true);
       const engine = new GenerativeEngine();
       engineRef.current = engine;
       await engine.start(spec);
       engine.setVolume(settings.volume);
+      setComposing(false);
     })();
   };
 
@@ -328,10 +334,10 @@ export default function SessionScreen() {
             <View style={[styles.nowPlaying, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <View style={styles.nowPlayingText}>
                 <AppText variant="caption" muted>
-                  NOW PLAYING
+                  {composing ? 'COMPOSING' : 'NOW PLAYING'}
                 </AppText>
                 <AppText variant="body" numberOfLines={1}>
-                  {specLabel}
+                  {composing ? 'Composing a piece just for you…' : specLabel}
                 </AppText>
               </View>
               <Pressable accessibilityLabel="Like this piece" onPress={likeCurrent} hitSlop={10} style={styles.npBtn}>

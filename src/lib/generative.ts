@@ -1,21 +1,27 @@
 /**
- * Live, never-repeating meditation music for native (iOS / Android).
+ * Native generative music — offline-render hybrid.
  *
- * This is the native twin of generative.web.ts. The web build synthesizes with
- * the browser's Web Audio API; here we use react-native-audio-api, which mirrors
- * that spec, so the two engines stay note-for-note in sync. The only meaningful
- * differences: we configure the iOS audio session up front, and we skip the
- * master DynamicsCompressor (not yet implemented natively) — its job was gentle
- * glue, so a slightly lower master gain stands in for it.
+ * The web build (generative.web.ts) synthesizes live with the Web Audio API.
+ * On phones, live JS-scheduled synthesis hits a glitch ceiling (pops and
+ * dropouts under thread load), so here we take a different, rock-solid path:
  *
- * Requires a native build (`npx expo run:ios` / `run:android`). It will not run
- * in Expo Go or after a JS-only reload that adds the dependency.
+ *   1. Render a unique piece *offline* (faster than realtime) with
+ *      react-native-audio-api's OfflineAudioContext — all events scheduled on
+ *      the audio clock, no wall-clock timers.
+ *   2. Crossfade-fold the result into a seamless loop.
+ *   3. Play that single AudioBuffer back on the realtime context.
+ *
+ * During playback there is no node churn and no JS scheduling, so it cannot
+ * pop or drop out. Variety is preserved: every session renders a fresh piece
+ * from the spec's seed. The cost is a short "composing" wait at the start.
+ *
+ * Requires a native build (`npx expo run:ios` / `run:android`).
  */
 
-import { AudioContext, AudioManager } from 'react-native-audio-api';
+import { AudioContext, AudioManager, OfflineAudioContext } from 'react-native-audio-api';
 import type {
   AudioBuffer,
-  AudioNode,
+  AudioBufferSourceNode,
   BiquadFilterNode,
   GainNode,
   OscillatorNode,
@@ -37,7 +43,6 @@ const SCALES: Record<string, number[]> = {
   harmonic_minor: [0, 2, 3, 5, 7, 8, 11],
 };
 
-// Four-note chord voicings as scale-degree offsets from the chord root.
 const VOICINGS = [
   [0, 2, 4, 6], // 7th
   [0, 1, 4, 6], // sus2
@@ -48,41 +53,37 @@ const VOICINGS = [
 
 const ARP_PATTERNS = [
   [0, 2, 1, 3, 2, 4, 1, 2],
-  [0, 1, 2, 3, 4, 3, 2, 1], // up & down
+  [0, 1, 2, 3, 4, 3, 2, 1],
   [0, 2, 4, 2, 1, 3, 1, 0],
-  [0, 3, 1, 4, 2, 0, 3, 1], // wider leaps
-  [4, 3, 2, 1, 0, 1, 2, 3], // descending
+  [0, 3, 1, 4, 2, 0, 3, 1],
+  [4, 3, 2, 1, 0, 1, 2, 3],
 ];
 
-// Chord-root movement as scale-degree sequences (index 0 is a static drone).
 const PROGRESSIONS = [
-  [0, 0, 0, 0], // drone — no movement
-  [0, 3, 4, 0], // I – IV – V – I
-  [0, 5, 3, 4], // I – vi – IV – V
-  [0, 4, 5, 3], // I – V – vi – IV
+  [0, 0, 0, 0],
+  [0, 3, 4, 0],
+  [0, 5, 3, 4],
+  [0, 4, 5, 3],
   [0, 2, 4, 5],
   [0, 5, 1, 4],
   [0, 6, 4, 5],
   [0, 3, 0, 4],
 ];
 
+// Loop length and seamless-crossfade window. Kept modest to bound memory
+// (~45s stereo ≈ 17 MB at 48 kHz) while still feeling non-repetitive.
+const LOOP_SECONDS = 45;
+const XFADE_SECONDS = 4;
+const RENDER_SECONDS = LOOP_SECONDS + XFADE_SECONDS;
+const IMPULSE_SECONDS = 1.6;
+// The offline mix is baked at this level; the player's master scales on top.
+const MIX_GAIN = 0.5;
+
 function midiToFreq(m: number): number {
   return 440 * Math.pow(2, (m - 69) / 12);
 }
 
-// --- Native real-time tuning -------------------------------------------------
-// Phones are far less forgiving than a browser tab. Two knobs matter most:
-//   LOOKAHEAD  — how far ahead we schedule each event. A bigger window absorbs
-//                JS-thread jitter so events never land in the past (which the
-//                native engine renders as a click/pop).
-//   The graph weight — fewer always-on nodes and a shorter reverb tail keep the
-//                audio render thread under its deadline, avoiding the dropouts
-//                ("sound going in and out") that come from buffer underruns.
-const LOOKAHEAD = 0.14;
-const IMPULSE_SECONDS = 1.6;
-
-// Custom timbres so pieces sound like different instruments, not just a sine pad.
-function makeWave(ctx: AudioContext, kind: string): PeriodicWave | null {
+function makeWave(ctx: OfflineAudioContext, kind: string): PeriodicWave | null {
   if (kind === 'bell') {
     const imag = new Float32Array([0, 1, 0.6, 0.25, 0.0, 0.12, 0, 0.05]);
     return ctx.createPeriodicWave(new Float32Array(imag.length), imag);
@@ -105,21 +106,24 @@ function makeRng(seed: number): () => number {
   };
 }
 
-// One audio context for the whole app lifetime; sessions share it and only
-// connect/disconnect their own nodes, exactly like the web engine.
-let sharedCtx: AudioContext | null = null;
+function deviceSampleRate(): number {
+  try {
+    return AudioManager.getDevicePreferredSampleRate() || 44100;
+  } catch {
+    return 44100;
+  }
+}
 
+let sharedCtx: AudioContext | null = null;
 function getCtx(): AudioContext | null {
   try {
     if (!sharedCtx) sharedCtx = new AudioContext();
     return sharedCtx;
   } catch {
-    // Native module missing (e.g. not rebuilt yet) — fail soft.
     return null;
   }
 }
 
-// Make sound play through the silent switch and alongside the bell layer.
 function configureSession(): void {
   try {
     AudioManager.setAudioSessionOptions({
@@ -128,7 +132,7 @@ function configureSession(): void {
       iosOptions: ['mixWithOthers'],
     });
   } catch {
-    /* falls back to platform defaults */
+    /* platform defaults */
   }
 }
 
@@ -141,66 +145,49 @@ interface Voice {
   side: number;
 }
 
-export class GenerativeEngine {
-  private ctx: AudioContext | null = null;
-  private master: GainNode | null = null; // fade in/out
-  private pulseGain: GainNode | null = null; // amplitude pump
-  private filter: BiquadFilterNode | null = null;
-  private bus: GainNode | null = null; // pad voices
-  private reverbSend: GainNode | null = null; // wet send into the convolver
-  private delaySend: GainNode | null = null; // tempo-synced echo send
+/**
+ * Builds the full audio graph on an OfflineAudioContext and schedules every
+ * event deterministically across the render window, then renders to a buffer.
+ */
+class Composer {
+  private master: GainNode | null = null;
+  private pulseGain: GainNode | null = null;
+  private reverbSend: GainNode | null = null;
+  private delaySend: GainNode | null = null;
   private voices: Voice[] = [];
   private bass: { osc: OscillatorNode; gain: GainNode } | null = null;
   private noise: AudioBuffer | null = null;
-  private extras: AudioNode[] = [];
-  private timers: ReturnType<typeof setTimeout>[] = [];
-  private rng: () => number = Math.random;
-  private spec: PieceSpec | null = null;
-  // Slightly lower than web (0.5) to make up for the missing master compressor.
-  private targetGain = 0.42;
+  private rng: () => number;
   private chordTones: number[] = [];
-  private arpIdx = 0;
-  private step = 0;
-  private nextStepTime = 0; // steady musical clock for the groove (seconds)
+  private chordEvents: { time: number; tones: number[] }[] = [];
   private chordStep = 0;
+  private arpIdx = 0;
   private arpPattern: number[] = ARP_PATTERNS[0];
   private arpEvery = 2;
   private voicing: number[] = VOICINGS[0];
 
-  async start(spec: PieceSpec): Promise<void> {
-    const ctx = getCtx();
-    if (!ctx) return;
-    this.ctx = ctx;
-    this.spec = spec;
+  constructor(
+    private ctx: OfflineAudioContext,
+    private spec: PieceSpec,
+  ) {
     this.rng = makeRng(spec.seed);
+  }
 
-    configureSession();
-    try {
-      await AudioManager.setAudioSessionActivity(true);
-    } catch {
-      /* keep going; may already be active */
-    }
-    if (ctx.state === 'suspended') {
-      try {
-        await ctx.resume();
-      } catch {
-        /* resumes when possible */
-      }
-    }
+  async render(): Promise<AudioBuffer> {
+    this.build();
+    this.scheduleAll(RENDER_SECONDS);
+    return this.ctx.startRendering();
+  }
 
-    const now = ctx.currentTime;
-    // Sustained pad/choir vs. plucked bells/harp/keys — the main character lever.
+  private build(): void {
+    const { ctx, spec } = this;
     const sustained = spec.instrument === 'pad' || spec.instrument === 'choir';
-    const fadeIn = sustained ? 2.5 + this.rng() * 3 : 1.4; // varied, shorter for plucked
 
-    // Chain: pad bus -> filter -> pulse -> master -> destination.
-    // (Web routes through a compressor here; native skips it.)
     const master = ctx.createGain();
-    master.gain.setValueAtTime(0.0001, now);
-    master.gain.exponentialRampToValueAtTime(this.targetGain, now + fadeIn);
+    master.gain.value = MIX_GAIN;
     master.connect(ctx.destination);
 
-    // Tempo-synced feedback delay (dotted-eighth) for space and movement.
+    // Tempo-synced feedback delay.
     const delay = ctx.createDelay(2);
     delay.delayTime.value = (60 / spec.tempo) * 0.75;
     const delayFb = ctx.createGain();
@@ -216,11 +203,10 @@ export class GenerativeEngine {
     delaySend.gain.value = 1;
     delaySend.connect(delay);
     this.delaySend = delaySend;
-    this.extras.push(delay, delayLp, delayFb, delayWet, delaySend);
 
-    // Reverb send: a generated impulse gives a lush, spacious tail.
+    // Reverb send.
     const convolver = ctx.createConvolver();
-    convolver.buffer = this.makeImpulse(ctx, IMPULSE_SECONDS, 2.4);
+    convolver.buffer = this.makeImpulse(IMPULSE_SECONDS, 2.4);
     const reverbWet = ctx.createGain();
     reverbWet.gain.value = spec.section === 'rest' ? 0.4 : 0.28;
     convolver.connect(reverbWet).connect(master);
@@ -228,7 +214,6 @@ export class GenerativeEngine {
     reverbSend.gain.value = 1;
     reverbSend.connect(convolver);
     this.reverbSend = reverbSend;
-    this.extras.push(convolver, reverbWet, reverbSend);
 
     const pulse = ctx.createGain();
     pulse.gain.value = 1;
@@ -244,9 +229,9 @@ export class GenerativeEngine {
     const bus = ctx.createGain();
     bus.gain.value = 1;
     bus.connect(filter);
-    bus.connect(reverbSend); // pad also feeds the reverb
+    bus.connect(reverbSend);
 
-    // Chorus: a slowly-modulated short delay thickens and widens the pad.
+    // Chorus.
     const chorus = ctx.createDelay(0.05);
     chorus.delayTime.value = 0.022;
     const chorusLfo = ctx.createOscillator();
@@ -259,14 +244,11 @@ export class GenerativeEngine {
     chorusWet.gain.value = 0.5;
     bus.connect(chorus);
     chorus.connect(chorusWet).connect(filter);
-    this.extras.push(chorus, chorusLfo, chorusDepth, chorusWet);
 
     this.master = master;
     this.pulseGain = pulse;
-    this.filter = filter;
-    this.bus = bus;
 
-    // A noise buffer reused for shakers.
+    // Noise for shakers.
     const noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
     const nd = new Float32Array(noise.length);
     for (let i = 0; i < nd.length; i++) nd[i] = this.rng() * 2 - 1;
@@ -280,50 +262,41 @@ export class GenerativeEngine {
     lfoGain.gain.value = baseCut * 0.35;
     lfo.connect(lfoGain).connect(filter.frequency);
     lfo.start();
-    this.extras.push(lfo, lfoGain);
 
     // Amplitude pump.
     if (spec.pulseDepth > 0) {
       const pumpLfo = ctx.createOscillator();
       pumpLfo.type = 'sine';
-      pumpLfo.frequency.value = spec.tempo / 60; // one cycle per beat
+      pumpLfo.frequency.value = spec.tempo / 60;
       const depth = ctx.createGain();
       depth.gain.value = spec.pulseDepth / 2;
       pulse.gain.value = 1 - spec.pulseDepth / 2;
       pumpLfo.connect(depth).connect(pulse.gain);
       pumpLfo.start();
-      this.extras.push(pumpLfo, depth);
     }
 
-    // Per-piece voicing, arpeggio pattern and rate, chosen from the seed.
     this.voicing = VOICINGS[Math.floor(this.rng() * VOICINGS.length)];
     this.arpPattern = ARP_PATTERNS[Math.floor(this.rng() * ARP_PATTERNS.length)];
     this.arpEvery = [2, 2, 2, 1, 4][Math.floor(this.rng() * 5)];
 
-    // Fewer voices than web (6/5) — a phone's audio thread is the bottleneck.
-    const voiceCount = spec.section === 'chill' ? 5 : 4;
-
     if (sustained) {
-      // Sustained pad / choir: held oscillators that glide between chords.
       const choir = spec.instrument === 'choir';
       const periodicWave = choir ? null : makeWave(ctx, spec.wave);
       const oscType: OscillatorType = choir
-        ? 'sawtooth' // airy ensemble
+        ? 'sawtooth'
         : spec.wave === 'warm'
           ? 'sawtooth'
           : spec.wave === 'triangle'
             ? 'triangle'
             : 'sine';
-      // One shared analog-drift LFO for warmth instead of one per voice — same
-      // shimmer, far fewer always-running oscillators.
+      const voiceCount = spec.section === 'chill' ? 5 : 4;
       const drift = ctx.createOscillator();
       drift.type = 'sine';
       drift.frequency.value = 0.05 + this.rng() * 0.08;
       const driftGain = ctx.createGain();
-      driftGain.gain.value = (choir ? 7 : 4) + this.rng() * 4; // cents
+      driftGain.gain.value = (choir ? 7 : 4) + this.rng() * 4;
       drift.connect(driftGain);
       drift.start();
-      this.extras.push(drift, driftGain);
       for (let i = 0; i < voiceCount; i++) {
         const osc = ctx.createOscillator();
         if (periodicWave) osc.setPeriodicWave(periodicWave);
@@ -338,145 +311,126 @@ export class GenerativeEngine {
         osc.start();
         this.voices.push({ osc, gain, pan, side });
       }
-    } else {
-      // Plucked archetypes: re-strum the chord on a slow grid (bells / harp / keys).
-      const beat = 60 / spec.tempo;
-      const every = [beat * 2, beat * 3, beat * 4][Math.floor(this.rng() * 3)];
-      const bellWave = spec.instrument === 'bells' ? makeWave(ctx, 'bell') : null;
-      const strum = () => {
-        if (!this.ctx) return;
-        const when = this.ctx.currentTime + LOOKAHEAD;
-        const tones = this.chordTones;
-        const order = this.rng() < 0.5 ? tones : [...tones].reverse();
-        order.forEach((m, i) => {
-          this.compNote(when + i * 0.05, midiToFreq(m), spec.instrument, bellWave, i % 2 ? 0.4 : -0.4);
-        });
-        this.timers.push(setTimeout(strum, every * 1000));
-      };
-      this.timers.push(setTimeout(strum, 300));
     }
 
-    // Sub-bass drone on the root, an octave down — entering at a varied time.
+    // Sub-bass at a constant level (no per-loop fade); frequency tracks chords.
     if (spec.bass) {
-      const bassEntry = this.rng() * 8;
       const osc = ctx.createOscillator();
       osc.type = 'sine';
       osc.frequency.value = midiToFreq(spec.root - 12);
       const gain = ctx.createGain();
-      gain.gain.setValueAtTime(0.0001, now + bassEntry);
-      gain.gain.exponentialRampToValueAtTime(0.16, now + bassEntry + 4);
+      gain.gain.value = 0.16;
       osc.connect(gain).connect(pulse);
       osc.start();
       this.bass = { osc, gain };
     }
+  }
 
-    // Open at a random point in the progression so pieces don't all start on
-    // the tonic chord.
+  private scheduleAll(renderLen: number): void {
+    const { spec, ctx } = this;
+    const sustained = spec.instrument === 'pad' || spec.instrument === 'choir';
+
+    // Chord progression across the whole render (also feeds chordAt lookups).
     this.chordStep = Math.floor(this.rng() * PROGRESSIONS[spec.progression % PROGRESSIONS.length].length);
-    this.setChord(true);
-    this.timers.push(
-      setInterval(() => this.setChord(false), Math.max(4000, spec.chordChangeSec * 1000)),
-    );
-
-    // Sparse chimes — first one at a varied time.
-    if (spec.chimeDensity > 0.02) {
-      const scheduleChime = () => {
-        if (!this.ctx) return;
-        this.playChime();
-        const gap = (5 + this.rng() * 12) / Math.max(0.05, spec.chimeDensity);
-        this.timers.push(setTimeout(scheduleChime, gap * 1000));
-      };
-      this.timers.push(setTimeout(scheduleChime, (3 + this.rng() * 16) * 1000));
+    const interval = Math.max(4, spec.chordChangeSec);
+    for (let when = 0, first = true; when < renderLen + interval; when += interval, first = false) {
+      this.applyChord(when, first);
     }
 
-    // Step grid for arp + percussion — the groove builds in after a varied delay.
-    // Rather than firing one note per JS tick (which makes the rhythm wobble
-    // and pop when the thread is busy), we poll often and schedule every step
-    // whose time falls inside a short look-ahead window. Note times come from a
-    // steady accumulator (nextStepTime), so the groove stays metronomic even if
-    // the polling itself is late — the "Tale of Two Clocks" pattern.
+    // Plucked archetypes re-strum the active chord on a slow grid.
+    if (!sustained) {
+      const beat = 60 / spec.tempo;
+      const every = [beat * 2, beat * 3, beat * 4][Math.floor(this.rng() * 3)];
+      const bellWave = spec.instrument === 'bells' ? makeWave(ctx, 'bell') : null;
+      for (let when = 0.3; when < renderLen; when += every) {
+        const tones = this.chordAt(when);
+        const order = this.rng() < 0.5 ? tones : [...tones].reverse();
+        order.forEach((m, i) =>
+          this.compNote(when + i * 0.05, midiToFreq(m), spec.instrument, bellWave, i % 2 ? 0.4 : -0.4),
+        );
+      }
+    }
+
+    // Sparse chimes.
+    if (spec.chimeDensity > 0.02) {
+      let when = 3 + this.rng() * 16;
+      while (when < renderLen) {
+        this.playChime(when);
+        when += (5 + this.rng() * 12) / Math.max(0.05, spec.chimeDensity);
+      }
+    }
+
+    // Steady arp + percussion grid.
     if (spec.arp || spec.percussion !== 'none') {
       const stepDur = 60 / spec.tempo / 4;
-      const scheduleAhead = 0.2; // schedule events up to 200ms into the future
-      const pump = () => {
-        const c = this.ctx;
-        if (!c) return;
-        // If the JS thread stalled and we fell behind, resync instead of firing
-        // a burst of past-due notes (which would cluster and pop).
-        if (this.nextStepTime < c.currentTime) this.nextStepTime = c.currentTime + LOOKAHEAD;
-        while (this.nextStepTime < c.currentTime + scheduleAhead) {
-          const s = this.step % 16;
-          if (spec.percussion !== 'none') this.triggerPercussion(s, this.nextStepTime);
-          if (spec.arp) this.triggerArp(s, this.nextStepTime);
-          this.step++;
-          this.nextStepTime += stepDur;
-        }
-      };
-      const grooveEntry = (sustained ? this.rng() * 14 : this.rng() * 8) * 1000;
-      this.timers.push(
-        setTimeout(() => {
-          if (!this.ctx) return;
-          this.nextStepTime = this.ctx.currentTime + LOOKAHEAD;
-          this.timers.push(setInterval(pump, 25));
-        }, grooveEntry),
-      );
+      let s = 0;
+      for (let when = 0; when < renderLen; when += stepDur, s++) {
+        this.chordTones = this.chordAt(when);
+        const st = s % 16;
+        if (spec.percussion !== 'none') this.triggerPercussion(st, when);
+        if (spec.arp) this.triggerArp(st, when);
+      }
     }
 
-    // Sparse melodic lead — enters at a varied time.
+    // Melodic lead phrases.
     if (spec.melody) {
-      this.timers.push(setTimeout(() => this.scheduleMelody(), (4 + this.rng() * 18) * 1000));
+      let when = 4 + this.rng() * 18;
+      while (when < renderLen) when = this.schedulePhrase(when);
     }
   }
 
-  private setChord(initial: boolean): void {
-    const ctx = this.ctx;
-    const spec = this.spec;
-    if (!ctx || !spec) return;
+  private chordAt(t: number): number[] {
+    let tones = this.chordEvents.length ? this.chordEvents[0].tones : [];
+    for (const e of this.chordEvents) {
+      if (e.time <= t) tones = e.tones;
+      else break;
+    }
+    return tones;
+  }
+
+  private applyChord(when: number, initial: boolean): void {
+    const { ctx, spec } = this;
     const scale = SCALES[spec.scale] ?? SCALES.major_pentatonic;
     const L = scale.length;
-    // Semitone offset for an (extended) scale degree, wrapping octaves.
     const deg = (x: number) => 12 * Math.floor(x / L) + scale[((x % L) + L) % L];
-
-    // Advance through the progression and build a lush diatonic 7th chord on it.
     const prog = PROGRESSIONS[spec.progression % PROGRESSIONS.length];
     const base = prog[this.chordStep % prog.length];
-    if (!initial) this.chordStep++;
+    this.chordStep++;
     const chord = this.voicing.map((o) => deg(base + o));
+    const tones = chord.map((c) => spec.root + c);
+    this.chordEvents.push({ time: when, tones });
 
-    // The chord's notes — used by the arp, the plucked strum, and the melody.
-    this.chordTones = chord.map((c) => spec.root + c);
-
-    const now = ctx.currentTime;
     const glide = initial ? 2 : 6;
     if (this.voices.length) {
-      // Spread the chord across the sustained voices (with an octave on top).
       const notes: number[] = [spec.root + chord[0], spec.root + chord[0] + 12];
       for (let i = 0; i < this.voices.length - 2; i++) {
         notes.push(spec.root + chord[i % 4] + (i >= 4 ? 12 : 0));
       }
       this.voices.forEach((v, idx) => {
         const midi = notes[idx % notes.length];
-        const detune = (spec.binauralHz / 2) * v.side;
-        v.osc.frequency.cancelScheduledValues(now);
-        v.osc.frequency.setTargetAtTime(midiToFreq(midi) + detune, now, glide / 3);
+        const freq = midiToFreq(midi) + (spec.binauralHz / 2) * v.side;
         const target = (0.7 / this.voices.length) * (0.7 + 0.6 * this.rng());
-        v.gain.gain.cancelScheduledValues(now);
-        v.gain.gain.setTargetAtTime(target, now, glide / 3);
+        if (initial) {
+          v.osc.frequency.setValueAtTime(freq, when);
+          v.gain.gain.setValueAtTime(target, when);
+        } else {
+          v.osc.frequency.setTargetAtTime(freq, when, glide / 3);
+          v.gain.gain.setTargetAtTime(target, when, glide / 3);
+        }
       });
     }
-
-    // Move the sub-bass with the chord root.
     if (this.bass) {
-      this.bass.osc.frequency.cancelScheduledValues(now);
-      this.bass.osc.frequency.setTargetAtTime(midiToFreq(spec.root + chord[0] - 12), now, glide / 3);
+      const bf = midiToFreq(spec.root + chord[0] - 12);
+      if (initial) this.bass.osc.frequency.setValueAtTime(bf, when);
+      else this.bass.osc.frequency.setTargetAtTime(bf, when, glide / 3);
     }
   }
 
   private triggerPercussion(s: number, when: number): void {
-    const rest = this.spec?.section === 'rest';
+    const rest = this.spec.section === 'rest';
     const kg = rest ? 0.16 : 0.3;
     const sg = rest ? 0.05 : 0.09;
-    switch (this.spec?.percussion) {
+    switch (this.spec.percussion) {
       case 'heartbeat':
         if (s === 0) this.softKick(when, kg);
         if (s === 2) this.softKick(when, kg * 0.6);
@@ -514,12 +468,12 @@ export class GenerativeEngine {
     const midi = this.chordTones[deg] + 12;
     const pan = this.arpIdx % 2 === 0 ? -0.6 : 0.6;
     this.arpIdx++;
-    this.arpNote(when, midiToFreq(midi), pan, this.spec?.section === 'rest' ? 0.05 : 0.08);
+    this.arpNote(when, midiToFreq(midi), pan, this.spec.section === 'rest' ? 0.05 : 0.08);
   }
 
   private softKick(when: number, gain: number): void {
-    const ctx = this.ctx;
-    if (!ctx || !this.master) return;
+    const { ctx, master } = this;
+    if (!master) return;
     const osc = ctx.createOscillator();
     osc.type = 'sine';
     osc.frequency.setValueAtTime(78, when);
@@ -528,16 +482,16 @@ export class GenerativeEngine {
     g.gain.setValueAtTime(0.0001, when);
     g.gain.exponentialRampToValueAtTime(gain, when + 0.005);
     g.gain.exponentialRampToValueAtTime(0.0001, when + 0.28);
-    osc.connect(g).connect(this.master);
+    osc.connect(g).connect(master);
     osc.start(when);
     osc.stop(when + 0.32);
   }
 
   private shaker(when: number, gain: number): void {
-    const ctx = this.ctx;
-    if (!ctx || !this.noise || !this.master) return;
+    const { ctx, noise, master } = this;
+    if (!noise || !master) return;
     const src = ctx.createBufferSource();
-    src.buffer = this.noise;
+    src.buffer = noise;
     src.loop = true;
     const hp = ctx.createBiquadFilter();
     hp.type = 'highpass';
@@ -548,19 +502,17 @@ export class GenerativeEngine {
     g.gain.exponentialRampToValueAtTime(0.0001, when + 0.06);
     const pan = ctx.createStereoPanner();
     pan.pan.value = this.rng() * 0.6 - 0.3;
-    src.connect(hp).connect(g).connect(pan).connect(this.master);
+    src.connect(hp).connect(g).connect(pan).connect(master);
     src.start(when, this.rng() * 0.5);
     src.stop(when + 0.1);
   }
 
-  /** A singing lead note with gentle vibrato, routed through the reverb. */
   private leadNote(when: number, freq: number, dur: number, pan: number, gain: number): void {
-    const ctx = this.ctx;
-    if (!ctx || !this.pulseGain) return;
+    const { ctx, pulseGain } = this;
+    if (!pulseGain) return;
     const osc = ctx.createOscillator();
     osc.type = 'triangle';
     osc.frequency.setValueAtTime(freq, when);
-    // Gentle vibrato.
     const vib = ctx.createOscillator();
     vib.frequency.value = 5;
     const vibGain = ctx.createGain();
@@ -575,48 +527,41 @@ export class GenerativeEngine {
     const p = ctx.createStereoPanner();
     p.pan.value = pan;
     osc.connect(g).connect(p);
-    p.connect(this.pulseGain);
+    p.connect(pulseGain);
     if (this.reverbSend) p.connect(this.reverbSend);
     if (this.delaySend) p.connect(this.delaySend);
     osc.start(when);
     osc.stop(when + dur + 0.06);
   }
 
-  /** Play a short melodic phrase, then schedule the next after a rest. */
-  private scheduleMelody(): void {
-    const ctx = this.ctx;
-    const spec = this.spec;
-    if (!ctx || !spec) return;
+  private schedulePhrase(t0: number): number {
+    const { spec } = this;
     const scale = SCALES[spec.scale] ?? SCALES.major_pentatonic;
     const L = scale.length;
     const deg = (x: number) => 12 * Math.floor(x / L) + scale[((x % L) + L) % L];
-
     const beat = 60 / spec.tempo;
     const noteLen = beat * (this.rng() < 0.5 ? 1 : 0.5);
     const notes = 3 + Math.floor(this.rng() * 4);
     const gain = spec.section === 'rest' ? 0.1 : 0.13;
-    let t = ctx.currentTime + 0.1;
-    let degIdx = L + Math.floor(this.rng() * L); // sit ~an octave above the root
-    const start = t;
+    let t = t0;
+    let degIdx = L + Math.floor(this.rng() * L);
     for (let i = 0; i < notes; i++) {
       if (this.rng() < 0.18) {
-        t += noteLen; // a rest
+        t += noteLen;
       } else {
         const midi = spec.root + deg(degIdx) + 12;
         this.leadNote(t, midiToFreq(midi), noteLen * (0.8 + this.rng() * 0.7), this.rng() * 0.4 - 0.2, gain);
         t += noteLen;
       }
-      // Mostly stepwise motion, occasional small leap, kept in a singable range.
       degIdx += this.rng() < 0.7 ? (this.rng() < 0.5 ? 1 : -1) : this.rng() < 0.5 ? 2 : -2;
       degIdx = Math.max(L - 1, Math.min(2 * L + 2, degIdx));
     }
-    const wait = t - start + (2 + this.rng() * 4); // rest between phrases
-    this.timers.push(setTimeout(() => this.scheduleMelody(), wait * 1000));
+    return t + 2 + this.rng() * 4;
   }
 
   private arpNote(when: number, freq: number, pan: number, gain: number): void {
-    const ctx = this.ctx;
-    if (!ctx || !this.pulseGain) return;
+    const { ctx, pulseGain } = this;
+    if (!pulseGain) return;
     const osc = ctx.createOscillator();
     osc.type = 'triangle';
     osc.frequency.value = freq;
@@ -627,14 +572,13 @@ export class GenerativeEngine {
     const p = ctx.createStereoPanner();
     p.pan.value = pan;
     osc.connect(g).connect(p);
-    p.connect(this.pulseGain);
+    p.connect(pulseGain);
     if (this.reverbSend) p.connect(this.reverbSend);
     if (this.delaySend) p.connect(this.delaySend);
     osc.start(when);
     osc.stop(when + 0.55);
   }
 
-  /** A plucked/struck chord tone for the bells / harp / keys archetypes. */
   private compNote(
     when: number,
     freq: number,
@@ -642,12 +586,11 @@ export class GenerativeEngine {
     bellWave: PeriodicWave | null,
     pan: number,
   ): void {
-    const ctx = this.ctx;
-    if (!ctx || !this.pulseGain) return;
+    const { ctx, pulseGain } = this;
+    if (!pulseGain) return;
     const osc = ctx.createOscillator();
     let dur: number;
     if (instrument === 'keys') {
-      // FM electric piano: a fast-decaying modulator gives the tine attack.
       osc.type = 'sine';
       osc.frequency.value = freq;
       const mod = ctx.createOscillator();
@@ -665,7 +608,7 @@ export class GenerativeEngine {
       osc.frequency.value = freq;
       dur = 2.6;
     } else {
-      osc.type = 'triangle'; // harp-ish pluck
+      osc.type = 'triangle';
       osc.frequency.value = freq;
       dur = 1.2;
     }
@@ -676,38 +619,37 @@ export class GenerativeEngine {
     const p = ctx.createStereoPanner();
     p.pan.value = pan;
     osc.connect(g).connect(p);
-    p.connect(this.pulseGain);
+    p.connect(pulseGain);
     if (this.reverbSend) p.connect(this.reverbSend);
     if (this.delaySend) p.connect(this.delaySend);
     osc.start(when);
     osc.stop(when + dur + 0.1);
   }
 
-  private playChime(): void {
-    const ctx = this.ctx;
-    const spec = this.spec;
-    if (!ctx || !spec || !this.master) return;
+  private playChime(when: number): void {
+    const { ctx, spec, master } = this;
+    if (!master) return;
     const scale = SCALES[spec.scale] ?? SCALES.major_pentatonic;
-    const deg = scale[Math.floor(this.rng() * scale.length)];
-    const midi = spec.root + 12 + deg + (this.rng() < 0.4 ? 12 : 0);
+    const d = scale[Math.floor(this.rng() * scale.length)];
+    const midi = spec.root + 12 + d + (this.rng() < 0.4 ? 12 : 0);
     const osc = ctx.createOscillator();
     osc.type = 'sine';
     osc.frequency.value = midiToFreq(midi);
     const g = ctx.createGain();
-    const now = ctx.currentTime;
-    g.gain.setValueAtTime(0.0001, now);
-    g.gain.exponentialRampToValueAtTime(0.09, now + 0.02);
-    g.gain.exponentialRampToValueAtTime(0.0001, now + 3);
+    g.gain.setValueAtTime(0.0001, when);
+    g.gain.exponentialRampToValueAtTime(0.09, when + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + 3);
     const pan = ctx.createStereoPanner();
     pan.pan.value = this.rng() * 2 - 1;
     osc.connect(g).connect(pan);
-    pan.connect(this.master);
+    pan.connect(master);
     if (this.reverbSend) pan.connect(this.reverbSend);
-    osc.start(now);
-    osc.stop(now + 3.2);
+    osc.start(when);
+    osc.stop(when + 3.2);
   }
 
-  private makeImpulse(ctx: AudioContext, seconds: number, decay: number): AudioBuffer {
+  private makeImpulse(seconds: number, decay: number): AudioBuffer {
+    const { ctx } = this;
     const len = Math.floor(seconds * ctx.sampleRate);
     const buf = ctx.createBuffer(2, len, ctx.sampleRate);
     for (let ch = 0; ch < 2; ch++) {
@@ -717,9 +659,94 @@ export class GenerativeEngine {
     }
     return buf;
   }
+}
+
+/** Equal-power crossfade-fold a rendered buffer into a seamless loop. */
+function foldLoop(rendered: AudioBuffer, loopSamples: number, xfSamples: number): Float32Array[] {
+  const out: Float32Array[] = [];
+  for (let c = 0; c < rendered.numberOfChannels; c++) {
+    const src = rendered.getChannelData(c);
+    const dst = new Float32Array(loopSamples);
+    dst.set(src.subarray(0, loopSamples));
+    // Blend the tail [loop, loop+xf) over the head [0, xf) so the wrap is seamless.
+    for (let i = 0; i < xfSamples; i++) {
+      const t = i / xfSamples;
+      dst[i] = src[i] * Math.sqrt(t) + src[loopSamples + i] * Math.sqrt(1 - t);
+    }
+    out.push(dst);
+  }
+  return out;
+}
+
+async function renderLoop(
+  spec: PieceSpec,
+): Promise<{ data: Float32Array[]; length: number; sampleRate: number } | null> {
+  const sr = deviceSampleRate();
+  const offline = new OfflineAudioContext(2, Math.ceil(RENDER_SECONDS * sr), sr);
+  const rendered = await new Composer(offline, spec).render();
+  const loopSamples = Math.floor(LOOP_SECONDS * sr);
+  const xfSamples = Math.floor(XFADE_SECONDS * sr);
+  return { data: foldLoop(rendered, loopSamples, xfSamples), length: loopSamples, sampleRate: sr };
+}
+
+/** Plays a pre-rendered, seamlessly-looping generative piece. */
+export class GenerativeEngine {
+  private ctx: AudioContext | null = null;
+  private master: GainNode | null = null;
+  private source: AudioBufferSourceNode | null = null;
+  private targetGain = 0.85;
+  private stopped = false;
+
+  async start(spec: PieceSpec): Promise<void> {
+    this.stopped = false;
+    configureSession();
+    try {
+      await AudioManager.setAudioSessionActivity(true);
+    } catch {
+      /* may already be active */
+    }
+
+    let loop: Awaited<ReturnType<typeof renderLoop>> = null;
+    try {
+      loop = await renderLoop(spec);
+    } catch {
+      loop = null;
+    }
+    if (this.stopped || !loop) return;
+
+    const ctx = getCtx();
+    if (!ctx) return;
+    this.ctx = ctx;
+    if (ctx.state === 'suspended') {
+      try {
+        await ctx.resume();
+      } catch {
+        /* resumes when possible */
+      }
+    }
+
+    const buffer = ctx.createBuffer(2, loop.length, loop.sampleRate);
+    buffer.copyToChannel(loop.data[0], 0);
+    buffer.copyToChannel(loop.data[1], 1);
+
+    const now = ctx.currentTime;
+    const master = ctx.createGain();
+    master.gain.setValueAtTime(0.0001, now);
+    master.gain.exponentialRampToValueAtTime(this.targetGain, now + 2.5);
+    master.connect(ctx.destination);
+
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    src.loop = true;
+    src.connect(master);
+    src.start();
+
+    this.master = master;
+    this.source = src;
+  }
 
   setVolume(v: number): void {
-    this.targetGain = 0.42 * Math.max(0, Math.min(1, v));
+    this.targetGain = Math.max(0, Math.min(1, v));
     const ctx = this.ctx;
     const master = this.master;
     if (!ctx || !master) return;
@@ -751,72 +778,33 @@ export class GenerativeEngine {
   }
 
   stop(): void {
+    this.stopped = true;
     const ctx = this.ctx;
-    this.timers.forEach((t) => {
-      clearTimeout(t);
-      clearInterval(t as unknown as ReturnType<typeof setInterval>);
-    });
-    this.timers = [];
-
-    const voices = this.voices;
-    const extras = this.extras;
-    const bass = this.bass;
     const master = this.master;
-    const filter = this.filter;
-    const pulse = this.pulseGain;
-    const bus = this.bus;
-
+    const src = this.source;
     if (ctx && master) {
       const now = ctx.currentTime;
       try {
         master.gain.cancelScheduledValues(now);
         master.gain.setValueAtTime(Math.max(0.0001, master.gain.value), now);
-        master.gain.exponentialRampToValueAtTime(0.0001, now + 1.6);
+        master.gain.exponentialRampToValueAtTime(0.0001, now + 1.2);
       } catch {
         /* ignore */
       }
     }
-
     setTimeout(() => {
-      const stopNode = (n: { stop?: () => void; disconnect?: () => void }) => {
-        try {
-          n.stop?.();
-        } catch {}
-        try {
-          n.disconnect?.();
-        } catch {}
-      };
-      voices.forEach((v) => {
-        stopNode(v.osc);
-        try {
-          v.gain.disconnect();
-          v.pan.disconnect();
-        } catch {}
-      });
-      if (bass) {
-        stopNode(bass.osc);
-        try {
-          bass.gain.disconnect();
-        } catch {}
-      }
-      extras.forEach((n) => stopNode(n as unknown as { stop?: () => void; disconnect?: () => void }));
       try {
-        bus?.disconnect();
-        filter?.disconnect();
-        pulse?.disconnect();
+        src?.stop();
+      } catch {}
+      try {
+        src?.disconnect();
+      } catch {}
+      try {
         master?.disconnect();
       } catch {}
-    }, 1800);
-
-    this.voices = [];
-    this.extras = [];
-    this.bass = null;
+    }, 1400);
     this.master = null;
-    this.filter = null;
-    this.pulseGain = null;
-    this.bus = null;
-    this.reverbSend = null;
-    this.delaySend = null;
+    this.source = null;
     this.ctx = null;
   }
 }
