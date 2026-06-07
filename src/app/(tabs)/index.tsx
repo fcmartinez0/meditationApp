@@ -2,11 +2,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
 import { Screen } from '@/components/Screen';
-import { SoundRow, type SoundItem } from '@/components/SoundRow';
+import { SoundCard } from '@/components/SoundCard';
+import type { SoundItem } from '@/components/SoundRow';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import type { AmbientSound } from '@/lib/types';
 import { useAppData } from '@/store/AppData';
@@ -229,16 +230,20 @@ export default function MeditateScreen() {
       {SECTIONS.map((section) => (
         <View key={section.title} style={styles.section}>
           <AppText variant="heading">{section.title}</AppText>
-          <View style={styles.list}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.shelf}
+            contentContainerStyle={styles.shelfContent}>
             {section.items.map((item) => (
-              <SoundRow
+              <SoundCard
                 key={item.key}
                 item={item}
                 selected={settings.ambient === item.key}
                 onPress={() => selectSound(item.key)}
               />
             ))}
-          </View>
+          </ScrollView>
           {section.caption ? (
             <AppText variant="caption" muted>
               {section.caption}
@@ -257,7 +262,9 @@ const styles = StyleSheet.create({
   breatheRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.xs },
   divider: { height: StyleSheet.hairlineWidth, marginVertical: spacing.xs },
   section: { gap: spacing.sm },
-  list: { gap: spacing.xs },
+  // Shelves bleed past the Screen's horizontal padding so cards scroll edge-to-edge.
+  shelf: { marginHorizontal: -spacing.xl },
+  shelfContent: { paddingHorizontal: spacing.xl, gap: spacing.md },
   bar: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
