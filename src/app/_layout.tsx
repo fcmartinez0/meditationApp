@@ -35,6 +35,10 @@ export default function RootLayout() {
                 name="breathe"
                 options={{ presentation: 'fullScreenModal', animation: 'fade' }}
               />
+              <Stack.Screen
+                name="browse"
+                options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+              />
               <Stack.Screen name="legal" options={{ presentation: 'modal' }} />
             </Stack>
             <OnboardingGate />

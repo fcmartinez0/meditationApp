@@ -1,130 +1,36 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
-import { FeaturedCard } from '@/components/FeaturedCard';
+import { BreathingOrb } from '@/components/BreathingOrb';
 import { Screen } from '@/components/Screen';
-import { SoundCard } from '@/components/SoundCard';
-import type { SoundItem } from '@/components/SoundRow';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { DURATIONS, greeting, soundMeta } from '@/lib/catalog';
 import type { AmbientSound } from '@/lib/types';
+import { categoryFor, categoryStyle } from '@/theme/categories';
 import { useAppData } from '@/store/AppData';
 import { radius, spacing } from '@/theme';
-import { categoryFor, categoryStyle } from '@/theme/categories';
 
-const DURATIONS = [3, 5, 10, 15, 20, 30];
-
-interface Section {
-  title: string;
-  caption?: string;
-  items: SoundItem[];
-}
-
-const SECTIONS: Section[] = [
-  {
-    title: 'Ambient',
-    items: [
-      { key: 'none', label: 'Silence', icon: 'moon-outline', hint: 'No background sound' },
-      { key: 'rain', label: 'Rain', icon: 'rainy-outline', hint: 'Steady rainfall' },
-      { key: 'ocean', label: 'Ocean', icon: 'water-outline', hint: 'Slow ocean swells' },
-      { key: 'forest', label: 'Forest', icon: 'leaf-outline', hint: 'Soft wind & forest' },
-      { key: 'stream', label: 'Stream', icon: 'rainy-outline', hint: 'Babbling brook' },
-      { key: 'fire', label: 'Campfire', icon: 'flame-outline', hint: 'Warm crackling fire' },
-      { key: 'night', label: 'Night', icon: 'moon-outline', hint: 'Crickets under a quiet night' },
-      { key: 'brown', label: 'Brown Noise', icon: 'cloudy-outline', hint: 'Deep, even hush' },
-      { key: 'pink', label: 'Pink Noise', icon: 'cloud-outline', hint: 'Soft, balanced hush' },
-      { key: 'white', label: 'White Noise', icon: 'cloud-outline', hint: 'Bright, even hush' },
-      { key: 'purr', label: 'Cat Purr', icon: 'paw-outline', hint: "~25 Hz · a cat's calming purr" },
-    ],
-  },
-  {
-    title: 'Frequencies',
-    caption:
-      'Calm, Focus and Deep are binaural beats — use headphones for the full effect. A wellness aid, not medical treatment.',
-    items: [
-      { key: 'calm', label: 'Calm', icon: 'heart-outline', hint: '7.83 Hz · grounding (432 Hz tuned)' },
-      { key: 'clarity', label: 'Clarity', icon: 'flash-outline', hint: '10 Hz · relaxed, clear presence' },
-      { key: 'focus', label: 'Focus', icon: 'bulb-outline', hint: '14 Hz · alert concentration' },
-      { key: 'dream', label: 'Dream', icon: 'cloud-outline', hint: '6 Hz · dreamy & meditative' },
-      { key: 'deep', label: 'Deep', icon: 'bed-outline', hint: '3 Hz · deep rest & sleep' },
-    ],
-  },
-  {
-    title: 'Generative',
-    caption:
-      'Composed live and never the same twice. Like or rate a piece and it learns what you enjoy.',
-    items: [
-      { key: 'gen_rest', label: 'Rest', icon: 'sparkles-outline', hint: 'live generative ambient' },
-      { key: 'gen_chill', label: 'Flow', icon: 'infinite-outline', hint: 'live generative groove' },
-    ],
-  },
-  {
-    title: 'Beats',
-    caption: 'Instrumental grooves modeled on artists we love. Stereo — headphones recommended.',
-    items: [
-      { key: 'melodic', label: 'Melodic House', icon: 'sunny-outline', hint: '123 BPM · euphoric (RÜFÜS vibe)' },
-      { key: 'deephouse', label: 'Deep House', icon: 'moon-outline', hint: '122 BPM · dark (ZHU vibe)' },
-      { key: 'techno', label: 'Ambient Techno', icon: 'pulse-outline', hint: '122 BPM · hypnotic (Jon Hopkins vibe)' },
-      { key: 'lofi', label: 'Lo-Fi', icon: 'cafe-outline', hint: '85 BPM · jazzy (Nujabes vibe)' },
-      { key: 'liquid', label: 'Liquid', icon: 'water-outline', hint: '172 BPM · liquid drum & bass' },
-      { key: 'chillstep', label: 'Chillstep', icon: 'rainy-outline', hint: '140 BPM · future garage (Burial)' },
-      { key: 'downtempo', label: 'Downtempo', icon: 'partly-sunny-outline', hint: '98 BPM · dreamy (Tycho vibe)' },
-    ],
-  },
-];
-
-/** Flat lookup of every sound's label + icon, for the sticky "ready" bar. */
-const SOUND_INDEX: Record<string, { label: string; icon: keyof typeof Ionicons.glyphMap }> = {};
-for (const s of SECTIONS) for (const it of s.items) SOUND_INDEX[it.key] = { label: it.label, icon: it.icon };
-
-function greeting(): string {
-  const h = new Date().getHours();
-  if (h < 12) return 'Good morning';
-  if (h < 18) return 'Good afternoon';
-  return 'Good evening';
-}
-
-// A gently-rotating "featured today" pick, stable within a day.
-const FEATURED: { key: AmbientSound; blurb: string }[] = [
-  { key: 'gen_rest', blurb: 'A fresh, never-repeating ambient piece — composed live, just for now.' },
-  { key: 'rain', blurb: 'Steady rainfall to soften the edges of a busy day.' },
-  { key: 'calm', blurb: '7.83 Hz grounding tones, tuned to 432 Hz. Best with headphones.' },
-  { key: 'fire', blurb: 'A warm, crackling fire for slow, cozy stillness.' },
-  { key: 'melodic', blurb: 'Euphoric melodic house to lift a flat afternoon.' },
-  { key: 'ocean', blurb: 'Slow ocean swells to pace a long, easy exhale.' },
-  { key: 'gen_chill', blurb: 'A live generative groove that drifts and quietly evolves.' },
-];
-
-function dayOfYear(): number {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), 0, 0);
-  return Math.floor((now.getTime() - start.getTime()) / 86_400_000);
-}
-
+/**
+ * Calm-first home: a single breathing orb and one obvious action. The full
+ * sound library lives one tap away behind "Browse", so opening the app feels
+ * like arriving somewhere quiet — not facing a wall of choices.
+ */
 export default function MeditateScreen() {
   const colors = useThemeColors();
   const router = useRouter();
   const { settings, stats, updateSettings } = useAppData();
 
-  // The app's accent follows the selected sound's category.
-  const active = categoryStyle(settings.ambient);
-  const cat = categoryFor(settings.ambient);
-  const headphonesHelp = cat === 'frequency' || cat === 'generative' || settings.ambient === 'purr';
+  // The whole screen's accent follows the chosen sound's category.
+  const cat = categoryStyle(settings.ambient);
+  const kind = categoryFor(settings.ambient);
+  const headphones = kind === 'frequency' || kind === 'generative' || settings.ambient === 'purr';
+  const sel = soundMeta(settings.ambient);
 
   const tap = () => Haptics.selectionAsync().catch(() => {});
-
-  const selectSound = (key: AmbientSound) => {
-    tap();
-    updateSettings({ ambient: key });
-  };
-
-  const selectDuration = (min: number) => {
-    tap();
-    updateSettings({ durationMin: min });
-  };
 
   const begin = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
@@ -134,184 +40,156 @@ export default function MeditateScreen() {
     });
   };
 
-  // Start straight into a session with a specific sound (used by the hero card).
-  const beginWith = (key: AmbientSound) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-    updateSettings({ ambient: key });
-    router.push({
-      pathname: '/session',
-      params: { duration: String(settings.durationMin), ambient: key },
-    });
+  const selectDuration = (min: number) => {
+    tap();
+    updateSettings({ durationMin: min });
   };
 
-  const featuredPick = FEATURED[dayOfYear() % FEATURED.length];
-  const featuredMeta = SOUND_INDEX[featuredPick.key] ?? { label: 'Rest', icon: 'sparkles-outline' as const };
-
-  const sel = SOUND_INDEX[settings.ambient] ?? { label: 'Silence', icon: 'moon-outline' as const };
-
-  // Always-visible "ready" bar — pick length and start without scrolling.
-  const readyBar = (
-    <View style={[styles.bar, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
-      <View style={styles.durationRow}>
-        {DURATIONS.map((min) => {
-          const selected = settings.durationMin === min;
-          return (
-            <Pressable
-              key={min}
-              onPress={() => selectDuration(min)}
-              accessibilityLabel={`${min} minutes`}
-              style={({ pressed }) => [
-                styles.durationPill,
-                {
-                  backgroundColor: selected ? active.accent : colors.surfaceMuted,
-                  transform: [{ scale: pressed ? 0.94 : 1 }],
-                },
-              ]}>
-              <AppText variant="caption" color={selected ? '#FFFFFF' : colors.textSecondary}>
-                {min}
-              </AppText>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      <View style={styles.beginRow}>
-        <LinearGradient
-          colors={active.colors}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.barArt}>
-          <Ionicons name={sel.icon} size={20} color="#FFFFFF" />
-        </LinearGradient>
-        <View style={styles.barText}>
-          <AppText variant="body" numberOfLines={1}>
-            {sel.label}
-          </AppText>
-          <View style={styles.barSub}>
-            <AppText variant="caption" muted>
-              {settings.durationMin} min
-            </AppText>
-            {headphonesHelp && (
-              <Ionicons name="headset-outline" size={12} color={colors.textSecondary} />
-            )}
-          </View>
-        </View>
-        <Pressable
-          onPress={begin}
-          accessibilityRole="button"
-          accessibilityLabel="Begin session"
-          style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.96 : 1 }], opacity: pressed ? 0.92 : 1 })}>
-          <LinearGradient
-            colors={active.colors}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.barBegin}>
-            <Ionicons name="play" size={18} color="#FFFFFF" />
-            <AppText variant="label" color="#FFFFFF" style={styles.beginLabel}>
-              Begin
-            </AppText>
-          </LinearGradient>
-        </Pressable>
-      </View>
-    </View>
-  );
+  const openBrowse = () => {
+    tap();
+    router.push('/browse');
+  };
 
   return (
-    <Screen scroll footer={readyBar}>
-      <View style={styles.header}>
-        <AppText variant="label" muted>
-          {greeting().toUpperCase()}
-        </AppText>
-        <AppText variant="title">Take a moment to breathe</AppText>
-      </View>
-
-      <FeaturedCard
-        accentKey={featuredPick.key}
-        icon={featuredMeta.icon}
-        label={featuredMeta.label}
-        blurb={featuredPick.blurb}
-        onPress={() => selectSound(featuredPick.key)}
-        onPlay={() => beginWith(featuredPick.key)}
-      />
-
-      <View style={styles.streakRow}>
-        <Ionicons name="flame" size={26} color={colors.warning} />
-        <View style={{ flex: 1 }}>
-          <AppText variant="heading">
-            {stats.currentStreak > 0 ? `${stats.currentStreak}-day streak` : 'Start your streak'}
+    <Screen>
+      <View style={styles.root}>
+        <View style={styles.header}>
+          <AppText variant="label" muted>
+            {greeting().toUpperCase()}
           </AppText>
-          <AppText variant="caption" muted>
-            {stats.meditatedToday
-              ? "You've meditated today. Beautiful."
-              : 'A few minutes is all it takes.'}
-          </AppText>
+          <AppText variant="title">Take a breath</AppText>
+          {stats.currentStreak > 0 && (
+            <View style={styles.streak}>
+              <Ionicons name="flame" size={15} color={colors.warning} />
+              <AppText variant="caption" muted>
+                {stats.currentStreak}-day streak{stats.meditatedToday ? ' · today ✓' : ''}
+              </AppText>
+            </View>
+          )}
         </View>
-        {stats.meditatedToday && (
-          <Ionicons name="checkmark-circle" size={24} color={colors.success} />
-        )}
-      </View>
 
-      <Pressable
-        onPress={() => { tap(); router.push('/breathe'); }}
-        accessibilityRole="button"
-        style={({ pressed }) => [styles.breatheRow, { opacity: pressed ? 0.6 : 1 }]}>
-        <Ionicons name="ellipse-outline" size={24} color={colors.accent} />
-        <View style={{ flex: 1 }}>
-          <AppText variant="heading">Breathing exercises</AppText>
-          <AppText variant="caption" muted>
-            Box · 4-7-8 · Calm · Coherent
-          </AppText>
-        </View>
-        <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
-      </Pressable>
+        <View style={styles.center}>
+          <BreathingOrb active core={cat.accent} halo={cat.colors[0]}>
+            <Ionicons name={sel.icon} size={44} color="#FFFFFF" />
+          </BreathingOrb>
 
-      <View style={[styles.divider, { backgroundColor: colors.border }]} />
+          <Pressable
+            onPress={begin}
+            accessibilityRole="button"
+            accessibilityLabel={`Begin ${sel.label} session`}
+            style={({ pressed }) => [styles.beginWrap, { transform: [{ scale: pressed ? 0.96 : 1 }] }]}>
+            <LinearGradient
+              colors={cat.colors}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.begin}>
+              <Ionicons name="play" size={20} color="#FFFFFF" />
+              <AppText variant="label" color="#FFFFFF" style={styles.beginLabel}>
+                Begin
+              </AppText>
+            </LinearGradient>
+          </Pressable>
 
-      {SECTIONS.map((section) => (
-        <View key={section.title} style={styles.section}>
-          <AppText variant="heading">{section.title}</AppText>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.shelf}
-            contentContainerStyle={styles.shelfContent}>
-            {section.items.map((item) => (
-              <SoundCard
-                key={item.key}
-                item={item}
-                selected={settings.ambient === item.key}
-                onPress={() => selectSound(item.key)}
-              />
-            ))}
-          </ScrollView>
-          {section.caption ? (
-            <AppText variant="caption" muted>
-              {section.caption}
+          <Pressable
+            onPress={openBrowse}
+            accessibilityRole="button"
+            accessibilityLabel="Change sound"
+            style={({ pressed }) => [styles.pick, { opacity: pressed ? 0.6 : 1 }]}>
+            <AppText variant="body" color={cat.accent}>
+              {sel.label}
             </AppText>
-          ) : null}
+            <AppText variant="body" muted>
+              · {settings.durationMin} min
+            </AppText>
+            {headphones && <Ionicons name="headset-outline" size={14} color={colors.textSecondary} />}
+            <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
+          </Pressable>
         </View>
-      ))}
 
+        <View style={styles.controls}>
+          <View style={styles.durationRow}>
+            {DURATIONS.map((min) => {
+              const selected = settings.durationMin === min;
+              return (
+                <Pressable
+                  key={min}
+                  onPress={() => selectDuration(min)}
+                  accessibilityLabel={`${min} minutes`}
+                  style={({ pressed }) => [
+                    styles.durationPill,
+                    {
+                      backgroundColor: selected ? cat.accent : colors.surfaceMuted,
+                      transform: [{ scale: pressed ? 0.94 : 1 }],
+                    },
+                  ]}>
+                  <AppText variant="caption" color={selected ? '#FFFFFF' : colors.textSecondary}>
+                    {min}
+                  </AppText>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <View style={styles.links}>
+            <LinkPill icon="albums-outline" label="Browse sounds" onPress={openBrowse} />
+            <LinkPill
+              icon="ellipse-outline"
+              label="Breathe"
+              onPress={() => {
+                tap();
+                router.push('/breathe');
+              }}
+            />
+          </View>
+        </View>
+      </View>
     </Screen>
   );
 }
 
+function LinkPill({
+  icon,
+  label,
+  onPress,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  onPress: () => void;
+}) {
+  const colors = useThemeColors();
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      style={({ pressed }) => [
+        styles.linkPill,
+        { borderColor: colors.border, opacity: pressed ? 0.6 : 1, transform: [{ scale: pressed ? 0.97 : 1 }] },
+      ]}>
+      <Ionicons name={icon} size={16} color={colors.textSecondary} />
+      <AppText variant="caption" muted>
+        {label}
+      </AppText>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
-  header: { gap: spacing.xs, marginTop: spacing.sm },
-  streakRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.xs },
-  breatheRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.xs },
-  divider: { height: StyleSheet.hairlineWidth, marginVertical: spacing.xs },
-  section: { gap: spacing.sm },
-  // Shelves bleed past the Screen's horizontal padding so cards scroll edge-to-edge.
-  shelf: { marginHorizontal: -spacing.xl },
-  shelfContent: { paddingHorizontal: spacing.xl, gap: spacing.md },
-  bar: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.md,
-    gap: spacing.md,
-    borderTopWidth: StyleSheet.hairlineWidth,
+  root: { flex: 1 },
+  header: { gap: spacing.xs, marginTop: spacing.sm, alignItems: 'center' },
+  streak: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.xs },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.xl },
+  beginWrap: { marginTop: spacing.sm },
+  begin: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xxl,
+    borderRadius: radius.pill,
   },
+  beginLabel: { fontSize: 17, letterSpacing: 0.3 },
+  pick: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  controls: { gap: spacing.lg, paddingBottom: spacing.md },
   durationRow: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.xs },
   durationPill: {
     flex: 1,
@@ -319,23 +197,14 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     alignItems: 'center',
   },
-  beginRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  barArt: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  barText: { flex: 1, gap: 2 },
-  barSub: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  barBegin: {
+  links: { flexDirection: 'row', justifyContent: 'center', gap: spacing.md },
+  linkPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.xl,
+    gap: spacing.xs,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
     borderRadius: radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
   },
-  beginLabel: { fontSize: 16, letterSpacing: 0.3 },
 });
