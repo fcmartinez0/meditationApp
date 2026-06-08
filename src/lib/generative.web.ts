@@ -10,7 +10,13 @@
  *  - sparse chimes on scale tones
  */
 
-import type { PieceSpec } from './types';
+import type { PieceSpec, Section } from './types';
+
+// Web synthesizes live and instantly, so there's nothing to pre-render.
+export async function prefetchGenerative(_section: Section): Promise<void> {}
+export function claimGenerative(_section: Section): null {
+  return null;
+}
 
 const SCALES: Record<string, number[]> = {
   major_pentatonic: [0, 2, 4, 7, 9],
@@ -140,7 +146,7 @@ export class GenerativeEngine {
   private arpEvery = 2;
   private voicing: number[] = VOICINGS[0];
 
-  async start(spec: PieceSpec): Promise<boolean> {
+  async start(spec: PieceSpec, _preloaded?: unknown): Promise<boolean> {
     const ctx = getCtx();
     if (!ctx) return false;
     this.ctx = ctx;

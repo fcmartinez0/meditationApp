@@ -30,7 +30,8 @@ import type {
   StereoPannerNode,
 } from 'react-native-audio-api';
 
-import type { PieceSpec } from './types';
+import { loadRatings, nextSpec } from './preferences';
+import type { PieceSpec, Section } from './types';
 
 const SCALES: Record<string, number[]> = {
   major_pentatonic: [0, 2, 4, 7, 9],
@@ -672,15 +673,52 @@ function foldLoop(rendered: AudioBuffer, loopSamples: number, xfSamples: number)
   return out;
 }
 
-async function renderLoop(
-  spec: PieceSpec,
-): Promise<{ data: Float32Array[]; length: number; sampleRate: number } | null> {
+export type LoopData = { data: Float32Array[]; length: number; sampleRate: number };
+
+async function renderLoop(spec: PieceSpec): Promise<LoopData | null> {
   const sr = RENDER_SR;
   const offline = new OfflineAudioContext(2, Math.ceil(RENDER_SECONDS * sr), sr);
   const rendered = await new Composer(offline, spec).render();
   const loopSamples = Math.floor(LOOP_SECONDS * sr);
   const xfSamples = Math.floor(XFADE_SECONDS * sr);
   return { data: foldLoop(rendered, loopSamples, xfSamples), length: loopSamples, sampleRate: sr };
+}
+
+// --- Background pre-render -------------------------------------------------
+// Rendering takes a few seconds, so we do it ahead of time (while the user is
+// still on the home) and stash the result. The session claims it for an
+// instant start; if nothing is ready it just renders on demand.
+let pending: { spec: PieceSpec; loop: LoopData | null } | null = null;
+let prefetching = false;
+
+/** Pre-render the next piece for a section, if not already prepared. */
+export async function prefetchGenerative(section: Section): Promise<void> {
+  if (prefetching) return;
+  if (pending && pending.spec.section === section && pending.loop) return; // ready
+  prefetching = true;
+  try {
+    const ratings = await loadRatings();
+    const spec = nextSpec(section, ratings);
+    pending = { spec, loop: null };
+    const loop = await renderLoop(spec);
+    if (pending && pending.spec.seed === spec.seed) pending.loop = loop;
+    else pending = null;
+  } catch (e) {
+    console.warn('[generative] prefetch failed', e);
+    pending = null;
+  } finally {
+    prefetching = false;
+  }
+}
+
+/** Take a ready pre-rendered piece for a section, or null if none is ready. */
+export function claimGenerative(section: Section): { spec: PieceSpec; loop: LoopData } | null {
+  if (pending && pending.spec.section === section && pending.loop) {
+    const claimed = { spec: pending.spec, loop: pending.loop };
+    pending = null;
+    return claimed;
+  }
+  return null;
 }
 
 /** Plays a pre-rendered, seamlessly-looping generative piece. */
@@ -691,8 +729,11 @@ export class GenerativeEngine {
   private targetGain = 0.85;
   private stopped = false;
 
-  /** Returns true once the loop is rendered and playing; false on any failure. */
-  async start(spec: PieceSpec): Promise<boolean> {
+  /**
+   * Returns true once the loop is playing; false on any failure.
+   * Pass a pre-rendered `preloaded` loop (from claimGenerative) to start instantly.
+   */
+  async start(spec: PieceSpec, preloaded?: LoopData | null): Promise<boolean> {
     this.stopped = false;
     try {
       configureSession();
@@ -702,19 +743,23 @@ export class GenerativeEngine {
         console.warn('[generative] audio session activate failed', e);
       }
 
-      const t0 = Date.now();
-      let loop: Awaited<ReturnType<typeof renderLoop>> = null;
-      try {
-        // Never hang forever — if the render stalls, fall back to a track.
-        loop = await Promise.race([
-          renderLoop(spec),
-          new Promise<null>((resolve) => setTimeout(() => resolve(null), 20000)),
-        ]);
-      } catch (e) {
-        console.warn('[generative] offline render threw', e);
-        return false;
+      let loop: LoopData | null = preloaded ?? null;
+      if (!loop) {
+        const t0 = Date.now();
+        try {
+          // Never hang forever — if the render stalls, fall back to a track.
+          loop = await Promise.race([
+            renderLoop(spec),
+            new Promise<null>((resolve) => setTimeout(() => resolve(null), 20000)),
+          ]);
+        } catch (e) {
+          console.warn('[generative] offline render threw', e);
+          return false;
+        }
+        console.log('[generative] rendered in', Date.now() - t0, 'ms, samples', loop?.length);
+      } else {
+        console.log('[generative] using pre-rendered loop');
       }
-      console.log('[generative] rendered in', Date.now() - t0, 'ms, samples', loop?.length);
       if (this.stopped) return false;
       if (!loop) {
         console.warn('[generative] render returned null');

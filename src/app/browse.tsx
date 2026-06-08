@@ -29,11 +29,12 @@ export default function BrowseScreen() {
     router.back();
   };
 
-  // Featured "play" starts a session straight away.
+  // Featured "play" starts a session straight away. Replace (not push) so
+  // ending the session returns to the home, not back into this sheet.
   const beginWith = (key: AmbientSound) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     updateSettings({ ambient: key });
-    router.push({
+    router.replace({
       pathname: '/session',
       params: { duration: String(settings.durationMin), ambient: key },
     });

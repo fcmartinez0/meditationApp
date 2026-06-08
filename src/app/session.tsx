@@ -15,7 +15,7 @@ import { TideTimer } from '@/components/TideTimer';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { SessionAudio } from '@/lib/audio';
 import { dayKey, formatClock } from '@/lib/date';
-import { GENERATIVE_SUPPORTED, GenerativeEngine } from '@/lib/generative';
+import { claimGenerative, GENERATIVE_SUPPORTED, GenerativeEngine, type LoopData } from '@/lib/generative';
 import { describeSpec, loadRatings, nextSpec, recordRating } from '@/lib/preferences';
 import type { AmbientSound, FileSound, GenerativeSound, PieceSpec } from '@/lib/types';
 import { isGenerative, sectionFor } from '@/lib/types';
@@ -110,10 +110,20 @@ export default function SessionScreen() {
       if (cancelled) return;
       audio.setVolume(settings.volume);
       if (useEngine) {
-        // Choose the next piece, learning from past ratings, then render it.
-        const ratings = await loadRatings();
-        if (cancelled) return;
-        const spec = nextSpec(sectionFor(ambient as GenerativeSound), ratings);
+        const section = sectionFor(ambient as GenerativeSound);
+        // Prefer a piece pre-rendered on the home for an instant start; else
+        // choose one now (learning from ratings) and render on demand.
+        const claimed = claimGenerative(section);
+        let spec: PieceSpec;
+        let preloaded: LoopData | null = null;
+        if (claimed) {
+          spec = claimed.spec;
+          preloaded = claimed.loop;
+        } else {
+          const ratings = await loadRatings();
+          if (cancelled) return;
+          spec = nextSpec(section, ratings);
+        }
         specRef.current = spec;
         setSpecLabel(describeSpec(spec));
         setComposing(true);
@@ -121,7 +131,7 @@ export default function SessionScreen() {
         engineRef.current = engine;
         let ok = false;
         try {
-          ok = await engine.start(spec);
+          ok = await engine.start(spec, preloaded);
         } finally {
           if (!cancelled) setComposing(false);
         }
