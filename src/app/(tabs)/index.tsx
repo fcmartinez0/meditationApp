@@ -2,13 +2,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
+import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
 import { BreathingOrb } from '@/components/BreathingOrb';
+import { DurationPicker } from '@/components/DurationPicker';
 import { Screen } from '@/components/Screen';
 import { useThemeColors } from '@/hooks/useThemeColors';
-import { DURATIONS, greeting, soundMeta } from '@/lib/catalog';
+import { greeting, soundMeta } from '@/lib/catalog';
 import type { AmbientSound } from '@/lib/types';
 import { categoryFor, categoryStyle } from '@/theme/categories';
 import { useAppData } from '@/store/AppData';
@@ -30,6 +32,8 @@ export default function MeditateScreen() {
   const headphones = kind === 'frequency' || kind === 'generative' || settings.ambient === 'purr';
   const sel = soundMeta(settings.ambient);
 
+  const [pickerOpen, setPickerOpen] = useState(false);
+
   const tap = () => Haptics.selectionAsync().catch(() => {});
 
   const begin = () => {
@@ -40,14 +44,14 @@ export default function MeditateScreen() {
     });
   };
 
-  const selectDuration = (min: number) => {
-    tap();
-    updateSettings({ durationMin: min });
-  };
-
   const openBrowse = () => {
     tap();
     router.push('/browse');
+  };
+
+  const openPicker = () => {
+    tap();
+    setPickerOpen(true);
   };
 
   return (
@@ -98,37 +102,24 @@ export default function MeditateScreen() {
             <AppText variant="body" color={cat.accent}>
               {sel.label}
             </AppText>
-            <AppText variant="body" muted>
-              · {settings.durationMin} min
-            </AppText>
             {headphones && <Ionicons name="headset-outline" size={14} color={colors.textSecondary} />}
             <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
           </Pressable>
         </View>
 
         <View style={styles.controls}>
-          <View style={styles.durationRow}>
-            {DURATIONS.map((min) => {
-              const selected = settings.durationMin === min;
-              return (
-                <Pressable
-                  key={min}
-                  onPress={() => selectDuration(min)}
-                  accessibilityLabel={`${min} minutes`}
-                  style={({ pressed }) => [
-                    styles.durationPill,
-                    {
-                      backgroundColor: selected ? cat.accent : colors.surfaceMuted,
-                      transform: [{ scale: pressed ? 0.94 : 1 }],
-                    },
-                  ]}>
-                  <AppText variant="caption" color={selected ? '#FFFFFF' : colors.textSecondary}>
-                    {min}
-                  </AppText>
-                </Pressable>
-              );
-            })}
-          </View>
+          <Pressable
+            onPress={openPicker}
+            accessibilityRole="button"
+            accessibilityLabel={`Session length, ${settings.durationMin} minutes`}
+            style={({ pressed }) => [
+              styles.lengthPill,
+              { backgroundColor: colors.surfaceMuted, transform: [{ scale: pressed ? 0.97 : 1 }] },
+            ]}>
+            <Ionicons name="timer-outline" size={18} color={cat.accent} />
+            <AppText variant="body">{settings.durationMin} min</AppText>
+            <Ionicons name="chevron-up" size={15} color={colors.textSecondary} />
+          </Pressable>
 
           <View style={styles.links}>
             <LinkPill icon="albums-outline" label="Browse sounds" onPress={openBrowse} />
@@ -143,6 +134,13 @@ export default function MeditateScreen() {
           </View>
         </View>
       </View>
+
+      <DurationPicker
+        visible={pickerOpen}
+        value={settings.durationMin}
+        onChange={(n) => updateSettings({ durationMin: n })}
+        onClose={() => setPickerOpen(false)}
+      />
     </Screen>
   );
 }
@@ -189,13 +187,14 @@ const styles = StyleSheet.create({
   },
   beginLabel: { fontSize: 17, letterSpacing: 0.3 },
   pick: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  controls: { gap: spacing.lg, paddingBottom: spacing.md },
-  durationRow: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.xs },
-  durationPill: {
-    flex: 1,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.pill,
+  controls: { gap: spacing.md, paddingBottom: spacing.md, alignItems: 'center' },
+  lengthPill: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.pill,
   },
   links: { flexDirection: 'row', justifyContent: 'center', gap: spacing.md },
   linkPill: {
