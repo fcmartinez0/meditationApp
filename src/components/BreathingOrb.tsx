@@ -18,7 +18,9 @@ const BREATH_MS = 4000;
 
 interface BreathingOrbProps {
   /** When false the orb settles to a resting size (paused). */
-  active: boolean;
+  active?: boolean;
+  /** Hold a calm, still glow with no pulsing (e.g. on the home screen). */
+  still?: boolean;
   /** Core / halo colors (default to the theme accent). */
   core?: string;
   halo?: string;
@@ -26,7 +28,7 @@ interface BreathingOrbProps {
 }
 
 /** A softly pulsing orb that paces the user's breath. */
-export function BreathingOrb({ active, core, halo, children }: BreathingOrbProps) {
+export function BreathingOrb({ active = false, still, core, halo, children }: BreathingOrbProps) {
   const colors = useThemeColors();
   const coreColor = core ?? colors.accentSoft;
   const haloColor = halo ?? colors.auroraEnd;
@@ -34,8 +36,8 @@ export function BreathingOrb({ active, core, halo, children }: BreathingOrbProps
   const reduced = useReducedMotion();
 
   useEffect(() => {
-    // Honor "Reduce Motion": hold a calm, half-open orb instead of pulsing.
-    if (reduced) {
+    // A still, half-open glow when asked (home) or for Reduce Motion — no pulse.
+    if (still || reduced) {
       cancelAnimation(progress);
       progress.value = withTiming(0.5, { duration: 600 });
       return;
@@ -51,7 +53,7 @@ export function BreathingOrb({ active, core, halo, children }: BreathingOrbProps
       progress.value = withTiming(0.15, { duration: 600 });
     }
     return () => cancelAnimation(progress);
-  }, [active, reduced, progress]);
+  }, [active, still, reduced, progress]);
 
   const coreStyle = useAnimatedStyle(() => ({
     // Gentler breath: a subtle 0.88 -> 1.0 swell rather than a big pulse.

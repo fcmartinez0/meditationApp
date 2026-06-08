@@ -71,7 +71,7 @@ export default function MeditateScreen() {
         </View>
 
         <View style={styles.center}>
-          <BreathingOrb active core={cat.accent} halo={cat.colors[0]}>
+          <BreathingOrb still core={cat.accent} halo={cat.colors[0]}>
             <Ionicons name={sel.icon} size={44} color="#FFFFFF" />
           </BreathingOrb>
 
