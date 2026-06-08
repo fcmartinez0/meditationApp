@@ -12,7 +12,7 @@ import { Screen } from '@/components/Screen';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { greeting, soundMeta } from '@/lib/catalog';
 import type { AmbientSound } from '@/lib/types';
-import { categoryFor, categoryStyle } from '@/theme/categories';
+import { categoryStyle } from '@/theme/categories';
 import { useAppData } from '@/store/AppData';
 import { radius, spacing } from '@/theme';
 
@@ -28,8 +28,6 @@ export default function MeditateScreen() {
 
   // The whole screen's accent follows the chosen sound's category.
   const cat = categoryStyle(settings.ambient);
-  const kind = categoryFor(settings.ambient);
-  const headphones = kind === 'frequency' || kind === 'generative' || settings.ambient === 'purr';
   const sel = soundMeta(settings.ambient);
 
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -94,44 +92,51 @@ export default function MeditateScreen() {
             </LinearGradient>
           </Pressable>
 
-          <Pressable
-            onPress={openBrowse}
-            accessibilityRole="button"
-            accessibilityLabel="Change sound"
-            style={({ pressed }) => [styles.pick, { opacity: pressed ? 0.6 : 1 }]}>
-            <AppText variant="body" color={cat.accent}>
-              {sel.label}
-            </AppText>
-            {headphones && <Ionicons name="headset-outline" size={14} color={colors.textSecondary} />}
-            <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
-          </Pressable>
         </View>
 
         <View style={styles.controls}>
-          <Pressable
-            onPress={openPicker}
-            accessibilityRole="button"
-            accessibilityLabel={`Session length, ${settings.durationMin} minutes`}
-            style={({ pressed }) => [
-              styles.lengthPill,
-              { backgroundColor: colors.surfaceMuted, transform: [{ scale: pressed ? 0.97 : 1 }] },
-            ]}>
-            <Ionicons name="timer-outline" size={18} color={cat.accent} />
-            <AppText variant="body">{settings.durationMin} min</AppText>
-            <Ionicons name="chevron-up" size={15} color={colors.textSecondary} />
-          </Pressable>
+          <View style={styles.chipsRow}>
+            <Pressable
+              onPress={openBrowse}
+              accessibilityRole="button"
+              accessibilityLabel={`Sound: ${sel.label}`}
+              style={({ pressed }) => [
+                styles.chip,
+                { backgroundColor: colors.surfaceMuted, transform: [{ scale: pressed ? 0.97 : 1 }] },
+              ]}>
+              <Ionicons name={sel.icon} size={18} color={cat.accent} />
+              <AppText variant="body" numberOfLines={1}>
+                {sel.label}
+              </AppText>
+              <Ionicons name="chevron-forward" size={14} color={colors.textSecondary} />
+            </Pressable>
 
-          <View style={styles.links}>
-            <LinkPill icon="albums-outline" label="Browse sounds" onPress={openBrowse} />
-            <LinkPill
-              icon="ellipse-outline"
-              label="Breathe"
-              onPress={() => {
-                tap();
-                router.push('/breathe');
-              }}
-            />
+            <Pressable
+              onPress={openPicker}
+              accessibilityRole="button"
+              accessibilityLabel={`Length: ${settings.durationMin} minutes`}
+              style={({ pressed }) => [
+                styles.chip,
+                { backgroundColor: colors.surfaceMuted, transform: [{ scale: pressed ? 0.97 : 1 }] },
+              ]}>
+              <Ionicons name="timer-outline" size={18} color={cat.accent} />
+              <AppText variant="body">{settings.durationMin} min</AppText>
+              <Ionicons name="chevron-up" size={14} color={colors.textSecondary} />
+            </Pressable>
           </View>
+
+          <Pressable
+            onPress={() => {
+              tap();
+              router.push('/breathe');
+            }}
+            accessibilityRole="button"
+            style={({ pressed }) => [styles.breatheLink, { opacity: pressed ? 0.55 : 1 }]}>
+            <Ionicons name="ellipse-outline" size={15} color={colors.textSecondary} />
+            <AppText variant="label" muted>
+              Breathing exercises
+            </AppText>
+          </Pressable>
         </View>
       </View>
 
@@ -142,32 +147,6 @@ export default function MeditateScreen() {
         onClose={() => setPickerOpen(false)}
       />
     </Screen>
-  );
-}
-
-function LinkPill({
-  icon,
-  label,
-  onPress,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
-  onPress: () => void;
-}) {
-  const colors = useThemeColors();
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      style={({ pressed }) => [
-        styles.linkPill,
-        { borderColor: colors.border, opacity: pressed ? 0.6 : 1, transform: [{ scale: pressed ? 0.97 : 1 }] },
-      ]}>
-      <Ionicons name={icon} size={16} color={colors.textSecondary} />
-      <AppText variant="caption" muted>
-        {label}
-      </AppText>
-    </Pressable>
   );
 }
 
@@ -186,24 +165,22 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
   },
   beginLabel: { fontSize: 17, letterSpacing: 0.3 },
-  pick: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   controls: { gap: spacing.md, paddingBottom: spacing.md, alignItems: 'center' },
-  lengthPill: {
+  chipsRow: { flexDirection: 'row', gap: spacing.md, alignSelf: 'stretch' },
+  chip: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: spacing.sm,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
     borderRadius: radius.pill,
   },
-  links: { flexDirection: 'row', justifyContent: 'center', gap: spacing.md },
-  linkPill: {
+  breatheLink: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
     paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radius.pill,
-    borderWidth: StyleSheet.hairlineWidth,
   },
 });
