@@ -23,7 +23,7 @@ import { useAppData } from '@/store/AppData';
 import { radius, spacing } from '@/theme';
 import { categoryStyle } from '@/theme/categories';
 
-type Phase = 'running' | 'paused' | 'finished';
+type Phase = 'preparing' | 'running' | 'paused' | 'finished';
 
 // On platforms without live synthesis, generative picks fall back to a track.
 const GENERATIVE_FALLBACK: Record<GenerativeSound, FileSound> = {
@@ -56,7 +56,9 @@ export default function SessionScreen() {
       : ambient;
 
   const [remaining, setRemaining] = useState(totalSec);
-  const [phase, setPhase] = useState<Phase>('running');
+  // Generative pieces render before the session starts; the countdown only
+  // begins once audio is actually playing (see startCountdown below).
+  const [phase, setPhase] = useState<Phase>(useEngine ? 'preparing' : 'running');
   const [rated, setRated] = useState<number | null>(null);
   const [specLabel, setSpecLabel] = useState<string | null>(null);
   const [liked, setLiked] = useState(false);
@@ -94,13 +96,21 @@ export default function SessionScreen() {
     const audio = new SessionAudio();
     audioRef.current = audio;
     let cancelled = false;
+    // Start the timer only once audio is ready, so the render doesn't eat into
+    // the session. Rings the start bell at the true beginning.
+    const startCountdown = () => {
+      if (cancelled) return;
+      if (settings.startBell) audioRef.current?.ringBell();
+      endAtRef.current = Date.now() + totalSec * 1000;
+      setRemaining(totalSec);
+      setPhase('running');
+    };
     (async () => {
       await audio.prepare(effectiveAmbient);
       if (cancelled) return;
       audio.setVolume(settings.volume);
-      if (settings.startBell) audio.ringBell();
       if (useEngine) {
-        // Choose the next piece, learning from past ratings, then play it live.
+        // Choose the next piece, learning from past ratings, then render it.
         const ratings = await loadRatings();
         if (cancelled) return;
         const spec = nextSpec(sectionFor(ambient as GenerativeSound), ratings);
@@ -128,6 +138,7 @@ export default function SessionScreen() {
       } else {
         audio.startAmbient();
       }
+      startCountdown();
     })();
     return () => {
       cancelled = true;
@@ -293,6 +304,32 @@ export default function SessionScreen() {
           )}
 
           <Button label="Done" onPress={() => router.back()} style={styles.doneBtn} />
+        </SafeAreaView>
+      </LinearGradient>
+    );
+  }
+
+  // Preparing: a calm screen while the piece renders — no countdown yet.
+  if (phase === 'preparing') {
+    return (
+      <LinearGradient colors={colors.gradient} style={styles.fill}>
+        <SafeAreaView style={styles.fill} edges={['left', 'right', 'bottom']}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Cancel"
+            onPress={endEarly}
+            hitSlop={16}
+            style={[styles.close, { top: Math.max(insets.top, 44) }]}>
+            <Ionicons name="close" size={26} color={colors.textSecondary} />
+          </Pressable>
+          <View style={styles.center} pointerEvents="none">
+            <BreathingOrb active core={cat.accent} halo={cat.colors[0]}>
+              <Ionicons name="sparkles-outline" size={40} color="#FFFFFF" />
+            </BreathingOrb>
+            <AppText variant="label" muted style={styles.hint}>
+              {composing ? 'Composing a piece just for you…' : 'Getting ready…'}
+            </AppText>
+          </View>
         </SafeAreaView>
       </LinearGradient>
     );
