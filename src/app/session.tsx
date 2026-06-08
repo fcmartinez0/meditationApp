@@ -330,6 +330,15 @@ export default function SessionScreen() {
               {composing ? 'Composing a piece just for you…' : 'Getting ready…'}
             </AppText>
           </View>
+
+          <View style={[styles.tip, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Ionicons name="heart" size={20} color={cat.accent} />
+            <AppText variant="caption" muted style={styles.tipText}>
+              Tap the <AppText variant="caption" color={cat.accent}>♥</AppText> on a piece you enjoy and{' '}
+              <AppText variant="caption" color={cat.accent}>shuffle</AppText> for a new one — your
+              generative music quietly learns what you love.
+            </AppText>
+          </View>
         </SafeAreaView>
       </LinearGradient>
     );
@@ -442,6 +451,17 @@ const styles = StyleSheet.create({
   clock: { fontSize: 52, fontWeight: '200' },
   clockMinimal: { fontSize: 76, fontWeight: '100' },
   hint: { marginTop: spacing.sm },
+  tip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginHorizontal: spacing.xl,
+    marginBottom: spacing.xxxl,
+    padding: spacing.lg,
+    borderRadius: radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  tipText: { flex: 1, lineHeight: 18 },
   controls: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xl, gap: spacing.lg },
   nowPlaying: {
     flexDirection: 'row',

@@ -705,7 +705,11 @@ export class GenerativeEngine {
       const t0 = Date.now();
       let loop: Awaited<ReturnType<typeof renderLoop>> = null;
       try {
-        loop = await renderLoop(spec);
+        // Never hang forever — if the render stalls, fall back to a track.
+        loop = await Promise.race([
+          renderLoop(spec),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 20000)),
+        ]);
       } catch (e) {
         console.warn('[generative] offline render threw', e);
         return false;
