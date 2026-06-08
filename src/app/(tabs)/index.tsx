@@ -108,7 +108,6 @@ export default function MeditateScreen() {
               <AppText variant="body" numberOfLines={1}>
                 {sel.label}
               </AppText>
-              <Ionicons name="chevron-forward" size={14} color={colors.textSecondary} />
             </Pressable>
 
             <Pressable
@@ -121,7 +120,6 @@ export default function MeditateScreen() {
               ]}>
               <Ionicons name="timer-outline" size={18} color={cat.accent} />
               <AppText variant="body">{settings.durationMin} min</AppText>
-              <Ionicons name="chevron-up" size={14} color={colors.textSecondary} />
             </Pressable>
           </View>
 
@@ -132,7 +130,6 @@ export default function MeditateScreen() {
             }}
             accessibilityRole="button"
             style={({ pressed }) => [styles.breatheLink, { opacity: pressed ? 0.55 : 1 }]}>
-            <Ionicons name="ellipse-outline" size={15} color={colors.textSecondary} />
             <AppText variant="label" muted>
               Breathing exercises
             </AppText>
