@@ -1,0 +1,77 @@
+{
+  "expo": {
+    "name": "Stillness",
+    "slug": "stillness-meditation",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "stillness",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "icon": "./assets/expo.icon",
+      "supportsTablet": true,
+      "bundleIdentifier": "com.fcmartinez0.stillness",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "privacyManifests": {
+        "NSPrivacyTracking": false,
+        "NSPrivacyTrackingDomains": [],
+        "NSPrivacyCollectedDataTypes": [],
+        "NSPrivacyAccessedAPITypes": [
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+            "NSPrivacyAccessedAPITypeReasons": ["CA92.1"]
+          }
+        ]
+      }
+    },
+    "android": {
+      "package": "com.fcmartinez0.stillness",
+      "adaptiveIcon": {
+        "backgroundColor": "#0E1020",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/favicon.png",
+      "name": "Stillness",
+      "shortName": "Stillness",
+      "display": "standalone",
+      "themeColor": "#0E1020",
+      "backgroundColor": "#0E1020",
+      "lang": "en"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-audio",
+      "expo-notifications",
+      [
+        "react-native-audio-api",
+        {
+          "iosBackgroundMode": true,
+          "disableFFmpeg": true
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#5B6CF0",
+          "android": {
+            "image": "./assets/images/splash-icon.png",
+            "imageWidth": 76
+          }
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true,
+      "baseUrl": "/meditationApp"
+    }
+  }
+}
