@@ -201,11 +201,20 @@ class Composer {
 
     const master = ctx.createGain();
     master.gain.value = MIX_GAIN;
-    // Soft-saturation master for cohesion and a gentle ceiling.
+    // Master chain: clean out subsonic rumble, add a touch of "air", then a
+    // soft-saturation stage for cohesion and a gentle ceiling.
+    const lowCut = ctx.createBiquadFilter();
+    lowCut.type = 'highpass';
+    lowCut.frequency.value = 28;
+    lowCut.Q.value = 0.7;
+    const air = ctx.createBiquadFilter();
+    air.type = 'highshelf';
+    air.frequency.value = 7500;
+    air.gain.value = 2.5;
     const shaper = ctx.createWaveShaper();
     shaper.curve = softClipCurve();
     shaper.oversample = '2x';
-    master.connect(shaper).connect(ctx.destination);
+    master.connect(lowCut).connect(air).connect(shaper).connect(ctx.destination);
 
     // Tempo-synced feedback delay.
     const delay = ctx.createDelay(2);
