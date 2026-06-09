@@ -1285,18 +1285,18 @@ const clarity = generateMusic({
 writeWavStereo(path.join(MUSIC_DIR, 'clarity.wav'), clarity.left, clarity.right, { targetDb: -16 });
 
 const lofi = generateLoFi();
-writeWavStereo(path.join(BEATS_DIR, 'lofi.wav'), lofi.left, lofi.right, { air: 0.3 });
+writeWavStereo(path.join(BEATS_DIR, 'lofi.wav'), lofi.left, lofi.right, { targetDb: -16, air: 0.3 });
 const liquid = generateLiquid();
-writeWavStereo(path.join(BEATS_DIR, 'liquid.wav'), liquid.left, liquid.right, { air: 0.3 });
+writeWavStereo(path.join(BEATS_DIR, 'liquid.wav'), liquid.left, liquid.right, { targetDb: -16, air: 0.3 });
 const chillstep = generateChillstep();
-writeWavStereo(path.join(BEATS_DIR, 'chillstep.wav'), chillstep.left, chillstep.right, { air: 0.3 });
+writeWavStereo(path.join(BEATS_DIR, 'chillstep.wav'), chillstep.left, chillstep.right, { targetDb: -16, air: 0.3 });
 const downtempo = generateDowntempo();
-writeWavStereo(path.join(BEATS_DIR, 'downtempo.wav'), downtempo.left, downtempo.right, { air: 0.3 });
+writeWavStereo(path.join(BEATS_DIR, 'downtempo.wav'), downtempo.left, downtempo.right, { targetDb: -16, air: 0.3 });
 const deephouse = generateDeepHouse();
-writeWavStereo(path.join(BEATS_DIR, 'deephouse.wav'), deephouse.left, deephouse.right, { air: 0.3 });
+writeWavStereo(path.join(BEATS_DIR, 'deephouse.wav'), deephouse.left, deephouse.right, { targetDb: -16, air: 0.3 });
 const melodic = generateMelodic();
-writeWavStereo(path.join(BEATS_DIR, 'melodic.wav'), melodic.left, melodic.right, { air: 0.3 });
+writeWavStereo(path.join(BEATS_DIR, 'melodic.wav'), melodic.left, melodic.right, { targetDb: -16, air: 0.3 });
 const techno = generateTechno();
-writeWavStereo(path.join(BEATS_DIR, 'techno.wav'), techno.left, techno.right, { air: 0.3 });
+writeWavStereo(path.join(BEATS_DIR, 'techno.wav'), techno.left, techno.right, { targetDb: -16, air: 0.3 });
 
 console.log('Done.');
