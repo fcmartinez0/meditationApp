@@ -1,0 +1,11 @@
+# gitleaks configuration for Stillness.
+# Extends the default ruleset and allowlists known false positives.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Local AsyncStorage key names — not secrets (e.g. mc.ratings.v1)"
+regexes = [
+  '''mc\.[a-z]+\.v\d+''',
+]
