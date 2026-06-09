@@ -46,7 +46,9 @@ async function ensureAudioMode() {
   try {
     await setAudioModeAsync({
       playsInSilentMode: true,
-      shouldPlayInBackground: false,
+      // Keep playing when the screen locks mid-session (matches the app's
+      // background-audio capability), so meditation isn't cut off.
+      shouldPlayInBackground: true,
       interruptionMode: 'mixWithOthers',
     });
     configured = true;

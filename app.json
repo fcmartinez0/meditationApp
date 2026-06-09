@@ -11,6 +11,7 @@
       "icon": "./assets/expo.icon",
       "supportsTablet": true,
       "bundleIdentifier": "com.fcmartinez0.stillness",
+      "buildNumber": "1",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       },
@@ -28,6 +29,7 @@
     },
     "android": {
       "package": "com.fcmartinez0.stillness",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#0E1020",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

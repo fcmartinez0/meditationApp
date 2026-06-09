@@ -33,6 +33,14 @@ import type {
 import { loadRatings, nextSpec } from './preferences';
 import type { PieceSpec, Section } from './types';
 
+// Diagnostics only in development — silent in production / App Store builds.
+const dlog = (...args: unknown[]) => {
+  if (__DEV__) console.log(...args);
+};
+const dwarn = (...args: unknown[]) => {
+  if (__DEV__) console.warn(...args);
+};
+
 const SCALES: Record<string, number[]> = {
   major_pentatonic: [0, 2, 4, 7, 9],
   minor_pentatonic: [0, 3, 5, 7, 10],
@@ -71,19 +79,32 @@ const PROGRESSIONS = [
   [0, 3, 0, 4],
 ];
 
-// Loop length and seamless-crossfade window.
-const LOOP_SECONDS = 40;
-const XFADE_SECONDS = 4;
+// Loop length and seamless-crossfade window. Generous now that rendering is
+// done ahead of time in the background, so the loop feels less repetitive.
+const LOOP_SECONDS = 60;
+const XFADE_SECONDS = 5;
 const RENDER_SECONDS = LOOP_SECONDS + XFADE_SECONDS;
-const IMPULSE_SECONDS = 1.2;
-// Render at a reduced rate — ambient content has little above ~10 kHz, and
-// halving the rate roughly halves render time. Playback resamples to device.
-const RENDER_SR = 24000;
+const IMPULSE_SECONDS = 1.8;
+// 32 kHz keeps render quick while preserving everything the ear needs here
+// (Nyquist 16 kHz). Playback resamples to the device rate.
+const RENDER_SR = 32000;
 // The offline mix is baked at this level; the player's master scales on top.
 const MIX_GAIN = 0.5;
 
 function midiToFreq(m: number): number {
   return 440 * Math.pow(2, (m - 69) / 12);
+}
+
+// Gentle tanh soft-clip for master "glue" and warmth — stands in for the
+// DynamicsCompressor that isn't available natively, and tames stray peaks.
+function softClipCurve(): Float32Array {
+  const n = 1024;
+  const c = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const x = (i / (n - 1)) * 2 - 1;
+    c[i] = Math.tanh(1.5 * x);
+  }
+  return c;
 }
 
 function makeWave(ctx: OfflineAudioContext, kind: string): PeriodicWave | null {
@@ -180,7 +201,11 @@ class Composer {
 
     const master = ctx.createGain();
     master.gain.value = MIX_GAIN;
-    master.connect(ctx.destination);
+    // Soft-saturation master for cohesion and a gentle ceiling.
+    const shaper = ctx.createWaveShaper();
+    shaper.curve = softClipCurve();
+    shaper.oversample = '2x';
+    master.connect(shaper).connect(ctx.destination);
 
     // Tempo-synced feedback delay.
     const delay = ctx.createDelay(2);
@@ -284,7 +309,7 @@ class Composer {
           : spec.wave === 'triangle'
             ? 'triangle'
             : 'sine';
-      const voiceCount = spec.section === 'chill' ? 5 : 4;
+      const voiceCount = spec.section === 'chill' ? 6 : 5;
       const drift = ctx.createOscillator();
       drift.type = 'sine';
       drift.frequency.value = 0.05 + this.rng() * 0.08;
@@ -704,7 +729,7 @@ export async function prefetchGenerative(section: Section): Promise<void> {
     if (pending && pending.spec.seed === spec.seed) pending.loop = loop;
     else pending = null;
   } catch (e) {
-    console.warn('[generative] prefetch failed', e);
+    dwarn('[generative] prefetch failed', e);
     pending = null;
   } finally {
     prefetching = false;
@@ -740,7 +765,7 @@ export class GenerativeEngine {
       try {
         await AudioManager.setAudioSessionActivity(true);
       } catch (e) {
-        console.warn('[generative] audio session activate failed', e);
+        dwarn('[generative] audio session activate failed', e);
       }
 
       let loop: LoopData | null = preloaded ?? null;
@@ -753,22 +778,22 @@ export class GenerativeEngine {
             new Promise<null>((resolve) => setTimeout(() => resolve(null), 20000)),
           ]);
         } catch (e) {
-          console.warn('[generative] offline render threw', e);
+          dwarn('[generative] offline render threw', e);
           return false;
         }
-        console.log('[generative] rendered in', Date.now() - t0, 'ms, samples', loop?.length);
+        dlog('[generative] rendered in', Date.now() - t0, 'ms, samples', loop?.length);
       } else {
-        console.log('[generative] using pre-rendered loop');
+        dlog('[generative] using pre-rendered loop');
       }
       if (this.stopped) return false;
       if (!loop) {
-        console.warn('[generative] render returned null');
+        dwarn('[generative] render returned null');
         return false;
       }
 
       const ctx = getCtx();
       if (!ctx) {
-        console.warn('[generative] no realtime AudioContext');
+        dwarn('[generative] no realtime AudioContext');
         return false;
       }
       this.ctx = ctx;
@@ -798,10 +823,10 @@ export class GenerativeEngine {
 
       this.master = master;
       this.source = src;
-      console.log('[generative] playing loop');
+      dlog('[generative] playing loop');
       return true;
     } catch (e) {
-      console.warn('[generative] start failed', e);
+      dwarn('[generative] start failed', e);
       return false;
     }
   }
