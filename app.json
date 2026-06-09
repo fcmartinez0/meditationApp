@@ -8,9 +8,9 @@
     "scheme": "stillness",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon",
       "supportsTablet": true,
       "bundleIdentifier": "com.fcmartinez0.stillness",
+      "buildNumber": "1",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       },
@@ -28,6 +28,7 @@
     },
     "android": {
       "package": "com.fcmartinez0.stillness",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#0E1020",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -61,9 +62,11 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#5B6CF0",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 120,
           "android": {
             "image": "./assets/images/splash-icon.png",
-            "imageWidth": 76
+            "imageWidth": 100
           }
         }
       ]

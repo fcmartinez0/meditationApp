@@ -17,13 +17,13 @@
  *   assets/audio/music/focus.wav  – 256 Hz carrier, 14 Hz beat (low-beta / SMR, alert focus)
  *   assets/audio/music/deep.wav   – 144 Hz drone, 3 Hz beat (delta, deep rest / sleep)
  *
- * Beat tracks (STEREO, looping) — synthesized grooves modeled on artist styles:
- *   assets/audio/beats/lofi.wav       – jazzy lo-fi hip-hop (Nujabes / J Dilla)
- *   assets/audio/beats/liquid.wav     – liquid drum & bass (LTJ Bukem / Netsky)
- *   assets/audio/beats/chillstep.wav  – future garage / chillstep (Burial)
- *   assets/audio/beats/downtempo.wav  – dreamy downtempo with arps (Tycho / Bonobo)
- *   assets/audio/beats/deephouse.wav  – dark, sultry deep house (ZHU)
- *   assets/audio/beats/melodic.wav    – warm, euphoric melodic house (RÜFÜS DU SOL)
+ * Beat tracks (STEREO, looping) — original synthesized grooves by genre:
+ *   assets/audio/beats/lofi.wav       – jazzy, dusty lo-fi hip-hop
+ *   assets/audio/beats/liquid.wav     – lush, rolling liquid drum & bass
+ *   assets/audio/beats/chillstep.wav  – smoky future garage / chillstep
+ *   assets/audio/beats/downtempo.wav  – dreamy downtempo with ping-pong arps
+ *   assets/audio/beats/deephouse.wav  – dark, sultry deep house
+ *   assets/audio/beats/melodic.wav    – warm, euphoric melodic house
  */
 
 const fs = require('fs');
@@ -464,7 +464,7 @@ function foldTail(L, R, loopSamples, tail) {
   return { left, right };
 }
 
-/** Lo-fi hip-hop, in the jazzy, dusty spirit of Nujabes / J Dilla. */
+/** Lo-fi hip-hop — jazzy and dusty. */
 function generateLoFi() {
   const bpm = 85;
   const bars = 8;
@@ -513,7 +513,7 @@ function generateLoFi() {
   return finishTrack(kit, loopSamples, tail, { reverbMix: 0.12 });
 }
 
-/** Liquid drum & bass, lush and rolling like LTJ Bukem / Netsky. */
+/** Liquid drum & bass — lush and rolling. */
 function generateLiquid() {
   const bpm = 172;
   const bars = 8;
@@ -555,7 +555,7 @@ function generateLiquid() {
   return finishTrack(kit, loopSamples, tail, { reverbMix: 0.22 });
 }
 
-/** Future garage / chillstep — smoky, 2-step, in the mood of Burial. */
+/** Future garage / chillstep — smoky and 2-step. */
 function generateChillstep() {
   const bpm = 140;
   const bars = 8;
@@ -604,7 +604,7 @@ function generateChillstep() {
   return finishTrack(kit, loopSamples, tail, { reverbMix: 0.16 });
 }
 
-/** Dreamy downtempo with ping-pong arps, à la Tycho / Bonobo. */
+/** Dreamy downtempo with ping-pong arps. */
 function generateDowntempo() {
   const bpm = 98;
   const bars = 8;
@@ -653,8 +653,8 @@ function generateDowntempo() {
   return finishTrack(kit, loopSamples, tail, { reverbMix: 0.16 });
 }
 
-/** Dark, sultry deep house — spacious four-on-the-floor in the spirit of ZHU. */
-function generateZhu() {
+/** Dark, sultry deep house — spacious four-on-the-floor. */
+function generateDeepHouse() {
   const bpm = 122;
   const bars = 8;
   const stepDur = 60 / bpm / 4;
@@ -756,13 +756,13 @@ function reverbChannel(buf, mix) {
 }
 
 /**
- * Warm, euphoric melodic house in the spirit of RÜFÜS DU SOL. The signatures
+ * Warm, euphoric melodic house. The signatures
  * are layered deliberately: an emotional i–VI–III–VII progression, a wide
  * detuned pad, a driving arp with dotted-eighth delay throws, a sidechain
  * "pump" that ducks the pad and bass on every kick, a filter that swells over
  * the 16-bar arrangement, and a reverb wash for space.
  */
-function generateRufus() {
+function generateMelodic() {
   const bpm = 123;
   const bars = 16; // a full 16-bar arrangement so it breathes rather than loops fast
   const stepDur = 60 / bpm / 4;
@@ -847,7 +847,7 @@ function generateRufus() {
   return foldTail(L, R, loopSamples, tail);
 }
 
-/** Hypnotic minimal / ambient techno: deep, rolling, evolving (à la Jon Hopkins). */
+/** Hypnotic minimal / ambient techno: deep, rolling, evolving. */
 function generateTechno() {
   const bpm = 122;
   const bars = 16;
@@ -1285,18 +1285,18 @@ const clarity = generateMusic({
 writeWavStereo(path.join(MUSIC_DIR, 'clarity.wav'), clarity.left, clarity.right, { targetDb: -16 });
 
 const lofi = generateLoFi();
-writeWavStereo(path.join(BEATS_DIR, 'lofi.wav'), lofi.left, lofi.right, { air: 0.3 });
+writeWavStereo(path.join(BEATS_DIR, 'lofi.wav'), lofi.left, lofi.right, { targetDb: -16, air: 0.3 });
 const liquid = generateLiquid();
-writeWavStereo(path.join(BEATS_DIR, 'liquid.wav'), liquid.left, liquid.right, { air: 0.3 });
+writeWavStereo(path.join(BEATS_DIR, 'liquid.wav'), liquid.left, liquid.right, { targetDb: -16, air: 0.3 });
 const chillstep = generateChillstep();
-writeWavStereo(path.join(BEATS_DIR, 'chillstep.wav'), chillstep.left, chillstep.right, { air: 0.3 });
+writeWavStereo(path.join(BEATS_DIR, 'chillstep.wav'), chillstep.left, chillstep.right, { targetDb: -16, air: 0.3 });
 const downtempo = generateDowntempo();
-writeWavStereo(path.join(BEATS_DIR, 'downtempo.wav'), downtempo.left, downtempo.right, { air: 0.3 });
-const deephouse = generateZhu();
-writeWavStereo(path.join(BEATS_DIR, 'deephouse.wav'), deephouse.left, deephouse.right, { air: 0.3 });
-const melodic = generateRufus();
-writeWavStereo(path.join(BEATS_DIR, 'melodic.wav'), melodic.left, melodic.right, { air: 0.3 });
+writeWavStereo(path.join(BEATS_DIR, 'downtempo.wav'), downtempo.left, downtempo.right, { targetDb: -16, air: 0.3 });
+const deephouse = generateDeepHouse();
+writeWavStereo(path.join(BEATS_DIR, 'deephouse.wav'), deephouse.left, deephouse.right, { targetDb: -16, air: 0.3 });
+const melodic = generateMelodic();
+writeWavStereo(path.join(BEATS_DIR, 'melodic.wav'), melodic.left, melodic.right, { targetDb: -16, air: 0.3 });
 const techno = generateTechno();
-writeWavStereo(path.join(BEATS_DIR, 'techno.wav'), techno.left, techno.right, { air: 0.3 });
+writeWavStereo(path.join(BEATS_DIR, 'techno.wav'), techno.left, techno.right, { targetDb: -16, air: 0.3 });
 
 console.log('Done.');

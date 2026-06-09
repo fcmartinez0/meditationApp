@@ -56,15 +56,15 @@ export const SECTIONS: Section[] = [
   },
   {
     title: 'Beats',
-    caption: 'Instrumental grooves modeled on artists we love. Stereo — headphones recommended.',
+    caption: 'Instrumental grooves to focus or unwind. Stereo — headphones recommended.',
     items: [
-      { key: 'melodic', label: 'Melodic House', icon: 'sunny-outline', hint: '123 BPM · euphoric (RÜFÜS vibe)' },
-      { key: 'deephouse', label: 'Deep House', icon: 'moon-outline', hint: '122 BPM · dark (ZHU vibe)' },
-      { key: 'techno', label: 'Ambient Techno', icon: 'pulse-outline', hint: '122 BPM · hypnotic (Jon Hopkins vibe)' },
-      { key: 'lofi', label: 'Lo-Fi', icon: 'cafe-outline', hint: '85 BPM · jazzy (Nujabes vibe)' },
-      { key: 'liquid', label: 'Liquid', icon: 'water-outline', hint: '172 BPM · liquid drum & bass' },
-      { key: 'chillstep', label: 'Chillstep', icon: 'rainy-outline', hint: '140 BPM · future garage (Burial)' },
-      { key: 'downtempo', label: 'Downtempo', icon: 'partly-sunny-outline', hint: '98 BPM · dreamy (Tycho vibe)' },
+      { key: 'melodic', label: 'Melodic House', icon: 'sunny-outline', hint: '123 BPM · warm & euphoric' },
+      { key: 'deephouse', label: 'Deep House', icon: 'moon-outline', hint: '122 BPM · dark & sultry' },
+      { key: 'techno', label: 'Ambient Techno', icon: 'pulse-outline', hint: '122 BPM · hypnotic & rolling' },
+      { key: 'lofi', label: 'Lo-Fi', icon: 'cafe-outline', hint: '85 BPM · jazzy & dusty' },
+      { key: 'liquid', label: 'Liquid', icon: 'water-outline', hint: '172 BPM · lush drum & bass' },
+      { key: 'chillstep', label: 'Chillstep', icon: 'rainy-outline', hint: '140 BPM · smoky future garage' },
+      { key: 'downtempo', label: 'Downtempo', icon: 'partly-sunny-outline', hint: '98 BPM · dreamy & melodic' },
     ],
   },
 ];
