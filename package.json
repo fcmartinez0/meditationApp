@@ -24,7 +24,7 @@
     "expo-symbols": "~56.0.5",
     "expo-system-ui": "~56.0.5",
     "expo-web-browser": "~56.0.5",
-    "react": "19.2.3",
+    "react": "19.2.7",
     "react-dom": "19.2.3",
     "react-native": "0.85.3",
     "react-native-audio-api": "^0.12.2",
@@ -37,7 +37,7 @@
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
-    "@types/react": "~19.2.2",
+    "@types/react": "~19.2.17",
     "jest-expo": "~56.0.4",
     "typescript": "~6.0.3"
   },
