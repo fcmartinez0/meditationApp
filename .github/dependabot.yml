@@ -4,11 +4,27 @@ updates:
     directory: '/'
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 3
     groups:
       expo:
         patterns: ['expo', 'expo-*', '@expo/*']
+    ignore:
+      # Expo SDK pins exact versions of these — update them with `npx expo install`
+      # when upgrading the SDK, not via Dependabot bumps that break the build.
+      - dependency-name: 'react'
+      - dependency-name: 'react-dom'
+      - dependency-name: 'react-native'
+      - dependency-name: 'react-native-*'
+      - dependency-name: '@react-native-async-storage/async-storage'
+      - dependency-name: '@types/react'
+      - dependency-name: 'expo'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'expo-*'
+        update-types: ['version-update:semver-major']
   - package-ecosystem: github-actions
     directory: '/'
     schedule:
       interval: weekly
+    groups:
+      actions:
+        patterns: ['*']
