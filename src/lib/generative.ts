@@ -96,16 +96,11 @@ function midiToFreq(m: number): number {
   return 440 * Math.pow(2, (m - 69) / 12);
 }
 
-// Gentle tanh soft-clip for master "glue" and warmth — stands in for the
-// DynamicsCompressor that isn't available natively, and tames stray peaks.
-function softClipCurve(): Float32Array {
-  const n = 1024;
-  const c = new Float32Array(n);
-  for (let i = 0; i < n; i++) {
-    const x = (i / (n - 1)) * 2 - 1;
-    c[i] = Math.tanh(1.5 * x);
-  }
-  return c;
+// Gentle tanh soft-clip for master "glue" and warmth — applied in JS to the
+// rendered samples (stands in for the DynamicsCompressor that isn't available
+// natively, and tames stray peaks without any native nodes).
+function softClip(x: number): number {
+  return Math.tanh(1.5 * x);
 }
 
 function makeWave(ctx: OfflineAudioContext, kind: string): PeriodicWave | null {
@@ -193,6 +188,7 @@ class Composer {
   async render(): Promise<AudioBuffer> {
     dlog('[generative] building graph');
     this.build();
+    dlog('[generative] graph built, scheduling events');
     this.scheduleAll(RENDER_SECONDS);
     dlog('[generative] startRendering…');
     return this.ctx.startRendering();
@@ -204,21 +200,11 @@ class Composer {
 
     const master = ctx.createGain();
     master.gain.value = MIX_GAIN;
-    // Master chain: clean out subsonic rumble, add a touch of "air", then a
-    // soft-saturation stage for cohesion and a gentle ceiling.
-    const lowCut = ctx.createBiquadFilter();
-    lowCut.type = 'highpass';
-    lowCut.frequency.value = 28;
-    lowCut.Q.value = 0.7;
-    const air = ctx.createBiquadFilter();
-    air.type = 'highshelf';
-    air.frequency.value = 7500;
-    air.gain.value = 2.5;
-    const shaper = ctx.createWaveShaper();
-    shaper.curve = softClipCurve();
-    // NOTE: no oversampling — '2x' is suspected of hanging the Simulator's
-    // offline render; the soft curve barely aliases at these levels anyway.
-    master.connect(lowCut).connect(air).connect(shaper).connect(ctx.destination);
+    // Plain master — breadcrumbs showed the Simulator hangs while building
+    // the graph with the extra master nodes (highshelf EQ / WaveShaper), so
+    // those are gone; soft-clip glue is applied in JS after the render
+    // (see foldLoop), which needs no native nodes at all.
+    master.connect(ctx.destination);
 
     // Tempo-synced feedback delay.
     const delay = ctx.createDelay(2);
@@ -706,6 +692,8 @@ function foldLoop(rendered: AudioBuffer, loopSamples: number, xfSamples: number)
       const t = i / xfSamples;
       dst[i] = src[i] * Math.sqrt(t) + src[loopSamples + i] * Math.sqrt(1 - t);
     }
+    // Master glue: gentle JS soft-clip (no native nodes involved).
+    for (let i = 0; i < loopSamples; i++) dst[i] = softClip(dst[i]);
     out.push(dst);
   }
   return out;
