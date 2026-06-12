@@ -191,8 +191,10 @@ class Composer {
   }
 
   async render(): Promise<AudioBuffer> {
+    dlog('[generative] building graph');
     this.build();
     this.scheduleAll(RENDER_SECONDS);
+    dlog('[generative] startRendering…');
     return this.ctx.startRendering();
   }
 
@@ -214,7 +216,8 @@ class Composer {
     air.gain.value = 2.5;
     const shaper = ctx.createWaveShaper();
     shaper.curve = softClipCurve();
-    shaper.oversample = '2x';
+    // NOTE: no oversampling — '2x' is suspected of hanging the Simulator's
+    // offline render; the soft curve barely aliases at these levels anyway.
     master.connect(lowCut).connect(air).connect(shaper).connect(ctx.destination);
 
     // Tempo-synced feedback delay.
@@ -712,8 +715,10 @@ export type LoopData = { data: Float32Array[]; length: number; sampleRate: numbe
 
 async function renderLoop(spec: PieceSpec): Promise<LoopData | null> {
   const sr = RENDER_SR;
+  dlog('[generative] creating OfflineAudioContext', RENDER_SECONDS, 's @', sr, 'Hz');
   const offline = new OfflineAudioContext(2, Math.ceil(RENDER_SECONDS * sr), sr);
   const rendered = await new Composer(offline, spec).render();
+  dlog('[generative] render complete, folding loop');
   const loopSamples = Math.floor(LOOP_SECONDS * sr);
   const xfSamples = Math.floor(XFADE_SECONDS * sr);
   return { data: foldLoop(rendered, loopSamples, xfSamples), length: loopSamples, sampleRate: sr };
@@ -731,6 +736,7 @@ export async function prefetchGenerative(section: Section): Promise<void> {
   if (prefetching) return;
   if (pending && pending.spec.section === section && pending.loop) return; // ready
   prefetching = true;
+  dlog('[generative] prefetch start for', section);
   try {
     const ratings = await loadRatings();
     const spec = nextSpec(section, ratings);
