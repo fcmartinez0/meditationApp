@@ -79,15 +79,16 @@ const PROGRESSIONS = [
   [0, 3, 0, 4],
 ];
 
-// Loop length and seamless-crossfade window. Generous now that rendering is
-// done ahead of time in the background, so the loop feels less repetitive.
-const LOOP_SECONDS = 60;
-const XFADE_SECONDS = 5;
+// Loop length and seamless-crossfade window. Kept light so even the iOS
+// Simulator's emulated audio can render without choking (heavier settings
+// froze the Simulator). Quality is preserved via the master EQ + soft-clip.
+const LOOP_SECONDS = 40;
+const XFADE_SECONDS = 4;
 const RENDER_SECONDS = LOOP_SECONDS + XFADE_SECONDS;
-const IMPULSE_SECONDS = 1.8;
-// 32 kHz keeps render quick while preserving everything the ear needs here
-// (Nyquist 16 kHz). Playback resamples to the device rate.
-const RENDER_SR = 32000;
+const IMPULSE_SECONDS = 1.2;
+// 24 kHz (Nyquist 12 kHz) keeps the render fast and memory low; playback
+// resamples to the device rate.
+const RENDER_SR = 24000;
 // The offline mix is baked at this level; the player's master scales on top.
 const MIX_GAIN = 0.5;
 
@@ -318,7 +319,7 @@ class Composer {
           : spec.wave === 'triangle'
             ? 'triangle'
             : 'sine';
-      const voiceCount = spec.section === 'chill' ? 6 : 5;
+      const voiceCount = spec.section === 'chill' ? 5 : 4;
       const drift = ctx.createOscillator();
       drift.type = 'sine';
       drift.frequency.value = 0.05 + this.rng() * 0.08;

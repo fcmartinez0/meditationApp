@@ -35,11 +35,16 @@ export default function MeditateScreen() {
   const [pickerOpen, setPickerOpen] = useState(false);
 
   // Pre-render the next generative piece in the background so Begin is instant.
+  // Delayed a couple of seconds so it never competes with launch/navigation
+  // (a heavy render at launch could otherwise stutter low-end devices).
   useFocusEffect(
     useCallback(() => {
-      if (isGenerative(settings.ambient)) {
-        void prefetchGenerative(sectionFor(settings.ambient));
-      }
+      const ambient = settings.ambient;
+      if (!isGenerative(ambient)) return;
+      const id = setTimeout(() => {
+        void prefetchGenerative(sectionFor(ambient));
+      }, 2000);
+      return () => clearTimeout(id);
     }, [settings.ambient]),
   );
 
