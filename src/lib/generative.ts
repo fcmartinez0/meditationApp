@@ -79,16 +79,14 @@ const PROGRESSIONS = [
   [0, 3, 0, 4],
 ];
 
-// Loop length and seamless-crossfade window. Kept light so even the iOS
-// Simulator's emulated audio can render without choking (heavier settings
-// froze the Simulator). Quality is preserved via the master EQ + soft-clip.
-const LOOP_SECONDS = 40;
+// Loop length and seamless-crossfade window. Kept short so the offline
+// render stays fast even on the iOS Simulator's slow emulated audio.
+const LOOP_SECONDS = 28;
 const XFADE_SECONDS = 4;
 const RENDER_SECONDS = LOOP_SECONDS + XFADE_SECONDS;
-const IMPULSE_SECONDS = 1.2;
-// 24 kHz (Nyquist 12 kHz) keeps the render fast and memory low; playback
+// 22.05 kHz (Nyquist 11 kHz) keeps the render fast and memory low; playback
 // resamples to the device rate.
-const RENDER_SR = 24000;
+const RENDER_SR = 22050;
 // The offline mix is baked at this level; the player's master scales on top.
 const MIX_GAIN = 0.5;
 
@@ -223,15 +221,26 @@ class Composer {
     delaySend.connect(delay);
     this.delaySend = delaySend;
 
-    // Reverb send.
-    const convolver = ctx.createConvolver();
-    convolver.buffer = this.makeImpulse(IMPULSE_SECONDS, 2.4);
+    // Reverb send — a cheap parallel-comb "reverb" (3 lowpassed feedback
+    // delays). Convolution sounded lush but was far too slow to render on the
+    // Simulator; this gives a diffuse tail for a fraction of the CPU.
     const reverbWet = ctx.createGain();
-    reverbWet.gain.value = spec.section === 'rest' ? 0.4 : 0.28;
-    convolver.connect(reverbWet).connect(master);
+    reverbWet.gain.value = spec.section === 'rest' ? 0.5 : 0.35;
+    reverbWet.connect(master);
     const reverbSend = ctx.createGain();
     reverbSend.gain.value = 1;
-    reverbSend.connect(convolver);
+    for (const dt of [0.061, 0.089, 0.117]) {
+      const d = ctx.createDelay(0.5);
+      d.delayTime.value = dt;
+      const fb = ctx.createGain();
+      fb.gain.value = 0.5;
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 3200;
+      d.connect(lp).connect(fb).connect(d);
+      reverbSend.connect(d);
+      d.connect(reverbWet);
+    }
     this.reverbSend = reverbSend;
 
     const pulse = ctx.createGain();
@@ -665,18 +674,6 @@ class Composer {
     if (this.reverbSend) pan.connect(this.reverbSend);
     osc.start(when);
     osc.stop(when + 3.2);
-  }
-
-  private makeImpulse(seconds: number, decay: number): AudioBuffer {
-    const { ctx } = this;
-    const len = Math.floor(seconds * ctx.sampleRate);
-    const buf = ctx.createBuffer(2, len, ctx.sampleRate);
-    for (let ch = 0; ch < 2; ch++) {
-      const d = new Float32Array(len);
-      for (let i = 0; i < len; i++) d[i] = (this.rng() * 2 - 1) * Math.pow(1 - i / len, decay);
-      buf.copyToChannel(d, ch);
-    }
-    return buf;
   }
 }
 

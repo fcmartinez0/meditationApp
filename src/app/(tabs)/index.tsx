@@ -43,7 +43,7 @@ export default function MeditateScreen() {
       if (!isGenerative(ambient)) return;
       const id = setTimeout(() => {
         void prefetchGenerative(sectionFor(ambient));
-      }, 2000);
+      }, 800);
       return () => clearTimeout(id);
     }, [settings.ambient]),
   );
