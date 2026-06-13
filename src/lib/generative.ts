@@ -188,9 +188,17 @@ class Composer {
     dlog('[generative] building graph');
     this.build();
     dlog('[generative] graph built, scheduling events');
-    this.scheduleAll(RENDER_SECONDS);
+    await this.scheduleAll(RENDER_SECONDS);
     dlog('[generative] startRendering…');
     return this.ctx.startRendering();
+  }
+
+  // Yield to the JS event loop periodically while creating nodes, so building
+  // the (large) graph never blocks the UI. The render itself already runs on a
+  // native background thread.
+  private ops = 0;
+  private async breathe(): Promise<void> {
+    if (++this.ops % 16 === 0) await new Promise<void>((r) => setTimeout(r, 0));
   }
 
   private build(): void {
@@ -337,7 +345,7 @@ class Composer {
     }
   }
 
-  private scheduleAll(renderLen: number): void {
+  private async scheduleAll(renderLen: number): Promise<void> {
     const { spec, ctx } = this;
     const sustained = spec.instrument === 'pad' || spec.instrument === 'choir';
 
@@ -359,6 +367,7 @@ class Composer {
         order.forEach((m, i) =>
           this.compNote(when + i * 0.05, midiToFreq(m), spec.instrument, bellWave, i % 2 ? 0.4 : -0.4),
         );
+        await this.breathe();
       }
     }
 
@@ -368,6 +377,7 @@ class Composer {
       while (when < renderLen) {
         this.playChime(when);
         when += (5 + this.rng() * 12) / Math.max(0.05, spec.chimeDensity);
+        await this.breathe();
       }
     }
 
@@ -380,13 +390,17 @@ class Composer {
         const st = s % 16;
         if (spec.percussion !== 'none') this.triggerPercussion(st, when);
         if (spec.arp) this.triggerArp(st, when);
+        await this.breathe();
       }
     }
 
     // Melodic lead phrases.
     if (spec.melody) {
       let when = 4 + this.rng() * 18;
-      while (when < renderLen) when = this.schedulePhrase(when);
+      while (when < renderLen) {
+        when = this.schedulePhrase(when);
+        await this.breathe();
+      }
     }
   }
 
