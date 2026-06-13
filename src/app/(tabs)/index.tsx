@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useRouter } from 'expo-router';
+import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
@@ -11,9 +11,7 @@ import { DurationPicker } from '@/components/DurationPicker';
 import { Screen } from '@/components/Screen';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { greeting, soundMeta } from '@/lib/catalog';
-import { prefetchGenerative } from '@/lib/generative';
 import type { AmbientSound } from '@/lib/types';
-import { isGenerative, sectionFor } from '@/lib/types';
 import { categoryStyle } from '@/theme/categories';
 import { useAppData } from '@/store/AppData';
 import { radius, spacing } from '@/theme';
@@ -33,20 +31,6 @@ export default function MeditateScreen() {
   const sel = soundMeta(settings.ambient);
 
   const [pickerOpen, setPickerOpen] = useState(false);
-
-  // Pre-render the next generative piece in the background so Begin is instant.
-  // Delayed a couple of seconds so it never competes with launch/navigation
-  // (a heavy render at launch could otherwise stutter low-end devices).
-  useFocusEffect(
-    useCallback(() => {
-      const ambient = settings.ambient;
-      if (!isGenerative(ambient)) return;
-      const id = setTimeout(() => {
-        void prefetchGenerative(sectionFor(ambient));
-      }, 800);
-      return () => clearTimeout(id);
-    }, [settings.ambient]),
-  );
 
   const tap = () => Haptics.selectionAsync().catch(() => {});
 

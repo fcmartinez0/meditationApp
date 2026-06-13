@@ -79,10 +79,11 @@ const PROGRESSIONS = [
   [0, 3, 0, 4],
 ];
 
-// Loop length and seamless-crossfade window. Kept short so the offline
-// render stays fast even on the iOS Simulator's slow emulated audio.
-const LOOP_SECONDS = 28;
-const XFADE_SECONDS = 4;
+// Loop length and seamless-crossfade window. Short so the offline render —
+// which blocks the JS thread on the Simulator — stays brief. It runs behind
+// the Composing screen, whose orb animates on the UI thread regardless.
+const LOOP_SECONDS = 18;
+const XFADE_SECONDS = 3;
 const RENDER_SECONDS = LOOP_SECONDS + XFADE_SECONDS;
 // 22.05 kHz (Nyquist 11 kHz) keeps the render fast and memory low; playback
 // resamples to the device rate.
@@ -221,27 +222,10 @@ class Composer {
     delaySend.connect(delay);
     this.delaySend = delaySend;
 
-    // Reverb send — a cheap parallel-comb "reverb" (3 lowpassed feedback
-    // delays). Convolution sounded lush but was far too slow to render on the
-    // Simulator; this gives a diffuse tail for a fraction of the CPU.
-    const reverbWet = ctx.createGain();
-    reverbWet.gain.value = spec.section === 'rest' ? 0.5 : 0.35;
-    reverbWet.connect(master);
-    const reverbSend = ctx.createGain();
-    reverbSend.gain.value = 1;
-    for (const dt of [0.061, 0.089, 0.117]) {
-      const d = ctx.createDelay(0.5);
-      d.delayTime.value = dt;
-      const fb = ctx.createGain();
-      fb.gain.value = 0.5;
-      const lp = ctx.createBiquadFilter();
-      lp.type = 'lowpass';
-      lp.frequency.value = 3200;
-      d.connect(lp).connect(fb).connect(d);
-      reverbSend.connect(d);
-      d.connect(reverbWet);
-    }
-    this.reverbSend = reverbSend;
+    // No dedicated reverb send. Convolution and feedback-comb reverbs both
+    // render far too slowly on the Simulator (startRendering blocks the JS
+    // thread until it finishes). The single tempo delay above gives space;
+    // note layers route to it. this.reverbSend stays null → reverb taps skip.
 
     const pulse = ctx.createGain();
     pulse.gain.value = 1;
@@ -257,7 +241,6 @@ class Composer {
     const bus = ctx.createGain();
     bus.gain.value = 1;
     bus.connect(filter);
-    bus.connect(reverbSend);
 
     // Chorus.
     const chorus = ctx.createDelay(0.05);
@@ -317,7 +300,7 @@ class Composer {
           : spec.wave === 'triangle'
             ? 'triangle'
             : 'sine';
-      const voiceCount = spec.section === 'chill' ? 5 : 4;
+      const voiceCount = spec.section === 'chill' ? 4 : 3;
       const drift = ctx.createOscillator();
       drift.type = 'sine';
       drift.frequency.value = 0.05 + this.rng() * 0.08;
