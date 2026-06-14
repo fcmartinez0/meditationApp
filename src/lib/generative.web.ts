@@ -346,6 +346,28 @@ export class GenerativeEngine {
       this.bass = { osc, gain };
     }
 
+    // Clean binaural beat (researched frequencies): two pure carriers, one per
+    // ear, differing by spec.binauralHz, tuned to the root. Straight to master
+    // (no filter/reverb) so the beat stays pure. Subtle; needs headphones.
+    if (spec.binauralHz > 0) {
+      const carrier = midiToFreq(spec.root);
+      for (const [offset, side] of [
+        [0, -1],
+        [spec.binauralHz, 1],
+      ] as const) {
+        const bosc = ctx.createOscillator();
+        bosc.type = 'sine';
+        bosc.frequency.value = carrier + offset;
+        const bg = ctx.createGain();
+        bg.gain.value = 0.08;
+        const bp = ctx.createStereoPanner();
+        bp.pan.value = side;
+        bosc.connect(bg).connect(bp).connect(master);
+        bosc.start();
+        this.extras.push(bosc, bg, bp);
+      }
+    }
+
     // Open at a random point in the progression so pieces don't all start on
     // the tonic chord.
     this.chordStep = Math.floor(this.rng() * PROGRESSIONS[spec.progression % PROGRESSIONS.length].length);
@@ -418,9 +440,9 @@ export class GenerativeEngine {
       }
       this.voices.forEach((v, idx) => {
         const midi = notes[idx % notes.length];
-        const detune = (spec.binauralHz / 2) * v.side;
+        // Pad plays in tune; the binaural beat is a dedicated clean layer.
         v.osc.frequency.cancelScheduledValues(now);
-        v.osc.frequency.setTargetAtTime(midiToFreq(midi) + detune, now, glide / 3);
+        v.osc.frequency.setTargetAtTime(midiToFreq(midi), now, glide / 3);
         const target = (0.7 / this.voices.length) * (0.7 + 0.6 * this.rng());
         v.gain.gain.cancelScheduledValues(now);
         v.gain.gain.setTargetAtTime(target, now, glide / 3);

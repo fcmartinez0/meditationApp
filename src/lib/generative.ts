@@ -351,6 +351,28 @@ class Composer {
       osc.start();
       this.bass = { osc, gain };
     }
+
+    // Clean binaural beat (researched frequencies) for entrainment: two pure
+    // carriers — one per ear — differing by spec.binauralHz, tuned to the root
+    // so they blend musically. Routed straight to master (no filter/reverb) so
+    // the beat stays pure. Subtle; needs headphones to perceive.
+    if (spec.binauralHz > 0) {
+      const carrier = midiToFreq(spec.root);
+      for (const [offset, side] of [
+        [0, -1],
+        [spec.binauralHz, 1],
+      ] as const) {
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.value = carrier + offset;
+        const g = ctx.createGain();
+        g.gain.value = 0.08;
+        const p = ctx.createStereoPanner();
+        p.pan.value = side;
+        osc.connect(g).connect(p).connect(master);
+        osc.start();
+      }
+    }
   }
 
   private async scheduleAll(renderLen: number): Promise<void> {
@@ -441,7 +463,9 @@ class Composer {
       }
       this.voices.forEach((v, idx) => {
         const midi = notes[idx % notes.length];
-        const freq = midiToFreq(midi) + (spec.binauralHz / 2) * v.side;
+        // Pad plays in tune; the binaural beat is a dedicated clean layer
+        // (see build) rather than a detune smeared across the chord.
+        const freq = midiToFreq(midi);
         const target = (0.7 / this.voices.length) * (0.7 + 0.6 * this.rng());
         if (initial) {
           v.osc.frequency.setValueAtTime(freq, when);

@@ -48,10 +48,10 @@ export const SECTIONS: Section[] = [
   {
     title: 'Generative',
     caption:
-      'Composed live and never the same twice. Like or rate a piece and it learns what you enjoy.',
+      'Composed live, never the same twice — with a binaural beat woven in. Headphones recommended; it learns what you like.',
     items: [
-      { key: 'gen_rest', label: 'Rest', icon: 'sparkles-outline', hint: 'live generative ambient' },
-      { key: 'gen_chill', label: 'Flow', icon: 'infinite-outline', hint: 'live generative groove' },
+      { key: 'gen_rest', label: 'Rest', icon: 'sparkles-outline', hint: 'live ambient · 3–6 Hz deep rest' },
+      { key: 'gen_chill', label: 'Flow', icon: 'infinite-outline', hint: 'live groove · 10 Hz alpha' },
     ],
   },
   {

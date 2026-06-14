@@ -286,6 +286,26 @@ class Piece {
         when = t + 2 + this.rng() * 4;
       }
     }
+
+    // --- Clean binaural beat (two carriers, one per ear) ---
+    if (spec.binauralHz > 0) {
+      const carrier = midi(spec.root);
+      for (const [offset, pan] of [
+        [0, -1],
+        [spec.binauralHz, 1],
+      ]) {
+        let ph = 0;
+        const f = carrier + offset;
+        const gl = Math.cos(((pan + 1) / 2) * (Math.PI / 2));
+        const gr = Math.sin(((pan + 1) / 2) * (Math.PI / 2));
+        for (let i = 0; i < this.len; i++) {
+          ph += (TAU * f) / SR;
+          const s = Math.sin(ph) * 0.08;
+          this.dryL[i] += s * gl;
+          this.dryR[i] += s * gr;
+        }
+      }
+    }
   }
 
   kick(when, gain) {
@@ -447,7 +467,7 @@ const SPECS = {
   },
   flow: {
     seed: 67890, section: 'chill', scale: 'dorian', root: 48, brightness: 0.6,
-    chordChangeSec: 6, binauralHz: 6, chimeDensity: 0.12, tempo: 92, pulseDepth: 0.2,
+    chordChangeSec: 6, binauralHz: 4, chimeDensity: 0.12, tempo: 92, pulseDepth: 0.2,
     wave: 'triangle', instrument: 'keys', arp: true, bass: true, percussion: 'pulse',
     progression: 3, melody: true,
   },
