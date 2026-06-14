@@ -79,14 +79,14 @@ const PROGRESSIONS = [
   [0, 3, 0, 4],
 ];
 
-// Loop length and seamless-crossfade window. Short so the offline render —
-// which blocks the JS thread on the Simulator — stays brief. It runs behind
-// the Composing screen, whose orb animates on the UI thread regardless.
-const LOOP_SECONDS = 18;
-const XFADE_SECONDS = 3;
+// Loop length and seamless-crossfade window. The render runs on a native
+// background thread and node-building yields to the UI, so this can be
+// generous without freezing anything.
+const LOOP_SECONDS = 28;
+const XFADE_SECONDS = 4;
 const RENDER_SECONDS = LOOP_SECONDS + XFADE_SECONDS;
-// 22.05 kHz (Nyquist 11 kHz) keeps the render fast and memory low; playback
-// resamples to the device rate.
+const IMPULSE_SECONDS = 1.4;
+// 22.05 kHz (Nyquist 11 kHz) keeps render/memory modest; playback resamples.
 const RENDER_SR = 22050;
 // The offline mix is baked at this level; the player's master scales on top.
 const MIX_GAIN = 0.5;
@@ -230,10 +230,18 @@ class Composer {
     delaySend.connect(delay);
     this.delaySend = delaySend;
 
-    // No dedicated reverb send. Convolution and feedback-comb reverbs both
-    // render far too slowly on the Simulator (startRendering blocks the JS
-    // thread until it finishes). The single tempo delay above gives space;
-    // note layers route to it. this.reverbSend stays null → reverb taps skip.
+    // Reverb send (one convolver node — cheap to create; its cost is in the
+    // off-thread render, so it no longer blocks the UI). This glue is what
+    // makes the overlapping layers cohere instead of sounding scattered.
+    const convolver = ctx.createConvolver();
+    convolver.buffer = this.makeImpulse(IMPULSE_SECONDS, 2.2);
+    const reverbWet = ctx.createGain();
+    reverbWet.gain.value = spec.section === 'rest' ? 0.42 : 0.3;
+    convolver.connect(reverbWet).connect(master);
+    const reverbSend = ctx.createGain();
+    reverbSend.gain.value = 1;
+    reverbSend.connect(convolver);
+    this.reverbSend = reverbSend;
 
     const pulse = ctx.createGain();
     pulse.gain.value = 1;
@@ -249,6 +257,7 @@ class Composer {
     const bus = ctx.createGain();
     bus.gain.value = 1;
     bus.connect(filter);
+    bus.connect(reverbSend); // pad feeds the reverb too
 
     // Chorus.
     const chorus = ctx.createDelay(0.05);
@@ -308,7 +317,7 @@ class Composer {
           : spec.wave === 'triangle'
             ? 'triangle'
             : 'sine';
-      const voiceCount = spec.section === 'chill' ? 4 : 3;
+      const voiceCount = spec.section === 'chill' ? 5 : 4;
       const drift = ctx.createOscillator();
       drift.type = 'sine';
       drift.frequency.value = 0.05 + this.rng() * 0.08;
@@ -376,7 +385,7 @@ class Composer {
       let when = 3 + this.rng() * 16;
       while (when < renderLen) {
         this.playChime(when);
-        when += (5 + this.rng() * 12) / Math.max(0.05, spec.chimeDensity);
+        when += (8 + this.rng() * 16) / Math.max(0.05, spec.chimeDensity);
         await this.breathe();
       }
     }
@@ -567,7 +576,7 @@ class Composer {
     const beat = 60 / spec.tempo;
     const noteLen = beat * (this.rng() < 0.5 ? 1 : 0.5);
     const notes = 3 + Math.floor(this.rng() * 4);
-    const gain = spec.section === 'rest' ? 0.1 : 0.13;
+    const gain = spec.section === 'rest' ? 0.08 : 0.1;
     let t = t0;
     let degIdx = L + Math.floor(this.rng() * L);
     for (let i = 0; i < notes; i++) {
@@ -662,7 +671,7 @@ class Composer {
     osc.frequency.value = midiToFreq(midi);
     const g = ctx.createGain();
     g.gain.setValueAtTime(0.0001, when);
-    g.gain.exponentialRampToValueAtTime(0.09, when + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.06, when + 0.02);
     g.gain.exponentialRampToValueAtTime(0.0001, when + 3);
     const pan = ctx.createStereoPanner();
     pan.pan.value = this.rng() * 2 - 1;
@@ -671,6 +680,18 @@ class Composer {
     if (this.reverbSend) pan.connect(this.reverbSend);
     osc.start(when);
     osc.stop(when + 3.2);
+  }
+
+  private makeImpulse(seconds: number, decay: number): AudioBuffer {
+    const { ctx } = this;
+    const len = Math.floor(seconds * ctx.sampleRate);
+    const buf = ctx.createBuffer(2, len, ctx.sampleRate);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = new Float32Array(len);
+      for (let i = 0; i < len; i++) d[i] = (this.rng() * 2 - 1) * Math.pow(1 - i / len, decay);
+      buf.copyToChannel(d, ch);
+    }
+    return buf;
   }
 }
 
