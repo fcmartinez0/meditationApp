@@ -86,8 +86,8 @@ const LOOP_SECONDS = 28;
 const XFADE_SECONDS = 4;
 const RENDER_SECONDS = LOOP_SECONDS + XFADE_SECONDS;
 const IMPULSE_SECONDS = 1.4;
-// 22.05 kHz (Nyquist 11 kHz) keeps render/memory modest; playback resamples.
-const RENDER_SR = 22050;
+// 32 kHz (Nyquist 16 kHz) leaves headroom for air/shimmer; playback resamples.
+const RENDER_SR = 32000;
 // The offline mix is baked at this level; the player's master scales on top.
 const MIX_GAIN = 0.5;
 
@@ -207,11 +207,13 @@ class Composer {
 
     const master = ctx.createGain();
     master.gain.value = MIX_GAIN;
-    // Plain master — breadcrumbs showed the Simulator hangs while building
-    // the graph with the extra master nodes (highshelf EQ / WaveShaper), so
-    // those are gone; soft-clip glue is applied in JS after the render
-    // (see foldLoop), which needs no native nodes at all.
-    master.connect(ctx.destination);
+    // A gentle high-shelf adds air/shimmer (the pieces read as too dark/muffled
+    // otherwise). One node, created here — no effect on UI responsiveness.
+    const air = ctx.createBiquadFilter();
+    air.type = 'highshelf';
+    air.frequency.value = 6500;
+    air.gain.value = 4;
+    master.connect(air).connect(ctx.destination);
 
     // Tempo-synced feedback delay.
     const delay = ctx.createDelay(2);
@@ -249,7 +251,7 @@ class Composer {
 
     const filter = ctx.createBiquadFilter();
     filter.type = 'lowpass';
-    const baseCut = 500 + spec.brightness * 3800;
+    const baseCut = 2200 + spec.brightness * 9000;
     filter.frequency.value = baseCut;
     filter.Q.value = 0.4;
     filter.connect(pulse);
@@ -310,13 +312,10 @@ class Composer {
     if (sustained) {
       const choir = spec.instrument === 'choir';
       const periodicWave = choir ? null : makeWave(ctx, spec.wave);
-      const oscType: OscillatorType = choir
-        ? 'sawtooth'
-        : spec.wave === 'warm'
-          ? 'sawtooth'
-          : spec.wave === 'triangle'
-            ? 'triangle'
-            : 'sine';
+      // Triangle (not pure sine) as the dark-end floor so the pad always has
+      // some upper harmonics — pure sine reads as muffled.
+      const oscType: OscillatorType =
+        choir || spec.wave === 'warm' ? 'sawtooth' : 'triangle';
       const voiceCount = spec.section === 'chill' ? 5 : 4;
       const drift = ctx.createOscillator();
       drift.type = 'sine';
