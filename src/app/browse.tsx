@@ -68,25 +68,22 @@ export default function BrowseScreen() {
           {SECTIONS.map((section) => (
             <View key={section.title} style={styles.section}>
               <AppText variant="heading">{section.title}</AppText>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={styles.shelf}
-                contentContainerStyle={styles.shelfContent}>
-                {section.items.map((item) => (
-                  <SoundCard
-                    key={item.key}
-                    item={item}
-                    selected={settings.ambient === item.key}
-                    onPress={() => choose(item.key)}
-                  />
-                ))}
-              </ScrollView>
               {section.caption ? (
                 <AppText variant="caption" muted>
                   {section.caption}
                 </AppText>
               ) : null}
+              <View style={styles.grid}>
+                {section.items.map((item) => (
+                  <View key={item.key} style={styles.cell}>
+                    <SoundCard
+                      item={item}
+                      selected={settings.ambient === item.key}
+                      onPress={() => choose(item.key)}
+                    />
+                  </View>
+                ))}
+              </View>
             </View>
           ))}
         </ScrollView>
@@ -106,8 +103,9 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.sm,
   },
   close: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  content: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xxxl, gap: spacing.lg },
+  content: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xxxl, gap: spacing.xl },
   section: { gap: spacing.sm },
-  shelf: { marginHorizontal: -spacing.xl },
-  shelfContent: { paddingHorizontal: spacing.xl, gap: spacing.md },
+  // Two-column vertical grid — no horizontal scrolling.
+  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: spacing.md },
+  cell: { width: '47%' },
 });

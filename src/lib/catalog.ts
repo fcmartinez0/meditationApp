@@ -18,40 +18,24 @@ export const DURATIONS = [3, 5, 10, 15, 20, 30];
 
 export const SECTIONS: Section[] = [
   {
-    title: 'Ambient',
-    items: [
-      { key: 'none', label: 'Silence', icon: 'moon-outline', hint: 'No background sound' },
-      { key: 'rain', label: 'Rain', icon: 'rainy-outline', hint: 'Steady rainfall' },
-      { key: 'ocean', label: 'Ocean', icon: 'water-outline', hint: 'Slow ocean swells' },
-      { key: 'forest', label: 'Forest', icon: 'leaf-outline', hint: 'Soft wind & forest' },
-      { key: 'stream', label: 'Stream', icon: 'rainy-outline', hint: 'Babbling brook' },
-      { key: 'fire', label: 'Campfire', icon: 'flame-outline', hint: 'Warm crackling fire' },
-      { key: 'night', label: 'Night', icon: 'moon-outline', hint: 'Crickets under a quiet night' },
-      { key: 'brown', label: 'Brown Noise', icon: 'cloudy-outline', hint: 'Deep, even hush' },
-      { key: 'pink', label: 'Pink Noise', icon: 'cloud-outline', hint: 'Soft, balanced hush' },
-      { key: 'white', label: 'White Noise', icon: 'cloud-outline', hint: 'Bright, even hush' },
-      { key: 'purr', label: 'Cat Purr', icon: 'paw-outline', hint: "~25 Hz · a cat's calming purr" },
-    ],
-  },
-  {
-    title: 'Frequencies',
-    caption:
-      'Calm, Focus and Deep are binaural beats — use headphones for the full effect. A wellness aid, not medical treatment.',
-    items: [
-      { key: 'calm', label: 'Calm', icon: 'heart-outline', hint: '7.83 Hz · grounding (432 Hz tuned)' },
-      { key: 'clarity', label: 'Clarity', icon: 'flash-outline', hint: '10 Hz · relaxed, clear presence' },
-      { key: 'focus', label: 'Focus', icon: 'bulb-outline', hint: '14 Hz · alert concentration' },
-      { key: 'dream', label: 'Dream', icon: 'cloud-outline', hint: '6 Hz · dreamy & meditative' },
-      { key: 'deep', label: 'Deep', icon: 'bed-outline', hint: '3 Hz · deep rest & sleep' },
-    ],
-  },
-  {
     title: 'Generative',
     caption:
       'Composed live, never the same twice — with a binaural beat woven in. Headphones recommended; it learns what you like.',
     items: [
       { key: 'gen_rest', label: 'Rest', icon: 'sparkles-outline', hint: 'live ambient · 3–6 Hz deep rest' },
       { key: 'gen_chill', label: 'Flow', icon: 'infinite-outline', hint: 'live groove · 10 Hz alpha' },
+    ],
+  },
+  {
+    title: 'Frequencies',
+    caption:
+      'Binaural beats — use headphones for the full effect. A wellness aid, not medical treatment.',
+    items: [
+      { key: 'calm', label: 'Calm', icon: 'heart-outline', hint: '7.83 Hz · grounding (432 Hz tuned)' },
+      { key: 'clarity', label: 'Clarity', icon: 'flash-outline', hint: '10 Hz · relaxed, clear presence' },
+      { key: 'focus', label: 'Focus', icon: 'bulb-outline', hint: '14 Hz · alert concentration' },
+      { key: 'dream', label: 'Dream', icon: 'cloud-outline', hint: '6 Hz · dreamy & meditative' },
+      { key: 'deep', label: 'Deep', icon: 'bed-outline', hint: '3 Hz · deep rest & sleep' },
     ],
   },
   {
@@ -65,6 +49,23 @@ export const SECTIONS: Section[] = [
       { key: 'liquid', label: 'Liquid', icon: 'water-outline', hint: '172 BPM · lush drum & bass' },
       { key: 'chillstep', label: 'Chillstep', icon: 'rainy-outline', hint: '140 BPM · smoky future garage' },
       { key: 'downtempo', label: 'Downtempo', icon: 'partly-sunny-outline', hint: '98 BPM · dreamy & melodic' },
+    ],
+  },
+  {
+    title: 'Ambient',
+    caption: 'Background textures to settle into.',
+    items: [
+      { key: 'none', label: 'Silence', icon: 'moon-outline', hint: 'No background sound' },
+      { key: 'rain', label: 'Rain', icon: 'rainy-outline', hint: 'Steady rainfall' },
+      { key: 'ocean', label: 'Ocean', icon: 'water-outline', hint: 'Slow ocean swells' },
+      { key: 'forest', label: 'Forest', icon: 'leaf-outline', hint: 'Soft wind & forest' },
+      { key: 'stream', label: 'Stream', icon: 'rainy-outline', hint: 'Babbling brook' },
+      { key: 'fire', label: 'Campfire', icon: 'flame-outline', hint: 'Warm crackling fire' },
+      { key: 'night', label: 'Night', icon: 'moon-outline', hint: 'Crickets under a quiet night' },
+      { key: 'brown', label: 'Brown Noise', icon: 'cloudy-outline', hint: 'Deep, even hush' },
+      { key: 'pink', label: 'Pink Noise', icon: 'cloud-outline', hint: 'Soft, balanced hush' },
+      { key: 'white', label: 'White Noise', icon: 'cloud-outline', hint: 'Bright, even hush' },
+      { key: 'purr', label: 'Cat Purr', icon: 'paw-outline', hint: "~25 Hz · a cat's calming purr" },
     ],
   },
 ];
