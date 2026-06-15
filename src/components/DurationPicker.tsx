@@ -63,17 +63,32 @@ export function DurationPicker({
 
   const onSettle = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const idx = Math.max(0, Math.min(VALUES.length - 1, Math.round(e.nativeEvent.contentOffset.y / ITEM_H)));
+    setCurrent(VALUES[idx]);
     onChange(VALUES[idx]);
+  };
+
+  // Tap a number to pick it — reliable on web/desktop where drag-scroll is finicky.
+  const selectValue = (v: number) => {
+    setCurrent(v);
+    lastIdx.current = v - MIN;
+    scrollRef.current?.scrollTo({ y: (v - MIN) * ITEM_H, animated: true });
+    Haptics.selectionAsync().catch(() => {});
+  };
+
+  // Always commit whatever's centered when the sheet is dismissed.
+  const commitAndClose = () => {
+    onChange(current);
+    onClose();
   };
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.root}>
-        <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close" />
+        <Pressable style={styles.backdrop} onPress={commitAndClose} accessibilityLabel="Close" />
         <View style={[styles.sheet, { backgroundColor: colors.surface, paddingBottom: insets.bottom + spacing.lg }]}>
           <View style={styles.header}>
-            <AppText variant="heading">Session length</AppText>
-            <Pressable onPress={onClose} hitSlop={12}>
+            <AppText variant="heading">Session length · {current} min</AppText>
+            <Pressable onPress={commitAndClose} hitSlop={12}>
               <AppText variant="body" color={colors.accent}>
                 Done
               </AppText>
@@ -90,16 +105,17 @@ export function DurationPicker({
               onScroll={onScroll}
               scrollEventThrottle={16}
               onMomentumScrollEnd={onSettle}
+              onScrollEndDrag={onSettle}
               contentContainerStyle={{ paddingVertical: PAD }}>
               {VALUES.map((v) => (
-                <View key={v} style={styles.item}>
+                <Pressable key={v} style={styles.item} onPress={() => selectValue(v)}>
                   <AppText
                     variant="title"
                     color={v === current ? colors.text : colors.textSecondary}
                     style={v === current ? styles.itemActive : styles.itemInactive}>
                     {v}
                   </AppText>
-                </View>
+                </Pressable>
               ))}
             </ScrollView>
             <AppText variant="body" muted style={styles.unit}>
