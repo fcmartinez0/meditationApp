@@ -4,7 +4,7 @@ import { useKeepAwake } from 'expo-keep-awake';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -56,9 +56,11 @@ export default function SessionScreen() {
       : ambient;
 
   const [remaining, setRemaining] = useState(totalSec);
-  // Generative pieces render before the session starts; the countdown only
-  // begins once audio is actually playing (see startCountdown below).
-  const [phase, setPhase] = useState<Phase>(useEngine ? 'preparing' : 'running');
+  // Only native needs a "preparing" wait (offline render takes a few seconds).
+  // On web the engine starts instantly, so begin running immediately — never
+  // gate the timer on audio setup (which can hang on web's AudioContext.resume).
+  const needsPrepare = useEngine && Platform.OS !== 'web';
+  const [phase, setPhase] = useState<Phase>(needsPrepare ? 'preparing' : 'running');
   const [rated, setRated] = useState<number | null>(null);
   const [specLabel, setSpecLabel] = useState<string | null>(null);
   const [liked, setLiked] = useState(false);

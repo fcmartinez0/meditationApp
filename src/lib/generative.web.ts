@@ -152,13 +152,10 @@ export class GenerativeEngine {
     this.ctx = ctx;
     this.spec = spec;
     this.rng = makeRng(spec.seed);
-    if (ctx.state === 'suspended') {
-      try {
-        await ctx.resume();
-      } catch {
-        /* resumes on next interaction */
-      }
-    }
+    // Fire-and-forget: do NOT await — resume() can stay pending until a user
+    // gesture, which would hang start() and freeze the session. The resume
+    // hooks (hookResume) reactivate audio on the next interaction.
+    if (ctx.state === 'suspended') void ctx.resume().catch(() => {});
 
     const now = ctx.currentTime;
     // Sustained pad/choir vs. plucked bells/harp/keys — the main character lever.
