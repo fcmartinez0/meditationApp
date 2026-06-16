@@ -274,13 +274,18 @@ class Piece {
         const notes = 3 + Math.floor(this.rng() * 4);
         let degIdx = Ln + Math.floor(this.rng() * Ln);
         let t = when;
+        const tones = this.chordAt(when).tones; // resolve onto the current chord
         for (let i = 0; i < notes; i++) {
-          if (this.rng() >= 0.18) {
-            const m = spec.root + deg(degIdx) + 12;
+          const last = i === notes - 1;
+          if (last || this.rng() >= 0.18) {
+            const m =
+              last && tones.length
+                ? tones[Math.floor(this.rng() * tones.length)] + 12
+                : spec.root + deg(degIdx) + 12;
             this.note(this.dryL, this.dryR, t, noteLen * (0.8 + this.rng() * 0.7), midi(m), 'triangle', gain, this.rng() * 0.4 - 0.2, { rev: 0.5, del: 0.5, vib: midi(m) * 0.006 });
           }
           t += noteLen;
-          degIdx += this.rng() < 0.7 ? (this.rng() < 0.5 ? 1 : -1) : this.rng() < 0.5 ? 2 : -2;
+          degIdx += this.rng() < 0.8 ? (this.rng() < 0.5 ? 1 : -1) : this.rng() < 0.5 ? 2 : -2;
           degIdx = clamp(degIdx, Ln - 1, 2 * Ln + 2);
         }
         when = t + 2 + this.rng() * 4;
@@ -473,7 +478,7 @@ const SPECS = {
   },
 };
 
-const seconds = 28;
+const seconds = 40;
 const outDir = process.env.OUT || '/tmp';
 for (const [name, spec] of Object.entries(SPECS)) {
   const p = new Piece(spec, seconds);

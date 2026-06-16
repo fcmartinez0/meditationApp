@@ -579,16 +579,21 @@ export class GenerativeEngine {
     let t = ctx.currentTime + 0.1;
     let degIdx = L + Math.floor(this.rng() * L); // sit ~an octave above the root
     const start = t;
+    const tones = this.chordTones; // resolve the phrase onto the current chord
     for (let i = 0; i < notes; i++) {
-      if (this.rng() < 0.18) {
+      const last = i === notes - 1;
+      if (!last && this.rng() < 0.18) {
         t += noteLen; // a rest
       } else {
-        const midi = spec.root + deg(degIdx) + 12;
+        const midi =
+          last && tones.length
+            ? tones[Math.floor(this.rng() * tones.length)] + 12 // land on a chord tone
+            : spec.root + deg(degIdx) + 12;
         this.leadNote(t, midiToFreq(midi), noteLen * (0.8 + this.rng() * 0.7), this.rng() * 0.4 - 0.2, gain);
         t += noteLen;
       }
-      // Mostly stepwise motion, occasional small leap, kept in a singable range.
-      degIdx += this.rng() < 0.7 ? (this.rng() < 0.5 ? 1 : -1) : this.rng() < 0.5 ? 2 : -2;
+      // Mostly stepwise motion for a singable contour; occasional small leap.
+      degIdx += this.rng() < 0.8 ? (this.rng() < 0.5 ? 1 : -1) : this.rng() < 0.5 ? 2 : -2;
       degIdx = Math.max(L - 1, Math.min(2 * L + 2, degIdx));
     }
     const wait = t - start + (2 + this.rng() * 4); // rest between phrases
