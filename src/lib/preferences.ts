@@ -39,8 +39,9 @@ const SCALES = [
   'harmonic_minor',
 ] as const;
 
-const WAVES: GenWave[] = ['sine', 'triangle', 'warm', 'bell', 'glass'];
-const INSTRUMENTS: GenInstrument[] = ['pad', 'choir', 'bells', 'pluck', 'keys'];
+// Pad timbres only — bell/glass are covered by the 'bells' instrument, so
+// keeping them out of the pad wave pool avoids odd "glass pad" rolls.
+const WAVES: GenWave[] = ['sine', 'triangle', 'warm'];
 
 interface Range {
   rootMin: number;
@@ -57,6 +58,7 @@ interface Range {
   arpChance: number;
   bassChance: number;
   percussion: GenPercussion[];
+  instruments: GenInstrument[];
 }
 
 // Sensible parameter ranges for each section.
@@ -69,14 +71,16 @@ const RANGES: Record<Section, Range> = {
     chordMin: 11,
     chordMax: 22,
     binaurals: [3, 4, 5, 6],
-    chimeMax: 0.35,
+    chimeMax: 0.25,
     tempoMin: 48,
     tempoMax: 72,
     pulseMax: 0,
-    arpChance: 0.45,
+    arpChance: 0.32,
     bassChance: 0.7,
-    // Mostly still, with subtle motion options for variety.
-    percussion: ['none', 'none', 'heartbeat', 'shaker', 'tribal'],
+    // Mostly still; only gentle motion (no busy tribal/offbeat for rest).
+    percussion: ['none', 'none', 'none', 'heartbeat', 'shaker'],
+    // Calming voices; bias toward the soft pad.
+    instruments: ['pad', 'pad', 'choir', 'bells', 'keys'],
   },
   chill: {
     rootMin: 48,
@@ -93,6 +97,7 @@ const RANGES: Record<Section, Range> = {
     arpChance: 0.75,
     bassChance: 0.85,
     percussion: ['pulse', 'shaker', 'broken', 'heartbeat', 'offbeat', 'tribal'],
+    instruments: ['pad', 'keys', 'pluck', 'bells', 'choir'],
   },
 };
 
@@ -136,6 +141,12 @@ export async function clearRatings(): Promise<void> {
 /** A fresh random spec within the section's ranges. */
 function randomSpec(section: Section): PieceSpec {
   const r = RANGES[section];
+  const arp = Math.random() < r.arpChance;
+  const percussion = pick(r.percussion);
+  // "Busyness budget": when arp + percussion are already moving, thin the
+  // extra layers so a piece never piles arp + perc + melody + dense chimes.
+  const busy = (arp ? 1 : 0) + (percussion !== 'none' ? 1 : 0);
+  const calm = busy >= 2 ? 0.4 : 1;
   return {
     seed: Math.floor(Math.random() * 1e9),
     section,
@@ -144,16 +155,16 @@ function randomSpec(section: Section): PieceSpec {
     brightness: randIn(r.brightMin, r.brightMax),
     chordChangeSec: randIn(r.chordMin, r.chordMax),
     binauralHz: pick(r.binaurals),
-    chimeDensity: randIn(0, r.chimeMax),
+    chimeDensity: randIn(0, r.chimeMax * calm),
     tempo: Math.round(randIn(r.tempoMin, r.tempoMax)),
     pulseDepth: r.pulseMax > 0 ? randIn(0, r.pulseMax) : 0,
     wave: pick(WAVES),
-    arp: Math.random() < r.arpChance,
+    arp,
     bass: Math.random() < r.bassChance,
-    percussion: pick(r.percussion),
+    percussion,
     progression: Math.floor(Math.random() * PROGRESSION_COUNT),
-    melody: Math.random() < (section === 'rest' ? 0.5 : 0.6),
-    instrument: pick(INSTRUMENTS),
+    melody: Math.random() < (section === 'rest' ? 0.5 : 0.6) * calm,
+    instrument: pick(r.instruments),
   };
 }
 
@@ -243,7 +254,7 @@ export function nextSpec(section: Section, ratings: PieceRating[]): PieceSpec {
     percussion: bestBy((s) => s.percussion, pick(r.percussion)),
     progression: bestBy((s) => s.progression, Math.floor(Math.random() * PROGRESSION_COUNT)),
     melody: likedMajority((s) => s.melody, section === 'rest' ? 0.5 : 0.6),
-    instrument: bestBy((s) => s.instrument, pick(INSTRUMENTS)),
+    instrument: bestBy((s) => s.instrument, pick(r.instruments)),
   };
 }
 
