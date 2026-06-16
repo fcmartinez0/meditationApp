@@ -6,38 +6,24 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/AppText';
-import { FeaturedCard } from '@/components/FeaturedCard';
 import { SoundCard } from '@/components/SoundCard';
 import { useThemeColors } from '@/hooks/useThemeColors';
-import { SECTIONS, featuredToday } from '@/lib/catalog';
+import { SECTIONS } from '@/lib/catalog';
 import type { AmbientSound } from '@/lib/types';
 import { useAppData } from '@/store/AppData';
 import { spacing } from '@/theme';
 
-/** The full sound library — Apple-Music-style shelves, opened from the home. */
+/** The full sound library — a vertical grid, opened from the home. */
 export default function BrowseScreen() {
   const colors = useThemeColors();
   const router = useRouter();
   const { settings, updateSettings } = useAppData();
-
-  const featured = featuredToday();
 
   // Pick a sound and return to the calm home, ready to begin.
   const choose = (key: AmbientSound) => {
     Haptics.selectionAsync().catch(() => {});
     updateSettings({ ambient: key });
     router.back();
-  };
-
-  // Featured "play" starts a session straight away. Replace (not push) so
-  // ending the session returns to the home, not back into this sheet.
-  const beginWith = (key: AmbientSound) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-    updateSettings({ ambient: key });
-    router.replace({
-      pathname: '/session',
-      params: { duration: String(settings.durationMin), ambient: key },
-    });
   };
 
   return (
@@ -56,15 +42,6 @@ export default function BrowseScreen() {
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-          <FeaturedCard
-            accentKey={featured.key}
-            icon={featured.icon}
-            label={featured.label}
-            blurb={featured.blurb}
-            onPress={() => choose(featured.key)}
-            onPlay={() => beginWith(featured.key)}
-          />
-
           {SECTIONS.map((section) => (
             <View key={section.title} style={styles.section}>
               <AppText variant="heading">{section.title}</AppText>
