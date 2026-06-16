@@ -166,6 +166,7 @@ const styles = StyleSheet.create({
   chipsRow: { flexDirection: 'row', gap: spacing.md, alignSelf: 'stretch' },
   chip: {
     flex: 1,
+    minHeight: 52, // ≥ 44pt HIG touch target
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -177,7 +178,9 @@ const styles = StyleSheet.create({
   breatheLink: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: spacing.xs,
-    paddingVertical: spacing.sm,
+    minHeight: 44, // ≥ 44pt HIG touch target
+    paddingHorizontal: spacing.lg,
   },
 });

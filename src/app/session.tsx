@@ -485,7 +485,7 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   nowPlayingText: { flex: 1, gap: 2 },
-  npBtn: { padding: spacing.xs },
+  npBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }, // ≥44pt target
   progressTrack: { height: 4, borderRadius: radius.pill, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: radius.pill },
   buttons: { flexDirection: 'row', gap: spacing.md },
