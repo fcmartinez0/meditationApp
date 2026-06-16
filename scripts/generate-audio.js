@@ -900,6 +900,104 @@ function generateTechno() {
  * small speakers, a breathy noise layer adds texture, and a slow breath
  * envelope rolls it in and out like a real purr.
  */
+/** Trip-hop — dark, cinematic, half-time and dusty. */
+function generateTripHop() {
+  const bpm = 80;
+  const bars = 8;
+  const swing = 0.16;
+  const stepDur = 60 / bpm / 4;
+  const totalSteps = bars * 16;
+  const loopSamples = Math.round(totalSteps * stepDur * SAMPLE_RATE);
+  const tail = Math.round(1.3 * SAMPLE_RATE);
+  const N = loopSamples + tail;
+  const kit = makeKit(N, 211);
+  const pos = (step) => {
+    const t = step * stepDur + (step % 2 === 1 ? swing * stepDur : 0);
+    return Math.round(t * SAMPLE_RATE);
+  };
+  // Moody minor progression: Cm9 – A♭maj7 – Fm9 – G (two bars each).
+  const chords = [
+    [48, 51, 55, 58, 62],
+    [44, 48, 51, 55],
+    [41, 48, 51, 55, 58],
+    [43, 50, 55, 58],
+  ];
+  const bassRoots = [36, 32, 29, 31];
+
+  kit.crackle({ gain: 0.4, density: 0.0006 });
+  kit.atmos({ gain: 0.05, cutoff: 1000, swellHz: 0.05 });
+  for (let bar = 0; bar < bars; bar++) {
+    const ci = Math.floor(bar / 2) % 4;
+    const chord = chords[ci];
+    const base = bar * 16;
+    if (bar % 2 === 0) {
+      kit.pad(pos(base), chord.map(midiToFreq), 2 * 16 * stepDur * 0.98, {
+        gain: 0.11, attack: 0.8, release: 0.9, detune: 7, bright: 0.04,
+      });
+    }
+    for (const m of chord) kit.key(pos(base + 0), midiToFreq(m), 1.3, { gain: 0.08, decay: 2.2 });
+    kit.sub(pos(base + 0), midiToFreq(bassRoots[ci]), stepDur * 8, { gain: 0.55 });
+    // Half-time feel: heavy kick on 1, snare on beat 3, sparse swung hats.
+    for (let s = 0; s < 16; s++) {
+      const p = pos(base + s);
+      if (s === 0) kit.kick(p, { gain: 0.95, pitchStart: 95, pitchEnd: 44, decay: 10 });
+      if (s === 6) kit.kick(p, { gain: 0.5, pitchStart: 90, pitchEnd: 44, decay: 12 });
+      if (s === 8) kit.snare(p, { gain: 0.5, decay: 14, noiseAmt: 0.6, tone: 170, toneAmt: 0.3 });
+      if (s % 4 === 2) kit.hat(p, { gain: 0.08, open: s === 14, pan: s % 8 === 2 ? -0.5 : 0.5 });
+    }
+  }
+  addFill(kit, pos, (bars - 1) * 16, false);
+  return finishTrack(kit, loopSamples, tail, { reverbMix: 0.2 });
+}
+
+/** Synthwave — dreamy, warm pads with a gentle arpeggio. */
+function generateSynthwave() {
+  const bpm = 84;
+  const bars = 8;
+  const stepDur = 60 / bpm / 4;
+  const totalSteps = bars * 16;
+  const loopSamples = Math.round(totalSteps * stepDur * SAMPLE_RATE);
+  const tail = Math.round(1.0 * SAMPLE_RATE);
+  const N = loopSamples + tail;
+  const kit = makeKit(N, 212);
+  const pos = (step) => Math.round(step * stepDur * SAMPLE_RATE);
+  // Warm progression: Fmaj7 – Am7 – Dm7 – B♭maj7 (two bars each).
+  const chords = [
+    [53, 57, 60, 64],
+    [57, 60, 64, 67],
+    [50, 53, 57, 60],
+    [46, 50, 53, 57],
+  ];
+  const bassRoots = [41, 45, 38, 46];
+  const arpIdx = [0, 2, 3, 2];
+
+  kit.atmos({ gain: 0.05, cutoff: 2200, swellHz: 0.05 });
+  for (let bar = 0; bar < bars; bar++) {
+    const ci = Math.floor(bar / 2) % 4;
+    const chord = chords[ci];
+    const base = bar * 16;
+    if (bar % 2 === 0) {
+      kit.pad(pos(base), chord.map(midiToFreq), 2 * 16 * stepDur * 0.98, {
+        gain: 0.1, attack: 0.4, release: 0.6, detune: 8, bright: 0.12,
+      });
+    }
+    kit.sub(pos(base + 0), midiToFreq(bassRoots[ci]), stepDur * 8, { gain: 0.5 });
+    kit.sub(pos(base + 8), midiToFreq(bassRoots[ci]), stepDur * 6, { gain: 0.42 });
+    for (let s = 0; s < 16; s++) {
+      const p = pos(base + s);
+      if (s % 4 === 0) kit.kick(p, { gain: 0.8, pitchStart: 90, pitchEnd: 46, decay: 13 });
+      if (s === 4 || s === 12) kit.clap(p, { gain: 0.18 });
+      if (s % 2 === 0) kit.hat(p, { gain: 0.07, open: s === 14, pan: s % 4 === 0 ? -0.5 : 0.5 });
+      if (s % 2 === 0) {
+        const m = chord[arpIdx[(s / 2) % arpIdx.length]] + 12;
+        kit.key(p, midiToFreq(m), 0.42, { gain: 0.08, decay: 5, pan: (s / 2) % 2 ? 0.4 : -0.4 });
+      }
+    }
+  }
+  addFill(kit, pos, (bars - 1) * 16, false);
+  return finishTrack(kit, loopSamples, tail, { reverbMix: 0.16, pumpBpm: bpm, pumpDepth: 0.25 });
+}
+
 function generatePurr() {
   const loopSeconds = 12;
   const crossSeconds = 2;
@@ -1204,6 +1302,7 @@ function generateAmbient(kind) {
   return makeSeamless(raw, loopSamples, crossSamples);
 }
 
+function buildAll() {
 console.log('Generating audio assets...');
 writeWav(path.join(OUT_DIR, 'bell.wav'), generateBell(), { master: false });
 writeWav(path.join(AMBIENT_DIR, 'rain.wav'), generateAmbient('rain'));
@@ -1298,5 +1397,13 @@ const melodic = generateMelodic();
 writeWavStereo(path.join(BEATS_DIR, 'melodic.wav'), melodic.left, melodic.right, { targetDb: -16, air: 0.3 });
 const techno = generateTechno();
 writeWavStereo(path.join(BEATS_DIR, 'techno.wav'), techno.left, techno.right, { targetDb: -16, air: 0.3 });
+const triphop = generateTripHop();
+writeWavStereo(path.join(BEATS_DIR, 'triphop.wav'), triphop.left, triphop.right, { targetDb: -16, air: 0.3 });
+const synthwave = generateSynthwave();
+writeWavStereo(path.join(BEATS_DIR, 'synthwave.wav'), synthwave.left, synthwave.right, { targetDb: -16, air: 0.3 });
 
 console.log('Done.');
+}
+
+module.exports = { writeWavStereo, BEATS_DIR, generateTripHop, generateSynthwave };
+if (require.main === module) buildAll();

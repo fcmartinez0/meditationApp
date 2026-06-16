@@ -28,6 +28,8 @@ export type AmbientSound =
   | 'deephouse'
   | 'melodic'
   | 'techno'
+  | 'triphop'
+  | 'synthwave'
   | GenerativeSound;
 
 /** Sounds backed by a bundled .wav (everything except silence and generative). */
@@ -58,6 +60,8 @@ export const AMBIENT_KEYS: AmbientSound[] = [
   'deephouse',
   'melodic',
   'techno',
+  'triphop',
+  'synthwave',
   'gen_rest',
   'gen_chill',
 ];

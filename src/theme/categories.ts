@@ -50,6 +50,8 @@ const CATEGORY_OF: Record<AmbientSound, Category> = {
   deephouse: 'beats',
   melodic: 'beats',
   techno: 'beats',
+  triphop: 'beats',
+  synthwave: 'beats',
 };
 
 export function categoryFor(sound: AmbientSound): Category {

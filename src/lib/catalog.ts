@@ -49,6 +49,8 @@ export const SECTIONS: Section[] = [
       { key: 'liquid', label: 'Liquid', icon: 'water-outline', hint: '172 BPM · lush drum & bass' },
       { key: 'chillstep', label: 'Chillstep', icon: 'rainy-outline', hint: '140 BPM · smoky future garage' },
       { key: 'downtempo', label: 'Downtempo', icon: 'partly-sunny-outline', hint: '98 BPM · dreamy & melodic' },
+      { key: 'triphop', label: 'Trip-Hop', icon: 'cloudy-night-outline', hint: '80 BPM · dark & cinematic' },
+      { key: 'synthwave', label: 'Synthwave', icon: 'planet-outline', hint: '84 BPM · dreamy retro arps' },
     ],
   },
   {
