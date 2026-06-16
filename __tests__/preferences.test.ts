@@ -65,4 +65,34 @@ describe('nextSpec', () => {
     expect(s.tempo).toBeGreaterThanOrEqual(80);
     expect(s.tempo).toBeLessThanOrEqual(104);
   });
+
+  it('converges toward liked traits while keeping binaural in the researched band', () => {
+    // A user who consistently likes lydian + bells pieces.
+    const ratings: PieceRating[] = [];
+    for (let i = 0; i < 15; i++) {
+      ratings.push({
+        section: 'rest',
+        spec: spec({ scale: 'lydian', instrument: 'bells', binauralHz: 4 }),
+        score: 1,
+        at: i,
+      });
+    }
+    const band = new Set([3, 4, 5, 6]); // rest's researched delta–theta pool
+    let lydian = 0;
+    for (let k = 0; k < 400; k++) {
+      const s = nextSpec('rest', ratings);
+      if (s.scale === 'lydian') lydian++;
+      expect(band.has(s.binauralHz)).toBe(true); // entrainment never leaves the band
+    }
+    expect(lydian).toBeGreaterThan(200); // clearly learned, despite exploration
+  });
+
+  it('weights recent feedback over older feedback', () => {
+    jest.spyOn(Math, 'random').mockReturnValue(0.9); // force exploit
+    const ratings: PieceRating[] = [];
+    // Older: liked aeolian. Newer (and more): liked phrygian.
+    for (let i = 0; i < 4; i++) ratings.push({ section: 'rest', spec: spec({ scale: 'aeolian' }), score: 1, at: i });
+    for (let i = 4; i < 12; i++) ratings.push({ section: 'rest', spec: spec({ scale: 'phrygian' }), score: 1, at: i });
+    expect(nextSpec('rest', ratings).scale).toBe('phrygian');
+  });
 });
