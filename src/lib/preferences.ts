@@ -22,7 +22,11 @@ import { PROGRESSION_COUNT } from './types';
 
 const RATINGS_KEY = 'mc.ratings.v1';
 const MAX_RATINGS = 300;
-const EXPLORE_RATE = 0.3;
+// Exploration shrinks as we learn more, but never stops (taste keeps evolving).
+const EXPLORE_MAX = 0.35;
+const EXPLORE_MIN = 0.12;
+// Recency half-life (in ratings): recent feedback counts ~2x an older one.
+const RECENCY_HALF_LIFE = 10;
 
 const SCALES = [
   'major_pentatonic',
@@ -64,7 +68,7 @@ const RANGES: Record<Section, Range> = {
     brightMax: 0.55,
     chordMin: 11,
     chordMax: 22,
-    binaurals: [0, 4, 6, 7.83],
+    binaurals: [3, 4, 5, 6],
     chimeMax: 0.35,
     tempoMin: 48,
     tempoMax: 72,
@@ -81,7 +85,7 @@ const RANGES: Record<Section, Range> = {
     brightMax: 0.85,
     chordMin: 6,
     chordMax: 12,
-    binaurals: [0, 0, 8],
+    binaurals: [9, 10, 11],
     chimeMax: 0.2,
     tempoMin: 80,
     tempoMax: 104,
@@ -154,42 +158,69 @@ function randomSpec(section: Section): PieceSpec {
 }
 
 /**
- * Build the next spec for a section. With probability EXPLORE_RATE (or when
- * there's no signal yet) returns a fresh random spec; otherwise returns a spec
- * centered on the user's liked specs with a little jitter, and using their
- * best-rated scale.
+ * Build the next spec for a section. Exploration (a fresh random piece) shrinks
+ * as ratings accumulate but never stops, so taste keeps evolving. Otherwise the
+ * piece is centered on the user's liked specs, weighted toward recent feedback,
+ * using their best net-liked categorical traits. binauralHz always stays within
+ * the section's researched band, so the entrainment benefit is never lost.
  */
 export function nextSpec(section: Section, ratings: PieceRating[]): PieceSpec {
-  const here = ratings.filter((rt) => rt.section === section);
+  const here = ratings.filter((rt) => rt.section === section).sort((a, b) => a.at - b.at);
   const liked = here.filter((rt) => rt.score > 0);
 
-  if (liked.length === 0 || Math.random() < EXPLORE_RATE) {
+  const exploreRate = Math.max(EXPLORE_MIN, EXPLORE_MAX - here.length * 0.015);
+  if (liked.length === 0 || Math.random() < exploreRate) {
     return randomSpec(section);
   }
 
   const r = RANGES[section];
-  const mean = (sel: (s: PieceSpec) => number) =>
-    liked.reduce((sum, rt) => sum + sel(rt.spec), 0) / liked.length;
+  // Recency weight per rating: newest ≈ 1, halving every RECENCY_HALF_LIFE.
+  const n = here.length;
+  const wAt = (i: number) => Math.pow(0.5, (n - 1 - i) / RECENCY_HALF_LIFE);
 
-  // Pick the categorical value with the best net score (likes minus dislikes).
+  // Recency-weighted mean over the liked pieces.
+  const mean = (sel: (s: PieceSpec) => number) => {
+    let s = 0;
+    let w = 0;
+    here.forEach((rt, i) => {
+      if (rt.score > 0) {
+        s += wAt(i) * sel(rt.spec);
+        w += wAt(i);
+      }
+    });
+    return w > 0 ? s / w : 0;
+  };
+
+  // Categorical: the value with the best recency-weighted net score — only
+  // commit when it's genuinely net-positive, else fall back to a fresh pick.
   const bestBy = <T>(get: (s: PieceSpec) => T, fallback: T): T => {
     const score = new Map<T, number>();
-    for (const rt of here) score.set(get(rt.spec), (score.get(get(rt.spec)) ?? 0) + rt.score);
+    here.forEach((rt, i) => {
+      const v = get(rt.spec);
+      score.set(v, (score.get(v) ?? 0) + wAt(i) * rt.score);
+    });
     let bestVal = fallback;
-    let best = -Infinity;
+    let best = 0;
     for (const [val, sc] of score) {
       if (sc > best) {
         best = sc;
         bestVal = val;
       }
     }
-    return best > -Infinity ? bestVal : fallback;
+    return bestVal;
   };
 
-  // Booleans: lean toward whatever the liked pieces mostly had.
+  // Booleans: lean toward what recent liked pieces mostly had.
   const likedMajority = (get: (s: PieceSpec) => boolean, chance: number): boolean => {
-    const yes = liked.filter((rt) => get(rt.spec)).length;
-    return yes * 2 >= liked.length ? Math.random() < 0.8 : Math.random() < chance * 0.5;
+    let yes = 0;
+    let tot = 0;
+    here.forEach((rt, i) => {
+      if (rt.score > 0) {
+        tot += wAt(i);
+        if (get(rt.spec)) yes += wAt(i);
+      }
+    });
+    return tot > 0 && yes * 2 >= tot ? Math.random() < 0.85 : Math.random() < chance * 0.4;
   };
 
   const jitter = (amt: number) => (Math.random() * 2 - 1) * amt;

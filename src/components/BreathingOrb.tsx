@@ -32,17 +32,22 @@ export function BreathingOrb({ active = false, still, core, halo, children }: Br
   const colors = useThemeColors();
   const coreColor = core ?? colors.accentSoft;
   const haloColor = halo ?? colors.auroraEnd;
-  const progress = useSharedValue(0);
+  // Start at the "still" size so a still/home orb shows no startup animation.
+  const progress = useSharedValue(0.5);
   const reduced = useReducedMotion();
 
   useEffect(() => {
-    // A still, half-open glow when asked (home) or for Reduce Motion — no pulse.
+    // A still, half-open glow when asked (home) or for Reduce Motion — set it
+    // instantly so there's no one-shot "pulse then stop" on mount.
     if (still || reduced) {
       cancelAnimation(progress);
-      progress.value = withTiming(0.5, { duration: 600 });
+      progress.value = 0.5;
       return;
     }
     if (active) {
+      // Begin the breath from fully exhaled so the swell spans the full range.
+      cancelAnimation(progress);
+      progress.value = 0;
       progress.value = withRepeat(
         withTiming(1, { duration: BREATH_MS, easing: Easing.inOut(Easing.ease) }),
         -1,

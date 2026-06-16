@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useRouter } from 'expo-router';
+import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
@@ -11,9 +11,7 @@ import { DurationPicker } from '@/components/DurationPicker';
 import { Screen } from '@/components/Screen';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { greeting, soundMeta } from '@/lib/catalog';
-import { prefetchGenerative } from '@/lib/generative';
 import type { AmbientSound } from '@/lib/types';
-import { isGenerative, sectionFor } from '@/lib/types';
 import { categoryStyle } from '@/theme/categories';
 import { useAppData } from '@/store/AppData';
 import { radius, spacing } from '@/theme';
@@ -33,15 +31,6 @@ export default function MeditateScreen() {
   const sel = soundMeta(settings.ambient);
 
   const [pickerOpen, setPickerOpen] = useState(false);
-
-  // Pre-render the next generative piece in the background so Begin is instant.
-  useFocusEffect(
-    useCallback(() => {
-      if (isGenerative(settings.ambient)) {
-        void prefetchGenerative(sectionFor(settings.ambient));
-      }
-    }, [settings.ambient]),
-  );
 
   const tap = () => Haptics.selectionAsync().catch(() => {});
 
@@ -177,6 +166,7 @@ const styles = StyleSheet.create({
   chipsRow: { flexDirection: 'row', gap: spacing.md, alignSelf: 'stretch' },
   chip: {
     flex: 1,
+    minHeight: 52, // ≥ 44pt HIG touch target
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -188,7 +178,9 @@ const styles = StyleSheet.create({
   breatheLink: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: spacing.xs,
-    paddingVertical: spacing.sm,
+    minHeight: 44, // ≥ 44pt HIG touch target
+    paddingHorizontal: spacing.lg,
   },
 });

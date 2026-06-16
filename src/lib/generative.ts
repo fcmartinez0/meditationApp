@@ -79,14 +79,14 @@ const PROGRESSIONS = [
   [0, 3, 0, 4],
 ];
 
-// Loop length and seamless-crossfade window. Generous now that rendering is
-// done ahead of time in the background, so the loop feels less repetitive.
-const LOOP_SECONDS = 60;
-const XFADE_SECONDS = 5;
+// Loop length and seamless-crossfade window. The render runs on a native
+// background thread and node-building yields to the UI, so this can be
+// generous without freezing anything.
+const LOOP_SECONDS = 28;
+const XFADE_SECONDS = 4;
 const RENDER_SECONDS = LOOP_SECONDS + XFADE_SECONDS;
-const IMPULSE_SECONDS = 1.8;
-// 32 kHz keeps render quick while preserving everything the ear needs here
-// (Nyquist 16 kHz). Playback resamples to the device rate.
+const IMPULSE_SECONDS = 1.4;
+// 32 kHz (Nyquist 16 kHz) leaves headroom for air/shimmer; playback resamples.
 const RENDER_SR = 32000;
 // The offline mix is baked at this level; the player's master scales on top.
 const MIX_GAIN = 0.5;
@@ -95,16 +95,11 @@ function midiToFreq(m: number): number {
   return 440 * Math.pow(2, (m - 69) / 12);
 }
 
-// Gentle tanh soft-clip for master "glue" and warmth — stands in for the
-// DynamicsCompressor that isn't available natively, and tames stray peaks.
-function softClipCurve(): Float32Array {
-  const n = 1024;
-  const c = new Float32Array(n);
-  for (let i = 0; i < n; i++) {
-    const x = (i / (n - 1)) * 2 - 1;
-    c[i] = Math.tanh(1.5 * x);
-  }
-  return c;
+// Gentle tanh soft-clip for master "glue" and warmth — applied in JS to the
+// rendered samples (stands in for the DynamicsCompressor that isn't available
+// natively, and tames stray peaks without any native nodes).
+function softClip(x: number): number {
+  return Math.tanh(1.5 * x);
 }
 
 function makeWave(ctx: OfflineAudioContext, kind: string): PeriodicWave | null {
@@ -190,9 +185,20 @@ class Composer {
   }
 
   async render(): Promise<AudioBuffer> {
+    dlog('[generative] building graph');
     this.build();
-    this.scheduleAll(RENDER_SECONDS);
+    dlog('[generative] graph built, scheduling events');
+    await this.scheduleAll(RENDER_SECONDS);
+    dlog('[generative] startRendering…');
     return this.ctx.startRendering();
+  }
+
+  // Yield to the JS event loop periodically while creating nodes, so building
+  // the (large) graph never blocks the UI. The render itself already runs on a
+  // native background thread.
+  private ops = 0;
+  private async breathe(): Promise<void> {
+    if (++this.ops % 16 === 0) await new Promise<void>((r) => setTimeout(r, 0));
   }
 
   private build(): void {
@@ -201,20 +207,13 @@ class Composer {
 
     const master = ctx.createGain();
     master.gain.value = MIX_GAIN;
-    // Master chain: clean out subsonic rumble, add a touch of "air", then a
-    // soft-saturation stage for cohesion and a gentle ceiling.
-    const lowCut = ctx.createBiquadFilter();
-    lowCut.type = 'highpass';
-    lowCut.frequency.value = 28;
-    lowCut.Q.value = 0.7;
+    // A gentle high-shelf adds air/shimmer (the pieces read as too dark/muffled
+    // otherwise). One node, created here — no effect on UI responsiveness.
     const air = ctx.createBiquadFilter();
     air.type = 'highshelf';
-    air.frequency.value = 7500;
-    air.gain.value = 2.5;
-    const shaper = ctx.createWaveShaper();
-    shaper.curve = softClipCurve();
-    shaper.oversample = '2x';
-    master.connect(lowCut).connect(air).connect(shaper).connect(ctx.destination);
+    air.frequency.value = 6500;
+    air.gain.value = 4;
+    master.connect(air).connect(ctx.destination);
 
     // Tempo-synced feedback delay.
     const delay = ctx.createDelay(2);
@@ -233,11 +232,13 @@ class Composer {
     delaySend.connect(delay);
     this.delaySend = delaySend;
 
-    // Reverb send.
+    // Reverb send (one convolver node — cheap to create; its cost is in the
+    // off-thread render, so it no longer blocks the UI). This glue is what
+    // makes the overlapping layers cohere instead of sounding scattered.
     const convolver = ctx.createConvolver();
-    convolver.buffer = this.makeImpulse(IMPULSE_SECONDS, 2.4);
+    convolver.buffer = this.makeImpulse(IMPULSE_SECONDS, 2.2);
     const reverbWet = ctx.createGain();
-    reverbWet.gain.value = spec.section === 'rest' ? 0.4 : 0.28;
+    reverbWet.gain.value = spec.section === 'rest' ? 0.42 : 0.3;
     convolver.connect(reverbWet).connect(master);
     const reverbSend = ctx.createGain();
     reverbSend.gain.value = 1;
@@ -250,7 +251,7 @@ class Composer {
 
     const filter = ctx.createBiquadFilter();
     filter.type = 'lowpass';
-    const baseCut = 500 + spec.brightness * 3800;
+    const baseCut = 2200 + spec.brightness * 9000;
     filter.frequency.value = baseCut;
     filter.Q.value = 0.4;
     filter.connect(pulse);
@@ -258,7 +259,7 @@ class Composer {
     const bus = ctx.createGain();
     bus.gain.value = 1;
     bus.connect(filter);
-    bus.connect(reverbSend);
+    bus.connect(reverbSend); // pad feeds the reverb too
 
     // Chorus.
     const chorus = ctx.createDelay(0.05);
@@ -311,14 +312,11 @@ class Composer {
     if (sustained) {
       const choir = spec.instrument === 'choir';
       const periodicWave = choir ? null : makeWave(ctx, spec.wave);
-      const oscType: OscillatorType = choir
-        ? 'sawtooth'
-        : spec.wave === 'warm'
-          ? 'sawtooth'
-          : spec.wave === 'triangle'
-            ? 'triangle'
-            : 'sine';
-      const voiceCount = spec.section === 'chill' ? 6 : 5;
+      // Triangle (not pure sine) as the dark-end floor so the pad always has
+      // some upper harmonics — pure sine reads as muffled.
+      const oscType: OscillatorType =
+        choir || spec.wave === 'warm' ? 'sawtooth' : 'triangle';
+      const voiceCount = spec.section === 'chill' ? 5 : 4;
       const drift = ctx.createOscillator();
       drift.type = 'sine';
       drift.frequency.value = 0.05 + this.rng() * 0.08;
@@ -353,9 +351,31 @@ class Composer {
       osc.start();
       this.bass = { osc, gain };
     }
+
+    // Clean binaural beat (researched frequencies) for entrainment: two pure
+    // carriers — one per ear — differing by spec.binauralHz, tuned to the root
+    // so they blend musically. Routed straight to master (no filter/reverb) so
+    // the beat stays pure. Subtle; needs headphones to perceive.
+    if (spec.binauralHz > 0) {
+      const carrier = midiToFreq(spec.root);
+      for (const [offset, side] of [
+        [0, -1],
+        [spec.binauralHz, 1],
+      ] as const) {
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.value = carrier + offset;
+        const g = ctx.createGain();
+        g.gain.value = 0.08;
+        const p = ctx.createStereoPanner();
+        p.pan.value = side;
+        osc.connect(g).connect(p).connect(master);
+        osc.start();
+      }
+    }
   }
 
-  private scheduleAll(renderLen: number): void {
+  private async scheduleAll(renderLen: number): Promise<void> {
     const { spec, ctx } = this;
     const sustained = spec.instrument === 'pad' || spec.instrument === 'choir';
 
@@ -377,6 +397,7 @@ class Composer {
         order.forEach((m, i) =>
           this.compNote(when + i * 0.05, midiToFreq(m), spec.instrument, bellWave, i % 2 ? 0.4 : -0.4),
         );
+        await this.breathe();
       }
     }
 
@@ -385,7 +406,8 @@ class Composer {
       let when = 3 + this.rng() * 16;
       while (when < renderLen) {
         this.playChime(when);
-        when += (5 + this.rng() * 12) / Math.max(0.05, spec.chimeDensity);
+        when += (8 + this.rng() * 16) / Math.max(0.05, spec.chimeDensity);
+        await this.breathe();
       }
     }
 
@@ -398,13 +420,17 @@ class Composer {
         const st = s % 16;
         if (spec.percussion !== 'none') this.triggerPercussion(st, when);
         if (spec.arp) this.triggerArp(st, when);
+        await this.breathe();
       }
     }
 
     // Melodic lead phrases.
     if (spec.melody) {
       let when = 4 + this.rng() * 18;
-      while (when < renderLen) when = this.schedulePhrase(when);
+      while (when < renderLen) {
+        when = this.schedulePhrase(when);
+        await this.breathe();
+      }
     }
   }
 
@@ -437,7 +463,9 @@ class Composer {
       }
       this.voices.forEach((v, idx) => {
         const midi = notes[idx % notes.length];
-        const freq = midiToFreq(midi) + (spec.binauralHz / 2) * v.side;
+        // Pad plays in tune; the binaural beat is a dedicated clean layer
+        // (see build) rather than a detune smeared across the chord.
+        const freq = midiToFreq(midi);
         const target = (0.7 / this.voices.length) * (0.7 + 0.6 * this.rng());
         if (initial) {
           v.osc.frequency.setValueAtTime(freq, when);
@@ -571,7 +599,7 @@ class Composer {
     const beat = 60 / spec.tempo;
     const noteLen = beat * (this.rng() < 0.5 ? 1 : 0.5);
     const notes = 3 + Math.floor(this.rng() * 4);
-    const gain = spec.section === 'rest' ? 0.1 : 0.13;
+    const gain = spec.section === 'rest' ? 0.08 : 0.1;
     let t = t0;
     let degIdx = L + Math.floor(this.rng() * L);
     for (let i = 0; i < notes; i++) {
@@ -666,7 +694,7 @@ class Composer {
     osc.frequency.value = midiToFreq(midi);
     const g = ctx.createGain();
     g.gain.setValueAtTime(0.0001, when);
-    g.gain.exponentialRampToValueAtTime(0.09, when + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.06, when + 0.02);
     g.gain.exponentialRampToValueAtTime(0.0001, when + 3);
     const pan = ctx.createStereoPanner();
     pan.pan.value = this.rng() * 2 - 1;
@@ -702,6 +730,8 @@ function foldLoop(rendered: AudioBuffer, loopSamples: number, xfSamples: number)
       const t = i / xfSamples;
       dst[i] = src[i] * Math.sqrt(t) + src[loopSamples + i] * Math.sqrt(1 - t);
     }
+    // Master glue: gentle JS soft-clip (no native nodes involved).
+    for (let i = 0; i < loopSamples; i++) dst[i] = softClip(dst[i]);
     out.push(dst);
   }
   return out;
@@ -711,8 +741,10 @@ export type LoopData = { data: Float32Array[]; length: number; sampleRate: numbe
 
 async function renderLoop(spec: PieceSpec): Promise<LoopData | null> {
   const sr = RENDER_SR;
+  dlog('[generative] creating OfflineAudioContext', RENDER_SECONDS, 's @', sr, 'Hz');
   const offline = new OfflineAudioContext(2, Math.ceil(RENDER_SECONDS * sr), sr);
   const rendered = await new Composer(offline, spec).render();
+  dlog('[generative] render complete, folding loop');
   const loopSamples = Math.floor(LOOP_SECONDS * sr);
   const xfSamples = Math.floor(XFADE_SECONDS * sr);
   return { data: foldLoop(rendered, loopSamples, xfSamples), length: loopSamples, sampleRate: sr };
@@ -730,6 +762,7 @@ export async function prefetchGenerative(section: Section): Promise<void> {
   if (prefetching) return;
   if (pending && pending.spec.section === section && pending.loop) return; // ready
   prefetching = true;
+  dlog('[generative] prefetch start for', section);
   try {
     const ratings = await loadRatings();
     const spec = nextSpec(section, ratings);

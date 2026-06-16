@@ -9,9 +9,7 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { categoryStyle } from '@/theme/categories';
 import { radius, spacing } from '@/theme';
 
-export const CARD_WIDTH = 150;
-
-/** An Apple-Music-style shelf card: a gradient "art" tile with title + hint. */
+/** A grid card: a gradient "art" tile with title + hint. Fills its cell. */
 export function SoundCard({
   item,
   selected,
@@ -36,7 +34,7 @@ export function SoundCard({
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={[styles.art, selected && styles.artSelected]}>
-        <Ionicons name={item.icon} size={32} color="#FFFFFF" />
+        <Ionicons name={item.icon} size={30} color="#FFFFFF" />
         {selected && (
           <View style={styles.eq}>
             <EqualizerBars color="#FFFFFF" />
@@ -57,10 +55,10 @@ export function SoundCard({
 }
 
 const styles = StyleSheet.create({
-  card: { width: CARD_WIDTH, gap: spacing.xs },
+  card: { width: '100%', gap: spacing.xs },
   art: {
-    width: CARD_WIDTH,
-    height: 112,
+    width: '100%',
+    height: 92,
     borderRadius: radius.lg,
     alignItems: 'center',
     justifyContent: 'center',
