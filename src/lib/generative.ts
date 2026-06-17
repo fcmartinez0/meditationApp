@@ -95,6 +95,51 @@ function midiToFreq(m: number): number {
   return 440 * Math.pow(2, (m - 69) / 12);
 }
 
+// Nearest-neighbour voice leading: move each pad voice to the closest tone of
+// the new chord, keeping voices distinct so the chord never collapses. Minimal
+// motion reads as musical part-writing rather than the whole pad lurching to a
+// new root. Returns one MIDI note per voice.
+function leadVoices(prev: number[], chordMidi: number[], count: number, root: number): number[] {
+  // First chord (or a voice was added): spread the chord tones low to high,
+  // doubling up from the bottom for any extra voices.
+  if (prev.length < count) {
+    const out: number[] = [];
+    for (let i = 0; i < count; i++) {
+      out.push(chordMidi[i % chordMidi.length] + (i >= chordMidi.length ? 12 : 0));
+    }
+    return out;
+  }
+  // Candidate pitches: every chord tone placed across the pad register.
+  const lo = root - 2;
+  const hi = root + 26;
+  const cand: number[] = [];
+  for (const t of chordMidi) {
+    for (let m = t - 24; m <= t + 24; m += 12) {
+      if (m >= lo && m <= hi) cand.push(m);
+    }
+  }
+  const uniq = Array.from(new Set(cand)).sort((a, b) => a - b);
+  // Greedy nearest assignment, lowest voice first, each tone used at most once.
+  const order = prev.map((_, i) => i).sort((a, b) => prev[a] - prev[b]);
+  const used = new Set<number>();
+  const out = new Array<number>(count);
+  for (const i of order) {
+    let best = uniq[0];
+    let bestD = Infinity;
+    for (const c of uniq) {
+      if (used.has(c)) continue;
+      const d = Math.abs(c - prev[i]);
+      if (d < bestD) {
+        bestD = d;
+        best = c;
+      }
+    }
+    used.add(best);
+    out[i] = best;
+  }
+  return out;
+}
+
 // Gentle tanh soft-clip for master "glue" and warmth — applied in JS to the
 // rendered samples (stands in for the DynamicsCompressor that isn't available
 // natively, and tames stray peaks without any native nodes).
@@ -176,6 +221,7 @@ class Composer {
   private arpPattern: number[] = ARP_PATTERNS[0];
   private arpEvery = 2;
   private voicing: number[] = VOICINGS[0];
+  private voiceMidi: number[] = [];
 
   constructor(
     private ctx: OfflineAudioContext,
@@ -462,12 +508,10 @@ class Composer {
 
     const glide = initial ? 2 : 6;
     if (this.voices.length) {
-      const notes: number[] = [spec.root + chord[0], spec.root + chord[0] + 12];
-      for (let i = 0; i < this.voices.length - 2; i++) {
-        notes.push(spec.root + chord[i % 4] + (i >= 4 ? 12 : 0));
-      }
+      const next = leadVoices(this.voiceMidi, tones, this.voices.length, spec.root);
+      this.voiceMidi = next;
       this.voices.forEach((v, idx) => {
-        const midi = notes[idx % notes.length];
+        const midi = next[idx];
         // Pad plays in tune; the binaural beat is a dedicated clean layer
         // (see build) rather than a detune smeared across the chord.
         const freq = midiToFreq(midi);

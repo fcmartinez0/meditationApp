@@ -49,6 +49,34 @@ const PROGRESSIONS = [
   [0, 3, 0, 4],
 ];
 const midi = (m) => 440 * Math.pow(2, (m - 69) / 12);
+// Mirrors leadVoices() in the engine — nearest-neighbour voice leading.
+function leadVoices(prev, chordMidi, count, root) {
+  if (prev.length < count) {
+    const out = [];
+    for (let i = 0; i < count; i++) out.push(chordMidi[i % chordMidi.length] + (i >= chordMidi.length ? 12 : 0));
+    return out;
+  }
+  const lo = root - 2;
+  const hi = root + 26;
+  const cand = [];
+  for (const t of chordMidi) for (let m = t - 24; m <= t + 24; m += 12) if (m >= lo && m <= hi) cand.push(m);
+  const uniq = Array.from(new Set(cand)).sort((a, b) => a - b);
+  const order = prev.map((_, i) => i).sort((a, b) => prev[a] - prev[b]);
+  const used = new Set();
+  const out = new Array(count);
+  for (const i of order) {
+    let best = uniq[0];
+    let bestD = Infinity;
+    for (const c of uniq) {
+      if (used.has(c)) continue;
+      const d = Math.abs(c - prev[i]);
+      if (d < bestD) { bestD = d; best = c; }
+    }
+    used.add(best);
+    out[i] = best;
+  }
+  return out;
+}
 function makeRng(seed) {
   let s = seed >>> 0 || 1;
   return () => {
@@ -147,11 +175,16 @@ class Piece {
     const prog = PROGRESSIONS[spec.progression % PROGRESSIONS.length];
     let step = Math.floor(this.rng() * prog.length);
     const interval = Math.max(4, spec.chordChangeSec);
+    const voiceCount = spec.section === 'chill' ? 5 : 4;
+    let prevVoices = [];
     for (let when = 0; when < renderLen + interval; when += interval) {
       const base = prog[step % prog.length];
       step++;
       const chord = this.voicing.map((o) => deg(base + o));
-      this.chordEvents.push({ time: when, chord, tones: chord.map((c) => spec.root + c) });
+      const tones = chord.map((c) => spec.root + c);
+      const voices = leadVoices(prevVoices, tones, voiceCount, spec.root);
+      prevVoices = voices;
+      this.chordEvents.push({ time: when, chord, tones, voices });
     }
   }
   chordAt(t) {
@@ -189,8 +222,7 @@ class Piece {
         for (let i = 0; i < this.len; i++) {
           const t = i / SR;
           const ev = this.chordAt(t);
-          const chord = ev.chord;
-          const noteMidi = spec.root + chord[v % chord.length] + (v >= 4 ? 12 : 0) + detuneCents / 100;
+          const noteMidi = ev.voices[v] + detuneCents / 100;
           const drift = 1 + 0.0006 * Math.sin(TAU * driftRate * t);
           const f = midi(noteMidi) * drift;
           ph += (TAU * f) / SR;

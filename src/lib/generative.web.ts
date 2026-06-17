@@ -62,6 +62,47 @@ function midiToFreq(m: number): number {
   return 440 * Math.pow(2, (m - 69) / 12);
 }
 
+// Nearest-neighbour voice leading: move each pad voice to the closest tone of
+// the new chord, keeping voices distinct so the chord never collapses. Minimal
+// motion reads as musical part-writing rather than the whole pad lurching to a
+// new root. Returns one MIDI note per voice.
+function leadVoices(prev: number[], chordMidi: number[], count: number, root: number): number[] {
+  if (prev.length < count) {
+    const out: number[] = [];
+    for (let i = 0; i < count; i++) {
+      out.push(chordMidi[i % chordMidi.length] + (i >= chordMidi.length ? 12 : 0));
+    }
+    return out;
+  }
+  const lo = root - 2;
+  const hi = root + 26;
+  const cand: number[] = [];
+  for (const t of chordMidi) {
+    for (let m = t - 24; m <= t + 24; m += 12) {
+      if (m >= lo && m <= hi) cand.push(m);
+    }
+  }
+  const uniq = Array.from(new Set(cand)).sort((a, b) => a - b);
+  const order = prev.map((_, i) => i).sort((a, b) => prev[a] - prev[b]);
+  const used = new Set<number>();
+  const out = new Array<number>(count);
+  for (const i of order) {
+    let best = uniq[0];
+    let bestD = Infinity;
+    for (const c of uniq) {
+      if (used.has(c)) continue;
+      const d = Math.abs(c - prev[i]);
+      if (d < bestD) {
+        bestD = d;
+        best = c;
+      }
+    }
+    used.add(best);
+    out[i] = best;
+  }
+  return out;
+}
+
 // Custom timbres so pieces sound like different instruments, not just a sine pad.
 function makeWave(ctx: AudioContext, kind: string): PeriodicWave | null {
   if (kind === 'bell') {
@@ -145,6 +186,7 @@ export class GenerativeEngine {
   private arpPattern: number[] = ARP_PATTERNS[0];
   private arpEvery = 2;
   private voicing: number[] = VOICINGS[0];
+  private voiceMidi: number[] = [];
 
   async start(spec: PieceSpec, _preloaded?: unknown): Promise<boolean> {
     const ctx = getCtx();
@@ -152,6 +194,7 @@ export class GenerativeEngine {
     this.ctx = ctx;
     this.spec = spec;
     this.rng = makeRng(spec.seed);
+    this.voiceMidi = [];
     // Fire-and-forget: do NOT await — resume() can stay pending until a user
     // gesture, which would hang start() and freeze the session. The resume
     // hooks (hookResume) reactivate audio on the next interaction.
@@ -430,13 +473,10 @@ export class GenerativeEngine {
     const now = ctx.currentTime;
     const glide = initial ? 2 : 6;
     if (this.voices.length) {
-      // Spread the chord across the sustained voices (with an octave on top).
-      const notes: number[] = [spec.root + chord[0], spec.root + chord[0] + 12];
-      for (let i = 0; i < this.voices.length - 2; i++) {
-        notes.push(spec.root + chord[i % 4] + (i >= 4 ? 12 : 0));
-      }
+      const next = leadVoices(this.voiceMidi, this.chordTones, this.voices.length, spec.root);
+      this.voiceMidi = next;
       this.voices.forEach((v, idx) => {
-        const midi = notes[idx % notes.length];
+        const midi = next[idx];
         // Pad plays in tune; the binaural beat is a dedicated clean layer.
         v.osc.frequency.cancelScheduledValues(now);
         v.osc.frequency.setTargetAtTime(midiToFreq(midi), now, glide / 3);
