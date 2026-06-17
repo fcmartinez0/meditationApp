@@ -229,6 +229,12 @@ export class GenerativeEngine {
     const master = ctx.createGain();
     master.gain.setValueAtTime(0.0001, now);
     master.gain.exponentialRampToValueAtTime(this.targetGain, now + fadeIn);
+    // A gentle high-shelf adds air/shimmer (matches the native engine and the
+    // preview — without it the web build reads as dark and muffled).
+    const air = ctx.createBiquadFilter();
+    air.type = 'highshelf';
+    air.frequency.value = 6500;
+    air.gain.value = 4;
     // Master glue: a gentle compressor for an even, polished level.
     const comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -22;
@@ -236,8 +242,8 @@ export class GenerativeEngine {
     comp.ratio.value = 3;
     comp.attack.value = 0.01;
     comp.release.value = 0.25;
-    master.connect(comp).connect(ctx.destination);
-    this.extras.push(comp);
+    master.connect(air).connect(comp).connect(ctx.destination);
+    this.extras.push(air, comp);
 
     // Tempo-synced feedback delay (dotted-eighth) for space and movement.
     const delay = ctx.createDelay(2);
@@ -261,7 +267,7 @@ export class GenerativeEngine {
     const convolver = ctx.createConvolver();
     convolver.buffer = this.makeImpulse(ctx, 2.6, 2.6);
     const reverbWet = ctx.createGain();
-    reverbWet.gain.value = spec.section === 'rest' ? 0.4 : 0.28;
+    reverbWet.gain.value = spec.section === 'rest' ? 0.42 : 0.3;
     convolver.connect(reverbWet).connect(master);
     const reverbSend = ctx.createGain();
     reverbSend.gain.value = 1;
@@ -275,7 +281,10 @@ export class GenerativeEngine {
 
     const filter = ctx.createBiquadFilter();
     filter.type = 'lowpass';
-    const baseCut = 500 + spec.brightness * 3800;
+    // Match the native engine and preview: pure sine/low cutoffs read as
+    // muffled, so keep the pad open (this used to be 500 + 3800*brightness,
+    // which left the web build noticeably darker than every other path).
+    const baseCut = 2200 + spec.brightness * 9000;
     filter.frequency.value = baseCut;
     filter.Q.value = 0.4;
     filter.connect(pulse);
@@ -340,19 +349,17 @@ export class GenerativeEngine {
     [this.motif, this.motifRhythm] = makeMotif(this.rng);
     this.phraseCount = 0;
 
-    const voiceCount = spec.section === 'chill' ? 6 : 5;
+    // Match the native engine / preview density (extra voices just thickened
+    // and muddied the web pad relative to the build the previews come from).
+    const voiceCount = spec.section === 'chill' ? 5 : 4;
 
     if (sustained) {
       // Sustained pad / choir: held oscillators that glide between chords.
       const choir = spec.instrument === 'choir';
       const periodicWave = choir ? null : makeWave(ctx, spec.wave);
-      const oscType: OscillatorType = choir
-        ? 'sawtooth' // airy ensemble
-        : spec.wave === 'warm'
-          ? 'sawtooth'
-          : spec.wave === 'triangle'
-            ? 'triangle'
-            : 'sine';
+      // Triangle (never a pure sine) is the dark-end floor so the pad keeps
+      // some upper harmonics — matches the native engine. Warm/choir use saw.
+      const oscType: OscillatorType = choir || spec.wave === 'warm' ? 'sawtooth' : 'triangle';
       for (let i = 0; i < voiceCount; i++) {
         const osc = ctx.createOscillator();
         if (periodicWave) osc.setPeriodicWave(periodicWave);
@@ -635,7 +642,7 @@ export class GenerativeEngine {
 
     const beat = 60 / spec.tempo;
     const baseLen = beat * (this.rng() < 0.5 ? 1 : 0.5);
-    const gain = spec.section === 'rest' ? 0.1 : 0.13;
+    const gain = spec.section === 'rest' ? 0.08 : 0.1;
     let t = ctx.currentTime + 0.1;
     const start = t;
     const tones = this.chordTones; // resolve the phrase onto the current chord
