@@ -156,13 +156,23 @@ export default function SettingsScreen() {
         <View style={[styles.divider, { backgroundColor: colors.border }]} />
         <Row label="Reminder time">
           <View style={styles.timeAdjust}>
-            <Pressable onPress={() => adjustTime(-1, 0)} style={styles.stepBtn} hitSlop={8}>
+            <Pressable
+              onPress={() => adjustTime(-1, 0)}
+              style={styles.stepBtn}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Reminder one hour earlier">
               <Ionicons name="remove-circle-outline" size={26} color={colors.accent} />
             </Pressable>
             <AppText variant="heading" style={styles.timeLabel}>
               {formatTime(settings.reminderHour, settings.reminderMinute)}
             </AppText>
-            <Pressable onPress={() => adjustTime(1, 0)} style={styles.stepBtn} hitSlop={8}>
+            <Pressable
+              onPress={() => adjustTime(1, 0)}
+              style={styles.stepBtn}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Reminder one hour later">
               <Ionicons name="add-circle-outline" size={26} color={colors.accent} />
             </Pressable>
           </View>
@@ -190,7 +200,9 @@ export default function SettingsScreen() {
             <Pressable
               onPress={() => updateSettings({ volume: Math.max(0, Math.round((settings.volume - 0.1) * 10) / 10) })}
               style={styles.stepBtn}
-              hitSlop={8}>
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Volume down">
               <Ionicons name="volume-low-outline" size={24} color={colors.accent} />
             </Pressable>
             <View style={[styles.volumeTrack, { backgroundColor: colors.surfaceMuted }]}>
@@ -201,7 +213,9 @@ export default function SettingsScreen() {
             <Pressable
               onPress={() => updateSettings({ volume: Math.min(1, Math.round((settings.volume + 0.1) * 10) / 10) })}
               style={styles.stepBtn}
-              hitSlop={8}>
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Volume up">
               <Ionicons name="volume-high-outline" size={24} color={colors.accent} />
             </Pressable>
           </View>

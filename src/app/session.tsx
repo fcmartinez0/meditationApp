@@ -34,6 +34,16 @@ const GENERATIVE_FALLBACK: Record<GenerativeSound, FileSound> = {
 // Sessions shorter than this when ended early aren't worth recording.
 const MIN_RECORD_SEC = 20;
 
+/** A screen-reader-friendly remaining time, e.g. "5 minutes 30 seconds remaining". */
+function spokenRemaining(sec: number): string {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  const parts: string[] = [];
+  if (m) parts.push(`${m} minute${m === 1 ? '' : 's'}`);
+  if (s) parts.push(`${s} second${s === 1 ? '' : 's'}`);
+  return `${parts.join(' ') || '0 seconds'} remaining`;
+}
+
 export default function SessionScreen() {
   useKeepAwake();
   const colors = useThemeColors();
@@ -376,17 +386,29 @@ export default function SessionScreen() {
           entering={FadeIn.duration(1100)}>
           {settings.timerStyle === 'tide' ? (
             <TideTimer active={phase === 'running'} progress={progress} color={cat.accent}>
-              <AppText variant="display" color="#FFFFFF" style={styles.clock}>
+              <AppText
+                variant="display"
+                color="#FFFFFF"
+                style={styles.clock}
+                accessibilityLabel={spokenRemaining(remaining)}>
                 {formatClock(remaining)}
               </AppText>
             </TideTimer>
           ) : settings.timerStyle === 'minimal' ? (
-            <AppText variant="display" color={cat.accent} style={styles.clockMinimal}>
+            <AppText
+              variant="display"
+              color={cat.accent}
+              style={styles.clockMinimal}
+              accessibilityLabel={spokenRemaining(remaining)}>
               {formatClock(remaining)}
             </AppText>
           ) : (
             <BreathingOrb active={phase === 'running'} core={cat.accent} halo={cat.colors[0]}>
-              <AppText variant="display" color="#FFFFFF" style={styles.clock}>
+              <AppText
+                variant="display"
+                color="#FFFFFF"
+                style={styles.clock}
+                accessibilityLabel={spokenRemaining(remaining)}>
                 {formatClock(remaining)}
               </AppText>
             </BreathingOrb>
