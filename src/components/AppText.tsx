@@ -35,6 +35,9 @@ export function AppText({
   const v = VARIANTS[variant];
   return (
     <Text
+      // Section/screen titles act as headers so VoiceOver can navigate by them.
+      // Callers can still override via props (spread after this).
+      accessibilityRole={variant === 'title' || variant === 'heading' ? 'header' : undefined}
       {...rest}
       style={[
         {
