@@ -62,6 +62,22 @@ function midiToFreq(m: number): number {
   return 440 * Math.pow(2, (m - 69) / 12);
 }
 
+// A short melodic motif: scale-degree steps plus a relative rhythm. Phrases
+// develop it through repetition, transposition and inversion so the lead reads
+// as a composed line rather than a fresh random walk. Returns [steps, rhythm].
+function makeMotif(rng: () => number): [number[], number[]] {
+  const len = 3 + Math.floor(rng() * 3);
+  const steps: number[] = [];
+  const rhythm: number[] = [];
+  for (let i = 0; i < len; i++) {
+    const r = rng();
+    const step = r < 0.55 ? (rng() < 0.5 ? 1 : -1) : r < 0.78 ? 0 : rng() < 0.5 ? 2 : -2;
+    steps.push(step);
+    rhythm.push(rng() < 0.7 ? 1 : rng() < 0.5 ? 0.5 : 2);
+  }
+  return [steps, rhythm];
+}
+
 // Nearest-neighbour voice leading: move each pad voice to the closest tone of
 // the new chord, keeping voices distinct so the chord never collapses. Minimal
 // motion reads as musical part-writing rather than the whole pad lurching to a
@@ -187,6 +203,9 @@ export class GenerativeEngine {
   private arpEvery = 2;
   private voicing: number[] = VOICINGS[0];
   private voiceMidi: number[] = [];
+  private motif: number[] = [];
+  private motifRhythm: number[] = [];
+  private phraseCount = 0;
 
   async start(spec: PieceSpec, _preloaded?: unknown): Promise<boolean> {
     const ctx = getCtx();
@@ -318,6 +337,8 @@ export class GenerativeEngine {
     this.voicing = VOICINGS[Math.floor(this.rng() * VOICINGS.length)];
     this.arpPattern = ARP_PATTERNS[Math.floor(this.rng() * ARP_PATTERNS.length)];
     this.arpEvery = [2, 2, 2, 1, 4][Math.floor(this.rng() * 5)];
+    [this.motif, this.motifRhythm] = makeMotif(this.rng);
+    this.phraseCount = 0;
 
     const voiceCount = spec.section === 'chill' ? 6 : 5;
 
@@ -613,30 +634,40 @@ export class GenerativeEngine {
     const deg = (x: number) => 12 * Math.floor(x / L) + scale[((x % L) + L) % L];
 
     const beat = 60 / spec.tempo;
-    const noteLen = beat * (this.rng() < 0.5 ? 1 : 0.5);
-    const notes = 3 + Math.floor(this.rng() * 4);
+    const baseLen = beat * (this.rng() < 0.5 ? 1 : 0.5);
     const gain = spec.section === 'rest' ? 0.1 : 0.13;
     let t = ctx.currentTime + 0.1;
-    let degIdx = L + Math.floor(this.rng() * L); // sit ~an octave above the root
     const start = t;
     const tones = this.chordTones; // resolve the phrase onto the current chord
-    for (let i = 0; i < notes; i++) {
-      const last = i === notes - 1;
-      if (!last && this.rng() < 0.18) {
-        t += noteLen; // a rest
+
+    // Alternate a "call" (ends open) with a "response" (resolves to a chord
+    // tone), developing the motif by exact repeat, transposition or inversion.
+    const isAnswer = this.phraseCount % 2 === 1;
+    const v = this.rng();
+    const invert = v < 0.3;
+    const transpose = v >= 0.3 && v < 0.6 ? (this.rng() < 0.5 ? 2 : -2) : 0;
+    this.phraseCount++;
+
+    const motif = this.motif.length ? this.motif : [1, -1, 1];
+    const rhythm = this.motifRhythm.length ? this.motifRhythm : [1, 1, 1];
+    let degIdx = L + Math.floor(this.rng() * L) + transpose;
+    for (let i = 0; i < motif.length; i++) {
+      const last = i === motif.length - 1;
+      const len = baseLen * rhythm[i];
+      if (!last && this.rng() < 0.12) {
+        t += len; // a breath
       } else {
         const midi =
-          last && tones.length
-            ? tones[Math.floor(this.rng() * tones.length)] + 12 // land on a chord tone
+          last && isAnswer && tones.length
+            ? tones[Math.floor(this.rng() * tones.length)] + 12 // resolve the answer
             : spec.root + deg(degIdx) + 12;
-        this.leadNote(t, midiToFreq(midi), noteLen * (0.8 + this.rng() * 0.7), this.rng() * 0.4 - 0.2, gain);
-        t += noteLen;
+        this.leadNote(t, midiToFreq(midi), len * (0.8 + this.rng() * 0.6), this.rng() * 0.4 - 0.2, gain);
+        t += len;
       }
-      // Mostly stepwise motion for a singable contour; occasional small leap.
-      degIdx += this.rng() < 0.8 ? (this.rng() < 0.5 ? 1 : -1) : this.rng() < 0.5 ? 2 : -2;
+      degIdx += invert ? -motif[i] : motif[i];
       degIdx = Math.max(L - 1, Math.min(2 * L + 2, degIdx));
     }
-    const wait = t - start + (2 + this.rng() * 4); // rest between phrases
+    const wait = t - start + (isAnswer ? 3 + this.rng() * 4 : 1.5 + this.rng() * 1.5);
     this.timers.push(setTimeout(() => this.scheduleMelody(), wait * 1000));
   }
 

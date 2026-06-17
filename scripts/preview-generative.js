@@ -49,6 +49,19 @@ const PROGRESSIONS = [
   [0, 3, 0, 4],
 ];
 const midi = (m) => 440 * Math.pow(2, (m - 69) / 12);
+// Mirrors makeMotif() in the engine.
+function makeMotif(rng) {
+  const len = 3 + Math.floor(rng() * 3);
+  const steps = [];
+  const rhythm = [];
+  for (let i = 0; i < len; i++) {
+    const r = rng();
+    const step = r < 0.55 ? (rng() < 0.5 ? 1 : -1) : r < 0.78 ? 0 : rng() < 0.5 ? 2 : -2;
+    steps.push(step);
+    rhythm.push(rng() < 0.7 ? 1 : rng() < 0.5 ? 0.5 : 2);
+  }
+  return [steps, rhythm];
+}
 // Mirrors leadVoices() in the engine — nearest-neighbour voice leading.
 function leadVoices(prev, chordMidi, count, root) {
   if (prev.length < count) {
@@ -136,6 +149,8 @@ class Piece {
     this.voicing = VOICINGS[Math.floor(this.rng() * VOICINGS.length)];
     this.arpPattern = ARP_PATTERNS[Math.floor(this.rng() * ARP_PATTERNS.length)];
     this.arpEvery = [2, 2, 2, 1, 4][Math.floor(this.rng() * 5)];
+    [this.motif, this.motifRhythm] = makeMotif(this.rng);
+    this.phraseCount = 0;
     this.arpIdx = 0;
     this.chordEvents = [];
   }
@@ -306,25 +321,32 @@ class Piece {
       const gain = spec.section === 'rest' ? 0.08 : 0.1;
       while (when < renderLen) {
         if (this.rng() >= arc(when)) { when += 3 + this.rng() * 3; continue; } // rest near edges
-        const noteLen = beat * (this.rng() < 0.5 ? 1 : 0.5);
-        const notes = 3 + Math.floor(this.rng() * 4);
-        let degIdx = Ln + Math.floor(this.rng() * Ln);
+        const baseLen = beat * (this.rng() < 0.5 ? 1 : 0.5);
+        const isAnswer = this.phraseCount % 2 === 1;
+        const v = this.rng();
+        const invert = v < 0.3;
+        const transpose = v >= 0.3 && v < 0.6 ? (this.rng() < 0.5 ? 2 : -2) : 0;
+        this.phraseCount++;
+        const motif = this.motif;
+        const rhythm = this.motifRhythm;
+        let degIdx = Ln + Math.floor(this.rng() * Ln) + transpose;
         let t = when;
         const tones = this.chordAt(when).tones; // resolve onto the current chord
-        for (let i = 0; i < notes; i++) {
-          const last = i === notes - 1;
-          if (last || this.rng() >= 0.18) {
+        for (let i = 0; i < motif.length; i++) {
+          const last = i === motif.length - 1;
+          const len = baseLen * rhythm[i];
+          if (last || this.rng() >= 0.12) {
             const m =
-              last && tones.length
+              last && isAnswer && tones.length
                 ? tones[Math.floor(this.rng() * tones.length)] + 12
                 : spec.root + deg(degIdx) + 12;
-            this.note(this.dryL, this.dryR, t, noteLen * (0.8 + this.rng() * 0.7), midi(m), 'triangle', gain, this.rng() * 0.4 - 0.2, { rev: 0.5, del: 0.5, vib: midi(m) * 0.006 });
+            this.note(this.dryL, this.dryR, t, len * (0.8 + this.rng() * 0.6), midi(m), 'triangle', gain, this.rng() * 0.4 - 0.2, { rev: 0.5, del: 0.5, vib: midi(m) * 0.006 });
           }
-          t += noteLen;
-          degIdx += this.rng() < 0.8 ? (this.rng() < 0.5 ? 1 : -1) : this.rng() < 0.5 ? 2 : -2;
+          t += len;
+          degIdx += invert ? -motif[i] : motif[i];
           degIdx = clamp(degIdx, Ln - 1, 2 * Ln + 2);
         }
-        when = t + 2 + this.rng() * 4;
+        when = t + (isAnswer ? 3 + this.rng() * 4 : 1.5 + this.rng() * 1.5);
       }
     }
 
