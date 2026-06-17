@@ -49,6 +49,8 @@ export const SECTIONS: Section[] = [
       { key: 'liquid', label: 'Liquid', icon: 'water-outline', hint: '172 BPM · lush drum & bass' },
       { key: 'chillstep', label: 'Chillstep', icon: 'rainy-outline', hint: '140 BPM · smoky future garage' },
       { key: 'downtempo', label: 'Downtempo', icon: 'partly-sunny-outline', hint: '98 BPM · dreamy & melodic' },
+      { key: 'triphop', label: 'Trip-Hop', icon: 'cloudy-night-outline', hint: '80 BPM · dark & cinematic' },
+      { key: 'synthwave', label: 'Synthwave', icon: 'planet-outline', hint: '84 BPM · dreamy retro arps' },
     ],
   },
   {
@@ -83,26 +85,4 @@ export function greeting(): string {
   if (h < 12) return 'Good morning';
   if (h < 18) return 'Good afternoon';
   return 'Good evening';
-}
-
-// A gently-rotating "featured today" pick, stable within a day.
-export const FEATURED: { key: AmbientSound; blurb: string }[] = [
-  { key: 'gen_rest', blurb: 'A fresh, never-repeating ambient piece — composed live, just for now.' },
-  { key: 'rain', blurb: 'Steady rainfall to soften the edges of a busy day.' },
-  { key: 'calm', blurb: '7.83 Hz grounding tones, tuned to 432 Hz. Best with headphones.' },
-  { key: 'fire', blurb: 'A warm, crackling fire for slow, cozy stillness.' },
-  { key: 'melodic', blurb: 'Euphoric melodic house to lift a flat afternoon.' },
-  { key: 'ocean', blurb: 'Slow ocean swells to pace a long, easy exhale.' },
-  { key: 'gen_chill', blurb: 'A live generative groove that drifts and quietly evolves.' },
-];
-
-export function dayOfYear(): number {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), 0, 0);
-  return Math.floor((now.getTime() - start.getTime()) / 86_400_000);
-}
-
-export function featuredToday() {
-  const pick = FEATURED[dayOfYear() % FEATURED.length];
-  return { ...pick, ...soundMeta(pick.key) };
 }

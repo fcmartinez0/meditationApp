@@ -82,7 +82,7 @@ const PROGRESSIONS = [
 // Loop length and seamless-crossfade window. The render runs on a native
 // background thread and node-building yields to the UI, so this can be
 // generous without freezing anything.
-const LOOP_SECONDS = 28;
+const LOOP_SECONDS = 40;
 const XFADE_SECONDS = 4;
 const RENDER_SECONDS = LOOP_SECONDS + XFADE_SECONDS;
 const IMPULSE_SECONDS = 1.4;
@@ -378,6 +378,10 @@ class Composer {
   private async scheduleAll(renderLen: number): Promise<void> {
     const { spec, ctx } = this;
     const sustained = spec.instrument === 'pad' || spec.instrument === 'choir';
+    // Arrangement arc: lead/decorative layers swell toward the middle of the
+    // loop and thin at the edges, so each loop "opens up" then settles. Pad and
+    // bass stay constant as the foundation; the thin edges meet via the crossfade.
+    const arc = (when: number) => 0.35 + 0.65 * Math.sin((Math.PI * when) / renderLen) ** 2;
 
     // Chord progression across the whole render (also feeds chordAt lookups).
     this.chordStep = Math.floor(this.rng() * PROGRESSIONS[spec.progression % PROGRESSIONS.length].length);
@@ -405,7 +409,7 @@ class Composer {
     if (spec.chimeDensity > 0.02) {
       let when = 3 + this.rng() * 16;
       while (when < renderLen) {
-        this.playChime(when);
+        if (this.rng() < arc(when)) this.playChime(when);
         when += (8 + this.rng() * 16) / Math.max(0.05, spec.chimeDensity);
         await this.breathe();
       }
@@ -419,7 +423,7 @@ class Composer {
         this.chordTones = this.chordAt(when);
         const st = s % 16;
         if (spec.percussion !== 'none') this.triggerPercussion(st, when);
-        if (spec.arp) this.triggerArp(st, when);
+        if (spec.arp && this.rng() < arc(when)) this.triggerArp(st, when);
         await this.breathe();
       }
     }
@@ -428,7 +432,8 @@ class Composer {
     if (spec.melody) {
       let when = 4 + this.rng() * 18;
       while (when < renderLen) {
-        when = this.schedulePhrase(when);
+        if (this.rng() < arc(when)) when = this.schedulePhrase(when);
+        else when += 3 + this.rng() * 3; // rest near the edges
         await this.breathe();
       }
     }
@@ -602,15 +607,21 @@ class Composer {
     const gain = spec.section === 'rest' ? 0.08 : 0.1;
     let t = t0;
     let degIdx = L + Math.floor(this.rng() * L);
+    const tones = this.chordAt(t0); // resolve the phrase onto the current chord
     for (let i = 0; i < notes; i++) {
-      if (this.rng() < 0.18) {
+      const last = i === notes - 1;
+      if (!last && this.rng() < 0.18) {
         t += noteLen;
       } else {
-        const midi = spec.root + deg(degIdx) + 12;
+        const midi =
+          last && tones.length
+            ? tones[Math.floor(this.rng() * tones.length)] + 12 // land on a chord tone
+            : spec.root + deg(degIdx) + 12;
         this.leadNote(t, midiToFreq(midi), noteLen * (0.8 + this.rng() * 0.7), this.rng() * 0.4 - 0.2, gain);
         t += noteLen;
       }
-      degIdx += this.rng() < 0.7 ? (this.rng() < 0.5 ? 1 : -1) : this.rng() < 0.5 ? 2 : -2;
+      // Mostly stepwise motion for a singable contour; occasional small leap.
+      degIdx += this.rng() < 0.8 ? (this.rng() < 0.5 ? 1 : -1) : this.rng() < 0.5 ? 2 : -2;
       degIdx = Math.max(L - 1, Math.min(2 * L + 2, degIdx));
     }
     return t + 2 + this.rng() * 4;

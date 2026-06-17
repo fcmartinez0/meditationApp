@@ -40,6 +40,8 @@ const AMBIENT_SOURCES: Record<FileSound, number> = {
   deephouse: require('@/assets/audio/beats/deephouse.wav'),
   melodic: require('@/assets/audio/beats/melodic.wav'),
   techno: require('@/assets/audio/beats/techno.wav'),
+  triphop: require('@/assets/audio/beats/triphop.wav'),
+  synthwave: require('@/assets/audio/beats/synthwave.wav'),
 };
 
 let sharedCtx: AudioContext | null = null;

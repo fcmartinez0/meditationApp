@@ -5,6 +5,8 @@ import { Platform } from 'react-native';
 
 const REMINDER_ID = 'daily-meditation-reminder';
 const ANDROID_CHANNEL = 'reminders';
+// Web can't schedule a repeating local notification, so reminders are native-only.
+export const NOTIFICATIONS_SUPPORTED = Platform.OS !== 'web';
 
 const REMINDER_MESSAGES = [
   'Time to breathe. A few quiet minutes are waiting for you.',
@@ -14,14 +16,16 @@ const REMINDER_MESSAGES = [
 ];
 
 // Show reminders even while the app is foregrounded.
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
+if (NOTIFICATIONS_SUPPORTED) {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    }),
+  });
+}
 
 async function ensureAndroidChannel() {
   if (Platform.OS !== 'android') return;
@@ -34,6 +38,7 @@ async function ensureAndroidChannel() {
 
 /** Asks for permission, returning whether it was granted. */
 export async function requestPermission(): Promise<boolean> {
+  if (!NOTIFICATIONS_SUPPORTED) return false;
   await ensureAndroidChannel();
   const existing = await Notifications.getPermissionsAsync();
   if (existing.granted) return true;
@@ -43,12 +48,14 @@ export async function requestPermission(): Promise<boolean> {
 }
 
 export async function getPermissionGranted(): Promise<boolean> {
+  if (!NOTIFICATIONS_SUPPORTED) return false;
   const status = await Notifications.getPermissionsAsync();
   return status.granted;
 }
 
 /** (Re)schedules a repeating daily reminder at the given local time. */
 export async function scheduleDailyReminder(hour: number, minute: number): Promise<void> {
+  if (!NOTIFICATIONS_SUPPORTED) return;
   await ensureAndroidChannel();
   await cancelDailyReminder();
   const body = REMINDER_MESSAGES[Math.floor(Math.random() * REMINDER_MESSAGES.length)];
@@ -69,6 +76,7 @@ export async function scheduleDailyReminder(hour: number, minute: number): Promi
 }
 
 export async function cancelDailyReminder(): Promise<void> {
+  if (!NOTIFICATIONS_SUPPORTED) return;
   try {
     await Notifications.cancelScheduledNotificationAsync(REMINDER_ID);
   } catch {

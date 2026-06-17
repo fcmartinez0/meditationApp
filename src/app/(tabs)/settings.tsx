@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, Platform, Pressable, StyleSheet, Switch, View } from 'react-native';
@@ -10,6 +11,7 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { formatTime } from '@/lib/date';
 import {
   cancelDailyReminder,
+  NOTIFICATIONS_SUPPORTED,
   requestPermission,
   scheduleDailyReminder,
 } from '@/lib/notifications';
@@ -57,6 +59,13 @@ export default function SettingsScreen() {
   const [busy, setBusy] = useState(false);
   const [ratings, setRatings] = useState<PieceRating[]>([]);
 
+  const tap = () => Haptics.selectionAsync().catch(() => {});
+  // Update a setting with a light tap of haptic feedback.
+  const set = (patch: Parameters<typeof updateSettings>[0]) => {
+    tap();
+    void updateSettings(patch);
+  };
+
   // Refresh learned-taste summaries whenever the screen comes into focus.
   useFocusEffect(
     useCallback(() => {
@@ -90,6 +99,7 @@ export default function SettingsScreen() {
 
   const onToggleReminder = async (enabled: boolean) => {
     if (busy) return;
+    tap();
     setBusy(true);
     try {
       if (enabled) {
@@ -113,6 +123,7 @@ export default function SettingsScreen() {
   };
 
   const adjustTime = async (deltaHours: number, deltaMinutes: number) => {
+    tap();
     let hour = (settings.reminderHour + deltaHours + 24) % 24;
     let minute = settings.reminderMinute + deltaMinutes;
     if (minute >= 60) minute -= 60;
@@ -141,11 +152,13 @@ export default function SettingsScreen() {
         <AppText variant="label" muted>
           DAILY REMINDER
         </AppText>
-        <Row label="Remind me to meditate" hint="A gentle daily nudge">
+        <Row
+          label="Remind me to meditate"
+          hint={NOTIFICATIONS_SUPPORTED ? 'A gentle daily nudge' : 'Available in the iOS / Android app'}>
           <Switch
-            value={settings.reminderEnabled}
+            value={settings.reminderEnabled && NOTIFICATIONS_SUPPORTED}
             onValueChange={onToggleReminder}
-            disabled={busy}
+            disabled={busy || !NOTIFICATIONS_SUPPORTED}
             trackColor={{ true: colors.accent, false: colors.surfaceMuted }}
             thumbColor={Platform.OS === 'android' ? colors.surface : undefined}
           />
@@ -153,13 +166,23 @@ export default function SettingsScreen() {
         <View style={[styles.divider, { backgroundColor: colors.border }]} />
         <Row label="Reminder time">
           <View style={styles.timeAdjust}>
-            <Pressable onPress={() => adjustTime(-1, 0)} style={styles.stepBtn} hitSlop={8}>
+            <Pressable
+              onPress={() => adjustTime(-1, 0)}
+              style={styles.stepBtn}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Reminder one hour earlier">
               <Ionicons name="remove-circle-outline" size={26} color={colors.accent} />
             </Pressable>
             <AppText variant="heading" style={styles.timeLabel}>
               {formatTime(settings.reminderHour, settings.reminderMinute)}
             </AppText>
-            <Pressable onPress={() => adjustTime(1, 0)} style={styles.stepBtn} hitSlop={8}>
+            <Pressable
+              onPress={() => adjustTime(1, 0)}
+              style={styles.stepBtn}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Reminder one hour later">
               <Ionicons name="add-circle-outline" size={26} color={colors.accent} />
             </Pressable>
           </View>
@@ -185,9 +208,11 @@ export default function SettingsScreen() {
         <Row label="Volume" hint={`${Math.round(settings.volume * 100)}%`}>
           <View style={styles.timeAdjust}>
             <Pressable
-              onPress={() => updateSettings({ volume: Math.max(0, Math.round((settings.volume - 0.1) * 10) / 10) })}
+              onPress={() => set({ volume: Math.max(0, Math.round((settings.volume - 0.1) * 10) / 10) })}
               style={styles.stepBtn}
-              hitSlop={8}>
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Volume down">
               <Ionicons name="volume-low-outline" size={24} color={colors.accent} />
             </Pressable>
             <View style={[styles.volumeTrack, { backgroundColor: colors.surfaceMuted }]}>
@@ -196,9 +221,11 @@ export default function SettingsScreen() {
               />
             </View>
             <Pressable
-              onPress={() => updateSettings({ volume: Math.min(1, Math.round((settings.volume + 0.1) * 10) / 10) })}
+              onPress={() => set({ volume: Math.min(1, Math.round((settings.volume + 0.1) * 10) / 10) })}
               style={styles.stepBtn}
-              hitSlop={8}>
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Volume up">
               <Ionicons name="volume-high-outline" size={24} color={colors.accent} />
             </Pressable>
           </View>
@@ -211,7 +238,7 @@ export default function SettingsScreen() {
             return (
               <Pressable
                 key={opt.value}
-                onPress={() => updateSettings({ timerStyle: opt.value })}
+                onPress={() => set({ timerStyle: opt.value })}
                 style={[
                   styles.intervalChip,
                   { backgroundColor: selected ? colors.accent : colors.surfaceMuted },
@@ -232,7 +259,7 @@ export default function SettingsScreen() {
         <Row label="Starting bell" hint="Ring when a session begins">
           <Switch
             value={settings.startBell}
-            onValueChange={(v) => updateSettings({ startBell: v })}
+            onValueChange={(v) => set({ startBell: v })}
             trackColor={{ true: colors.accent, false: colors.surfaceMuted }}
             thumbColor={Platform.OS === 'android' ? colors.surface : undefined}
           />
@@ -240,7 +267,7 @@ export default function SettingsScreen() {
         <Row label="Ending bell" hint="Ring when a session ends">
           <Switch
             value={settings.endBell}
-            onValueChange={(v) => updateSettings({ endBell: v })}
+            onValueChange={(v) => set({ endBell: v })}
             trackColor={{ true: colors.accent, false: colors.surfaceMuted }}
             thumbColor={Platform.OS === 'android' ? colors.surface : undefined}
           />
@@ -256,7 +283,7 @@ export default function SettingsScreen() {
             return (
               <Pressable
                 key={opt.value}
-                onPress={() => updateSettings({ intervalMin: opt.value })}
+                onPress={() => set({ intervalMin: opt.value })}
                 style={[
                   styles.intervalChip,
                   {

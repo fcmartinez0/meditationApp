@@ -170,6 +170,7 @@ class Piece {
     const deg = (x) => 12 * Math.floor(x / Ln) + scale[((x % Ln) + Ln) % Ln];
     const sustained = spec.instrument === 'pad' || spec.instrument === 'choir';
     this.buildChords(renderLen);
+    const arc = (when) => 0.35 + 0.65 * Math.sin((Math.PI * when) / renderLen) ** 2;
 
     // --- Pad: continuous voices gliding through chords ---
     if (sustained) {
@@ -235,9 +236,11 @@ class Piece {
     if (spec.chimeDensity > 0.02) {
       let when = 3 + this.rng() * 16;
       while (when < renderLen) {
-        const d = scale[Math.floor(this.rng() * scale.length)];
-        const m = spec.root + 12 + d + (this.rng() < 0.4 ? 12 : 0);
-        this.note(this.dryL, this.dryR, when, 3, midi(m), 'sine', 0.06, this.rng() * 2 - 1, { rev: 0.6 });
+        if (this.rng() < arc(when)) {
+          const d = scale[Math.floor(this.rng() * scale.length)];
+          const m = spec.root + 12 + d + (this.rng() < 0.4 ? 12 : 0);
+          this.note(this.dryL, this.dryR, when, 3, midi(m), 'sine', 0.06, this.rng() * 2 - 1, { rev: 0.6 });
+        }
         when += (8 + this.rng() * 16) / Math.max(0.05, spec.chimeDensity);
       }
     }
@@ -252,7 +255,7 @@ class Piece {
       for (let when = 0; when < renderLen; when += stepDur, s++) {
         const st = s % 16;
         const tones = this.chordAt(when).tones;
-        if (spec.arp && st % this.arpEvery === 0 && tones.length) {
+        if (spec.arp && st % this.arpEvery === 0 && tones.length && this.rng() < arc(when)) {
           const di = this.arpPattern[this.arpIdx % this.arpPattern.length] % tones.length;
           const pan = this.arpIdx % 2 === 0 ? -0.6 : 0.6;
           this.arpIdx++;
@@ -270,17 +273,23 @@ class Piece {
       const beat = 60 / spec.tempo;
       const gain = spec.section === 'rest' ? 0.08 : 0.1;
       while (when < renderLen) {
+        if (this.rng() >= arc(when)) { when += 3 + this.rng() * 3; continue; } // rest near edges
         const noteLen = beat * (this.rng() < 0.5 ? 1 : 0.5);
         const notes = 3 + Math.floor(this.rng() * 4);
         let degIdx = Ln + Math.floor(this.rng() * Ln);
         let t = when;
+        const tones = this.chordAt(when).tones; // resolve onto the current chord
         for (let i = 0; i < notes; i++) {
-          if (this.rng() >= 0.18) {
-            const m = spec.root + deg(degIdx) + 12;
+          const last = i === notes - 1;
+          if (last || this.rng() >= 0.18) {
+            const m =
+              last && tones.length
+                ? tones[Math.floor(this.rng() * tones.length)] + 12
+                : spec.root + deg(degIdx) + 12;
             this.note(this.dryL, this.dryR, t, noteLen * (0.8 + this.rng() * 0.7), midi(m), 'triangle', gain, this.rng() * 0.4 - 0.2, { rev: 0.5, del: 0.5, vib: midi(m) * 0.006 });
           }
           t += noteLen;
-          degIdx += this.rng() < 0.7 ? (this.rng() < 0.5 ? 1 : -1) : this.rng() < 0.5 ? 2 : -2;
+          degIdx += this.rng() < 0.8 ? (this.rng() < 0.5 ? 1 : -1) : this.rng() < 0.5 ? 2 : -2;
           degIdx = clamp(degIdx, Ln - 1, 2 * Ln + 2);
         }
         when = t + 2 + this.rng() * 4;
@@ -473,7 +482,7 @@ const SPECS = {
   },
 };
 
-const seconds = 28;
+const seconds = 40;
 const outDir = process.env.OUT || '/tmp';
 for (const [name, spec] of Object.entries(SPECS)) {
   const p = new Piece(spec, seconds);

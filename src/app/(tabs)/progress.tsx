@@ -67,7 +67,11 @@ export default function ProgressScreen() {
             const height = Math.max(4, (minutes / maxMinutes) * MAX_BAR_HEIGHT);
             const isToday = i === today;
             return (
-              <View key={i} style={styles.barColumn}>
+              <View
+                key={i}
+                style={styles.barColumn}
+                accessible
+                accessibilityLabel={`${WEEKDAY_LABELS[i]}${isToday ? ' (today)' : ''}, ${minutes} minute${minutes === 1 ? '' : 's'}`}>
                 <View style={styles.barArea}>
                   <View
                     style={[
