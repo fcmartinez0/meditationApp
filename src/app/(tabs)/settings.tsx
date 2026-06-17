@@ -10,6 +10,7 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { formatTime } from '@/lib/date';
 import {
   cancelDailyReminder,
+  NOTIFICATIONS_SUPPORTED,
   requestPermission,
   scheduleDailyReminder,
 } from '@/lib/notifications';
@@ -141,11 +142,13 @@ export default function SettingsScreen() {
         <AppText variant="label" muted>
           DAILY REMINDER
         </AppText>
-        <Row label="Remind me to meditate" hint="A gentle daily nudge">
+        <Row
+          label="Remind me to meditate"
+          hint={NOTIFICATIONS_SUPPORTED ? 'A gentle daily nudge' : 'Available in the iOS / Android app'}>
           <Switch
-            value={settings.reminderEnabled}
+            value={settings.reminderEnabled && NOTIFICATIONS_SUPPORTED}
             onValueChange={onToggleReminder}
-            disabled={busy}
+            disabled={busy || !NOTIFICATIONS_SUPPORTED}
             trackColor={{ true: colors.accent, false: colors.surfaceMuted }}
             thumbColor={Platform.OS === 'android' ? colors.surface : undefined}
           />
