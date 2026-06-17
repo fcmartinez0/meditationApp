@@ -530,7 +530,7 @@ const SPECS = {
   },
   flow: {
     seed: 67890, section: 'chill', scale: 'dorian', root: 48, brightness: 0.6,
-    chordChangeSec: 6, binauralHz: 4, chimeDensity: 0.12, tempo: 92, pulseDepth: 0.2,
+    chordChangeSec: 6, binauralHz: 10, chimeDensity: 0.12, tempo: 92, pulseDepth: 0.2,
     wave: 'triangle', instrument: 'keys', arp: true, bass: true, percussion: 'pulse',
     progression: 3, melody: true,
   },
