@@ -378,6 +378,10 @@ class Composer {
   private async scheduleAll(renderLen: number): Promise<void> {
     const { spec, ctx } = this;
     const sustained = spec.instrument === 'pad' || spec.instrument === 'choir';
+    // Arrangement arc: lead/decorative layers swell toward the middle of the
+    // loop and thin at the edges, so each loop "opens up" then settles. Pad and
+    // bass stay constant as the foundation; the thin edges meet via the crossfade.
+    const arc = (when: number) => 0.35 + 0.65 * Math.sin((Math.PI * when) / renderLen) ** 2;
 
     // Chord progression across the whole render (also feeds chordAt lookups).
     this.chordStep = Math.floor(this.rng() * PROGRESSIONS[spec.progression % PROGRESSIONS.length].length);
@@ -405,7 +409,7 @@ class Composer {
     if (spec.chimeDensity > 0.02) {
       let when = 3 + this.rng() * 16;
       while (when < renderLen) {
-        this.playChime(when);
+        if (this.rng() < arc(when)) this.playChime(when);
         when += (8 + this.rng() * 16) / Math.max(0.05, spec.chimeDensity);
         await this.breathe();
       }
@@ -419,7 +423,7 @@ class Composer {
         this.chordTones = this.chordAt(when);
         const st = s % 16;
         if (spec.percussion !== 'none') this.triggerPercussion(st, when);
-        if (spec.arp) this.triggerArp(st, when);
+        if (spec.arp && this.rng() < arc(when)) this.triggerArp(st, when);
         await this.breathe();
       }
     }
@@ -428,7 +432,8 @@ class Composer {
     if (spec.melody) {
       let when = 4 + this.rng() * 18;
       while (when < renderLen) {
-        when = this.schedulePhrase(when);
+        if (this.rng() < arc(when)) when = this.schedulePhrase(when);
+        else when += 3 + this.rng() * 3; // rest near the edges
         await this.breathe();
       }
     }
