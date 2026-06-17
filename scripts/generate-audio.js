@@ -58,7 +58,7 @@ const softClip = (x, ceiling) => ceiling * Math.tanh(x / ceiling);
  * a soft limiter. Channels are gain-linked so stereo / binaural imaging (and
  * the binaural beat) is preserved.
  */
-function master(channels, { targetDb = -14, thresholdDb = -18, ratio = 3, air = 0 } = {}) {
+function master(channels, { targetDb = -14, thresholdDb = -18, ratio = 3, air = 0, widen = 1 } = {}) {
   const n = channels[0].length;
   const thr = dbToLin(thresholdDb);
   const atk = Math.exp(-1 / (0.005 * SAMPLE_RATE));
@@ -70,6 +70,19 @@ function master(channels, { targetDb = -14, thresholdDb = -18, ratio = 3, air = 
     for (const ch of channels) {
       const hp = highPass(ch, 7000);
       for (let i = 0; i < n; i++) ch[i] += air * hp[i];
+    }
+  }
+
+  // 0.5) Stereo widening (mid/side): scale the side signal for a wider image.
+  // The mono sum is preserved, so it stays mono-compatible and the bass (which
+  // lives mostly in the centre) is untouched.
+  if (widen !== 1 && channels.length === 2) {
+    const [l, r] = channels;
+    for (let i = 0; i < n; i++) {
+      const m = (l[i] + r[i]) / 2;
+      const s = ((l[i] - r[i]) / 2) * widen;
+      l[i] = m + s;
+      r[i] = m - s;
     }
   }
 
@@ -136,7 +149,8 @@ function writeWav(filePath, samples, opts = {}) {
 
 function writeWavStereo(filePath, left, right, opts = {}) {
   const n = Math.min(left.length, right.length);
-  if (opts.master !== false) master([left, right], { targetDb: opts.targetDb ?? -14, air: opts.air ?? 0 });
+  if (opts.master !== false)
+    master([left, right], { targetDb: opts.targetDb ?? -14, air: opts.air ?? 0, widen: opts.widen ?? 1 });
   // Joint normalization keeps the stereo image balanced.
   let peak = 0;
   for (let i = 0; i < n; i++) {
@@ -940,10 +954,10 @@ function generateTripHop() {
     // Half-time feel: heavy kick on 1, snare on beat 3, sparse swung hats.
     for (let s = 0; s < 16; s++) {
       const p = pos(base + s);
-      if (s === 0) kit.kick(p, { gain: 0.95, pitchStart: 95, pitchEnd: 44, decay: 10 });
-      if (s === 6) kit.kick(p, { gain: 0.5, pitchStart: 90, pitchEnd: 44, decay: 12 });
+      if (s === 0) kit.kick(p, { gain: 0.82, pitchStart: 95, pitchEnd: 44, decay: 10 });
+      if (s === 6) kit.kick(p, { gain: 0.42, pitchStart: 90, pitchEnd: 44, decay: 12 });
       if (s === 8) kit.snare(p, { gain: 0.5, decay: 14, noiseAmt: 0.6, tone: 170, toneAmt: 0.3 });
-      if (s % 4 === 2) kit.hat(p, { gain: 0.08, open: s === 14, pan: s % 8 === 2 ? -0.5 : 0.5 });
+      if (s % 4 === 2) kit.hat(p, { gain: 0.08, open: s === 14, pan: s % 8 === 2 ? -0.7 : 0.7 });
     }
   }
   addFill(kit, pos, (bars - 1) * 16, false);
@@ -978,8 +992,11 @@ function generateSynthwave() {
     const base = bar * 16;
     if (bar % 2 === 0) {
       kit.pad(pos(base), chord.map(midiToFreq), 2 * 16 * stepDur * 0.98, {
-        gain: 0.1, attack: 0.4, release: 0.6, detune: 8, bright: 0.12,
+        gain: 0.1, attack: 0.4, release: 0.6, detune: 12, bright: 0.2,
       });
+      // Shimmer: the chord an octave up, soft and wide, for retro sparkle.
+      const sp = (bar / 2) % 2 ? 0.7 : -0.7;
+      for (const m of chord) kit.key(pos(base + 0), midiToFreq(m + 24), 1.6, { gain: 0.035, decay: 3, pan: sp });
     }
     kit.sub(pos(base + 0), midiToFreq(bassRoots[ci]), stepDur * 8, { gain: 0.5 });
     kit.sub(pos(base + 8), midiToFreq(bassRoots[ci]), stepDur * 6, { gain: 0.42 });
@@ -987,10 +1004,10 @@ function generateSynthwave() {
       const p = pos(base + s);
       if (s % 4 === 0) kit.kick(p, { gain: 0.8, pitchStart: 90, pitchEnd: 46, decay: 13 });
       if (s === 4 || s === 12) kit.clap(p, { gain: 0.18 });
-      if (s % 2 === 0) kit.hat(p, { gain: 0.07, open: s === 14, pan: s % 4 === 0 ? -0.5 : 0.5 });
+      if (s % 2 === 0) kit.hat(p, { gain: 0.07, open: s === 14, pan: s % 4 === 0 ? -0.6 : 0.6 });
       if (s % 2 === 0) {
         const m = chord[arpIdx[(s / 2) % arpIdx.length]] + 12;
-        kit.key(p, midiToFreq(m), 0.42, { gain: 0.08, decay: 5, pan: (s / 2) % 2 ? 0.4 : -0.4 });
+        kit.key(p, midiToFreq(m), 0.42, { gain: 0.08, decay: 5, pan: (s / 2) % 2 ? 0.6 : -0.6 });
       }
     }
   }
@@ -1398,9 +1415,9 @@ writeWavStereo(path.join(BEATS_DIR, 'melodic.wav'), melodic.left, melodic.right,
 const techno = generateTechno();
 writeWavStereo(path.join(BEATS_DIR, 'techno.wav'), techno.left, techno.right, { targetDb: -16, air: 0.3 });
 const triphop = generateTripHop();
-writeWavStereo(path.join(BEATS_DIR, 'triphop.wav'), triphop.left, triphop.right, { targetDb: -16, air: 0.3 });
+writeWavStereo(path.join(BEATS_DIR, 'triphop.wav'), triphop.left, triphop.right, { targetDb: -16, air: 0.3, widen: 1.4 });
 const synthwave = generateSynthwave();
-writeWavStereo(path.join(BEATS_DIR, 'synthwave.wav'), synthwave.left, synthwave.right, { targetDb: -16, air: 0.3 });
+writeWavStereo(path.join(BEATS_DIR, 'synthwave.wav'), synthwave.left, synthwave.right, { targetDb: -16, air: 0.45, widen: 1.7 });
 
 console.log('Done.');
 }
