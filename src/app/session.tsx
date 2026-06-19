@@ -15,7 +15,7 @@ import { TideTimer } from '@/components/TideTimer';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { SessionAudio } from '@/lib/audio';
 import { dayKey, formatClock } from '@/lib/date';
-import { claimGenerative, GENERATIVE_SUPPORTED, GenerativeEngine, type LoopData } from '@/lib/generative';
+import { GENERATIVE_SUPPORTED, GenerativeEngine, takeGenerative, type LoopData } from '@/lib/generative';
 import { describeSpec, loadRatings, nextSpec, recordRating } from '@/lib/preferences';
 import type { AmbientSound, FileSound, GenerativeSound, PieceSpec } from '@/lib/types';
 import { isGenerative, sectionFor } from '@/lib/types';
@@ -132,9 +132,12 @@ export default function SessionScreen() {
         audio.setVolume(settings.volume);
         if (useEngine) {
           const section = sectionFor(ambient as GenerativeSound);
-          // Prefer a piece pre-rendered on the home for an instant start; else
-          // choose one now (learning from ratings) and render on demand.
-          const claimed = claimGenerative(section);
+          // Prefer a piece pre-rendered at launch/home for an instant start. If
+          // one is still rendering, this awaits it rather than starting a second
+          // render (rendering twice was the cause of the long "Composing" hang).
+          // Only if nothing was prepared do we choose and render on demand.
+          const claimed = await takeGenerative(section);
+          if (cancelled) return;
           let spec: PieceSpec;
           let preloaded: LoopData | null = null;
           if (claimed) {

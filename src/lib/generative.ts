@@ -79,17 +79,20 @@ const PROGRESSIONS = [
   [0, 3, 0, 4],
 ];
 
-// Loop length and seamless-crossfade window. The render runs on a native
-// background thread, but a long window means a large node graph and a heavy
-// offline convolution that can saturate a slow device (notably the iOS
-// simulator) to the point of an apparent freeze. Keep the window modest — the
-// crossfade-fold still yields a seamless, varied loop.
-const LOOP_SECONDS = 24;
-const XFADE_SECONDS = 3;
+// Loop length and seamless-crossfade window. Render cost scales with ALL of
+// these: a longer window means more scheduled nodes AND more samples to process,
+// a higher sample rate means more DSP per node, and a longer reverb impulse
+// means a heavier convolution. On a slow device (notably the iOS simulator) a
+// generous window pushes the render long enough to look like a freeze. Keep it
+// lean — the crossfade-fold still yields a seamless, varied loop, and shorter
+// here is the single biggest lever on "time to first note".
+const LOOP_SECONDS = 16;
+const XFADE_SECONDS = 2;
 const RENDER_SECONDS = LOOP_SECONDS + XFADE_SECONDS;
-const IMPULSE_SECONDS = 1.0;
-// 32 kHz (Nyquist 16 kHz) leaves headroom for air/shimmer; playback resamples.
-const RENDER_SR = 32000;
+const IMPULSE_SECONDS = 0.7;
+// 24 kHz (Nyquist 12 kHz) still covers the air/shimmer the pads need while
+// cutting per-sample DSP ~25% vs 32 kHz; playback resamples to the device rate.
+const RENDER_SR = 24000;
 // The offline mix is baked at this level; the player's master scales on top.
 const MIX_GAIN = 0.5;
 
@@ -900,35 +903,55 @@ async function renderLoop(spec: PieceSpec): Promise<LoopData | null> {
 }
 
 // --- Background pre-render -------------------------------------------------
-// Rendering takes a few seconds, so we do it ahead of time (while the user is
-// still on the home) and stash the result. The session claims it for an
-// instant start; if nothing is ready it just renders on demand.
+// Rendering takes a few seconds, so we do it ahead of time (at app launch and
+// while the user is on the home) and stash the result. The session takes it for
+// an instant start. Crucially, if a prefetch for the right section is still
+// in flight when the session starts, the session *awaits that same render*
+// rather than kicking off a second one — rendering twice back-to-back was the
+// main cause of the "Composing" hang.
 let pending: { spec: PieceSpec; loop: LoopData | null } | null = null;
-let prefetching = false;
+let inFlight: { section: Section; promise: Promise<void> } | null = null;
 
-/** Pre-render the next piece for a section, if not already prepared. */
-export async function prefetchGenerative(section: Section): Promise<void> {
-  if (prefetching) return;
-  if (pending && pending.spec.section === section && pending.loop) return; // ready
-  prefetching = true;
-  dlog('[generative] prefetch start for', section);
-  try {
-    const ratings = await loadRatings();
-    const spec = nextSpec(section, ratings);
-    pending = { spec, loop: null };
-    const loop = await renderLoop(spec);
-    if (pending && pending.spec.seed === spec.seed) pending.loop = loop;
-    else pending = null;
-  } catch (e) {
-    dwarn('[generative] prefetch failed', e);
-    pending = null;
-  } finally {
-    prefetching = false;
-  }
+function runPrefetch(section: Section): Promise<void> {
+  const promise = (async () => {
+    dlog('[generative] prefetch start for', section);
+    try {
+      const ratings = await loadRatings();
+      const spec = nextSpec(section, ratings);
+      pending = { spec, loop: null };
+      const loop = await renderLoop(spec);
+      if (pending && pending.spec.seed === spec.seed) pending.loop = loop;
+      else pending = null;
+    } catch (e) {
+      dwarn('[generative] prefetch failed', e);
+      pending = null;
+    }
+  })();
+  inFlight = { section, promise };
+  void promise.finally(() => {
+    if (inFlight && inFlight.promise === promise) inFlight = null;
+  });
+  return promise;
 }
 
-/** Take a ready pre-rendered piece for a section, or null if none is ready. */
-export function claimGenerative(section: Section): { spec: PieceSpec; loop: LoopData } | null {
+/** Pre-render the next piece for a section, if not already prepared/in flight. */
+export async function prefetchGenerative(section: Section): Promise<void> {
+  if (inFlight && inFlight.section === section) return inFlight.promise;
+  if (pending && pending.spec.section === section && pending.loop) return; // ready
+  return runPrefetch(section);
+}
+
+/**
+ * Take a ready (or in-flight) pre-rendered piece for a section. If a prefetch
+ * for this section is still rendering, this awaits it instead of letting the
+ * caller start a duplicate render. Returns null only if nothing was prepared.
+ */
+export async function takeGenerative(
+  section: Section,
+): Promise<{ spec: PieceSpec; loop: LoopData } | null> {
+  if (inFlight && inFlight.section === section) {
+    await inFlight.promise.catch(() => {});
+  }
   if (pending && pending.spec.section === section && pending.loop) {
     const claimed = { spec: pending.spec, loop: pending.loop };
     pending = null;
@@ -947,7 +970,7 @@ export class GenerativeEngine {
 
   /**
    * Returns true once the loop is playing; false on any failure.
-   * Pass a pre-rendered `preloaded` loop (from claimGenerative) to start instantly.
+   * Pass a pre-rendered `preloaded` loop (from takeGenerative) to start instantly.
    */
   async start(spec: PieceSpec, preloaded?: LoopData | null): Promise<boolean> {
     this.stopped = false;

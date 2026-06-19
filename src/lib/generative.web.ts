@@ -12,9 +12,9 @@
 
 import type { PieceSpec, Section } from './types';
 
-// Web synthesizes live and instantly, so there's nothing to pre-render.
+// Web synthesizes live and instantly, so there's nothing to pre-render or take.
 export async function prefetchGenerative(_section: Section): Promise<void> {}
-export function claimGenerative(_section: Section): null {
+export async function takeGenerative(_section: Section): Promise<null> {
   return null;
 }
 
