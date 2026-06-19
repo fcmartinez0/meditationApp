@@ -229,12 +229,13 @@ export class GenerativeEngine {
     const master = ctx.createGain();
     master.gain.setValueAtTime(0.0001, now);
     master.gain.exponentialRampToValueAtTime(this.targetGain, now + fadeIn);
-    // A gentle high-shelf adds air/shimmer (matches the native engine and the
-    // preview — without it the web build reads as dark and muffled).
+    // A gentle high-shelf adds air without the dark, muffled feel the web build
+    // had before. Kept lower than the native +4 dB because the full-band
+    // oscillators here already carry more top end than the band-limited preview.
     const air = ctx.createBiquadFilter();
     air.type = 'highshelf';
     air.frequency.value = 6500;
-    air.gain.value = 4;
+    air.gain.value = 2;
     // Master glue: a gentle compressor for an even, polished level.
     const comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -22;
@@ -281,10 +282,11 @@ export class GenerativeEngine {
 
     const filter = ctx.createBiquadFilter();
     filter.type = 'lowpass';
-    // Match the native engine and preview: pure sine/low cutoffs read as
-    // muffled, so keep the pad open (this used to be 500 + 3800*brightness,
-    // which left the web build noticeably darker than every other path).
-    const baseCut = 2200 + spec.brightness * 9000;
+    // The preview synth is band-limited (~24 harmonics, rolling off near 3-4 kHz)
+    // but the live oscillators here run full-band to Nyquist, so an identical
+    // cutoff over-brightens. Tune the web cutoff to match the preview's
+    // perceived brightness rather than its nominal filter value.
+    const baseCut = 1400 + spec.brightness * 5000;
     filter.frequency.value = baseCut;
     filter.Q.value = 0.4;
     filter.connect(pulse);
