@@ -34,14 +34,14 @@ const GENERATIVE_FALLBACK: Record<GenerativeSound, FileSound> = {
 // Sessions shorter than this when ended early aren't worth recording.
 const MIN_RECORD_SEC = 20;
 
-/** A screen-reader-friendly remaining time, e.g. "5 minutes 30 seconds remaining". */
-function spokenRemaining(sec: number): string {
+/** A screen-reader-friendly clock, e.g. "5 minutes 30 seconds remaining". */
+function spokenClock(sec: number, suffix: string): string {
   const m = Math.floor(sec / 60);
   const s = sec % 60;
   const parts: string[] = [];
   if (m) parts.push(`${m} minute${m === 1 ? '' : 's'}`);
   if (s) parts.push(`${s} second${s === 1 ? '' : 's'}`);
-  return `${parts.join(' ') || '0 seconds'} remaining`;
+  return `${parts.join(' ') || '0 seconds'} ${suffix}`;
 }
 
 export default function SessionScreen() {
@@ -66,6 +66,9 @@ export default function SessionScreen() {
       : ambient;
 
   const [remaining, setRemaining] = useState(totalSec);
+  // Generative pieces play open-ended: a count-up elapsed clock instead of a
+  // countdown, no auto-finish, and nothing recorded toward streaks.
+  const [elapsed, setElapsed] = useState(0);
   // Only native needs a "preparing" wait (offline render takes a few seconds).
   // On web the engine starts instantly, so begin running immediately — never
   // gate the timer on audio setup (which can hang on web's AudioContext.resume).
@@ -82,6 +85,7 @@ export default function SessionScreen() {
   const engineRef = useRef<GenerativeEngine | null>(null);
   const specRef = useRef<PieceSpec | null>(null);
   const endAtRef = useRef<number>(Date.now() + totalSec * 1000);
+  const startAtRef = useRef<number>(Date.now());
   const lastBellMarkRef = useRef(0);
   const recordedRef = useRef(false);
 
@@ -114,8 +118,11 @@ export default function SessionScreen() {
     // the session.
     const startCountdown = () => {
       if (cancelled) return;
-      endAtRef.current = Date.now() + totalSec * 1000;
+      const now = Date.now();
+      endAtRef.current = now + totalSec * 1000;
+      startAtRef.current = now;
       setRemaining(totalSec);
+      setElapsed(0);
       setPhase('running');
     };
     (async () => {
@@ -192,26 +199,32 @@ export default function SessionScreen() {
   // The ticking clock — only runs while the session is active.
   useEffect(() => {
     if (phase !== 'running') return;
+    const intervalBell = (elapsedSec: number) => {
+      const intervalSec = settings.intervalMin * 60;
+      if (intervalSec <= 0 || elapsedSec <= 0) return;
+      const mark = Math.floor(elapsedSec / intervalSec);
+      if (mark > lastBellMarkRef.current) {
+        lastBellMarkRef.current = mark;
+        audioRef.current?.ringBell();
+        haptic();
+      }
+    };
     const tick = () => {
+      if (useEngine) {
+        // Open-ended: count up and never auto-finish.
+        const el = Math.max(0, Math.round((Date.now() - startAtRef.current) / 1000));
+        setElapsed(el);
+        intervalBell(el);
+        return;
+      }
       const rem = Math.max(0, Math.round((endAtRef.current - Date.now()) / 1000));
       setRemaining(rem);
-
-      const elapsed = totalSec - rem;
-      const intervalSec = settings.intervalMin * 60;
-      if (intervalSec > 0 && rem > 0) {
-        const mark = Math.floor(elapsed / intervalSec);
-        if (mark > lastBellMarkRef.current) {
-          lastBellMarkRef.current = mark;
-          audioRef.current?.ringBell();
-          haptic();
-        }
-      }
-
+      if (rem > 0) intervalBell(totalSec - rem);
       if (rem <= 0) finish();
     };
     const id = setInterval(tick, 500);
     return () => clearInterval(id);
-  }, [phase, totalSec, settings.intervalMin, finish]);
+  }, [phase, totalSec, settings.intervalMin, finish, useEngine]);
 
   const togglePause = () => {
     Haptics.selectionAsync().catch(() => {});
@@ -220,16 +233,34 @@ export default function SessionScreen() {
       audioRef.current?.pauseAmbient();
       engineRef.current?.pause();
     } else if (phase === 'paused') {
-      endAtRef.current = Date.now() + remaining * 1000;
+      const now = Date.now();
+      endAtRef.current = now + remaining * 1000; // countdown resume
+      startAtRef.current = now - elapsed * 1000; // count-up resume
       setPhase('running');
       audioRef.current?.resumeAmbient();
       engineRef.current?.resume();
     }
   };
 
+  // Leave a session in progress. Generative plays open-ended and records
+  // nothing, so it just stops and offers a rating; timed sessions record the
+  // elapsed time toward streaks.
   const endEarly = () => {
-    const elapsed = totalSec - remaining;
-    persist(elapsed, false);
+    if (useEngine) {
+      engineRef.current?.stop();
+      void audioRef.current?.stopAmbient();
+      setPhase('finished');
+      return;
+    }
+    persist(totalSec - remaining, false);
+    engineRef.current?.stop();
+    void audioRef.current?.stopAmbient();
+    router.back();
+  };
+
+  // Bail out before audio is ready (the "preparing"/composing screen) — nothing
+  // to record or rate yet, so just leave.
+  const cancel = () => {
     engineRef.current?.stop();
     void audioRef.current?.stopAmbient();
     router.back();
@@ -274,23 +305,36 @@ export default function SessionScreen() {
     })();
   };
 
-  const progress = 1 - remaining / totalSec;
+  // Generative is open-ended: show a count-up clock and no progress bar.
+  const clockSeconds = useEngine ? elapsed : remaining;
+  const spokenTime = useEngine
+    ? spokenClock(elapsed, 'elapsed')
+    : spokenClock(remaining, 'remaining');
+  const progress = useEngine ? 0 : 1 - remaining / totalSec;
 
   if (phase === 'finished') {
     return (
       <LinearGradient colors={colors.gradient} style={styles.fill}>
         <SafeAreaView style={styles.completed}>
-          <Ionicons name="checkmark-circle" size={88} color={colors.success} />
+          <Ionicons
+            name={useEngine ? 'musical-notes' : 'checkmark-circle'}
+            size={88}
+            color={colors.success}
+          />
           <AppText variant="title" center>
-            Session complete
+            {useEngine ? 'Hope you enjoyed it' : 'Session complete'}
           </AppText>
-          <AppText variant="body" muted center>
-            You meditated for {Math.round(totalSec / 60)} minutes.
-          </AppText>
-          <View style={styles.streakPill}>
-            <Ionicons name="flame" size={20} color={colors.warning} />
-            <AppText variant="label">{stats.currentStreak}-day streak</AppText>
-          </View>
+          {!useEngine && (
+            <>
+              <AppText variant="body" muted center>
+                You meditated for {Math.round(totalSec / 60)} minutes.
+              </AppText>
+              <View style={styles.streakPill}>
+                <Ionicons name="flame" size={20} color={colors.warning} />
+                <AppText variant="label">{stats.currentStreak}-day streak</AppText>
+              </View>
+            </>
+          )}
 
           {useEngine && specRef.current && (
             <View style={styles.rating}>
@@ -345,7 +389,7 @@ export default function SessionScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Cancel"
-            onPress={endEarly}
+            onPress={cancel}
             hitSlop={16}
             style={[styles.close, { top: Math.max(insets.top, 44) }]}>
             <Ionicons name="close" size={26} color={colors.textSecondary} />
@@ -396,8 +440,8 @@ export default function SessionScreen() {
                 variant="display"
                 color="#FFFFFF"
                 style={styles.clock}
-                accessibilityLabel={spokenRemaining(remaining)}>
-                {formatClock(remaining)}
+                accessibilityLabel={spokenTime}>
+                {formatClock(clockSeconds)}
               </AppText>
             </TideTimer>
           ) : settings.timerStyle === 'minimal' ? (
@@ -405,8 +449,8 @@ export default function SessionScreen() {
               variant="display"
               color={cat.accent}
               style={styles.clockMinimal}
-              accessibilityLabel={spokenRemaining(remaining)}>
-              {formatClock(remaining)}
+              accessibilityLabel={spokenTime}>
+              {formatClock(clockSeconds)}
             </AppText>
           ) : (
             <BreathingOrb active={phase === 'running'} core={cat.accent} halo={cat.colors[0]}>
@@ -414,8 +458,8 @@ export default function SessionScreen() {
                 variant="display"
                 color="#FFFFFF"
                 style={styles.clock}
-                accessibilityLabel={spokenRemaining(remaining)}>
-                {formatClock(remaining)}
+                accessibilityLabel={spokenTime}>
+                {formatClock(clockSeconds)}
               </AppText>
             </BreathingOrb>
           )}
@@ -462,14 +506,16 @@ export default function SessionScreen() {
               </Pressable>
             </View>
           )}
-          <View style={[styles.progressTrack, { backgroundColor: colors.surfaceMuted }]}>
-            <View
-              style={[
-                styles.progressFill,
-                { backgroundColor: cat.accent, width: `${Math.min(100, progress * 100)}%` },
-              ]}
-            />
-          </View>
+          {!useEngine && (
+            <View style={[styles.progressTrack, { backgroundColor: colors.surfaceMuted }]}>
+              <View
+                style={[
+                  styles.progressFill,
+                  { backgroundColor: cat.accent, width: `${Math.min(100, progress * 100)}%` },
+                ]}
+              />
+            </View>
+          )}
           <View style={styles.buttons}>
             <Button
               label={phase === 'running' ? 'Pause' : 'Resume'}

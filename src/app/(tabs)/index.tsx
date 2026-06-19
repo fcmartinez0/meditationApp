@@ -31,6 +31,8 @@ export default function MeditateScreen() {
   // The whole screen's accent follows the chosen sound's category.
   const cat = categoryStyle(settings.ambient);
   const sel = soundMeta(settings.ambient);
+  // Generative pieces play open-ended, so there's no session length to set.
+  const generative = isGenerative(settings.ambient);
 
   const [pickerOpen, setPickerOpen] = useState(false);
 
@@ -125,17 +127,26 @@ export default function MeditateScreen() {
               </AppText>
             </Pressable>
 
-            <Pressable
-              onPress={openPicker}
-              accessibilityRole="button"
-              accessibilityLabel={`Length: ${settings.durationMin} minutes`}
-              style={({ pressed }) => [
-                styles.chip,
-                { backgroundColor: colors.surfaceMuted, transform: [{ scale: pressed ? 0.97 : 1 }] },
-              ]}>
-              <Ionicons name="timer-outline" size={18} color={cat.accent} />
-              <AppText variant="body">{settings.durationMin} min</AppText>
-            </Pressable>
+            {generative ? (
+              <View
+                accessibilityLabel="Length: open-ended"
+                style={[styles.chip, { backgroundColor: colors.surfaceMuted }]}>
+                <Ionicons name="infinite" size={18} color={cat.accent} />
+                <AppText variant="body">Open-ended</AppText>
+              </View>
+            ) : (
+              <Pressable
+                onPress={openPicker}
+                accessibilityRole="button"
+                accessibilityLabel={`Length: ${settings.durationMin} minutes`}
+                style={({ pressed }) => [
+                  styles.chip,
+                  { backgroundColor: colors.surfaceMuted, transform: [{ scale: pressed ? 0.97 : 1 }] },
+                ]}>
+                <Ionicons name="timer-outline" size={18} color={cat.accent} />
+                <AppText variant="body">{settings.durationMin} min</AppText>
+              </Pressable>
+            )}
           </View>
 
           <Pressable
