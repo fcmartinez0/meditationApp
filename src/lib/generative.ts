@@ -848,16 +848,48 @@ async function foldLoop(
 
 export type LoopData = { data: Float32Array[]; length: number; sampleRate: number };
 
+// The native audio engine deadlocks if an offline render runs concurrently with
+// another render or with a *live realtime context* — which is exactly what froze
+// the second session (its on-demand render overlapped the first session's still-
+// running playback context). Serialize every render behind this lock and suspend
+// any live realtime context for the render's duration.
+let renderLock: Promise<void> = Promise.resolve();
+
 async function renderLoop(spec: PieceSpec): Promise<LoopData | null> {
-  const sr = RENDER_SR;
-  dlog('[generative] creating OfflineAudioContext', RENDER_SECONDS, 's @', sr, 'Hz');
-  const offline = new OfflineAudioContext(2, Math.ceil(RENDER_SECONDS * sr), sr);
-  const rendered = await new Composer(offline, spec).render();
-  dlog('[generative] render complete, folding loop');
-  const loopSamples = Math.floor(LOOP_SECONDS * sr);
-  const xfSamples = Math.floor(XFADE_SECONDS * sr);
-  const data = await foldLoop(rendered, loopSamples, xfSamples);
-  return { data, length: loopSamples, sampleRate: sr };
+  const prev = renderLock;
+  let release!: () => void;
+  renderLock = new Promise<void>((r) => (release = r));
+  await prev; // wait for any in-flight render to finish
+
+  const realtime = sharedCtx;
+  const wasRunning = !!realtime && realtime.state === 'running';
+  try {
+    if (wasRunning && realtime) {
+      try {
+        await realtime.suspend();
+      } catch {
+        /* best effort */
+      }
+    }
+    const sr = RENDER_SR;
+    dlog('[generative] creating OfflineAudioContext', RENDER_SECONDS, 's @', sr, 'Hz');
+    const offline = new OfflineAudioContext(2, Math.ceil(RENDER_SECONDS * sr), sr);
+    const rendered = await new Composer(offline, spec).render();
+    dlog('[generative] render complete, folding loop');
+    const loopSamples = Math.floor(LOOP_SECONDS * sr);
+    const xfSamples = Math.floor(XFADE_SECONDS * sr);
+    const data = await foldLoop(rendered, loopSamples, xfSamples);
+    return { data, length: loopSamples, sampleRate: sr };
+  } finally {
+    if (wasRunning && realtime) {
+      try {
+        await realtime.resume();
+      } catch {
+        /* resumes on next playback */
+      }
+    }
+    release();
+  }
 }
 
 // --- Background pre-render -------------------------------------------------

@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
@@ -35,14 +35,17 @@ export default function MeditateScreen() {
   const [pickerOpen, setPickerOpen] = useState(false);
 
   // Pre-render the next generative piece in the background while the user is
-  // still here, so starting a session is instant instead of stalling on the
-  // "Composing…" screen. The render runs off the JS thread and is a no-op on
-  // web, so this never blocks the home screen.
-  useEffect(() => {
-    if (GENERATIVE_SUPPORTED && isGenerative(settings.ambient)) {
-      void prefetchGenerative(sectionFor(settings.ambient));
-    }
-  }, [settings.ambient]);
+  // here, so starting a session is instant instead of stalling on the
+  // "Composing…" screen. Runs on focus (not just mount) so the *next* session
+  // is also prepared after returning from one. The render runs off the JS
+  // thread and is a no-op on web, so this never blocks the home screen.
+  useFocusEffect(
+    useCallback(() => {
+      if (GENERATIVE_SUPPORTED && isGenerative(settings.ambient)) {
+        void prefetchGenerative(sectionFor(settings.ambient));
+      }
+    }, [settings.ambient]),
+  );
 
   const tap = () => Haptics.selectionAsync().catch(() => {});
 
