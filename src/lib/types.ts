@@ -162,10 +162,6 @@ export interface Settings {
   /** Interval bell every N minutes (0 = off). */
   intervalMin: number;
   ambient: AmbientSound;
-  /** Play a bell at the start of a session. */
-  startBell: boolean;
-  /** Play a bell at the end of a session. */
-  endBell: boolean;
   /** Daily reminder enabled. */
   reminderEnabled: boolean;
   /** Reminder time, 24h. */
@@ -196,9 +192,6 @@ export const DEFAULT_SETTINGS: Settings = {
   durationMin: 10,
   intervalMin: 0,
   ambient: 'none',
-  // Bells are off by default — many people prefer silent start/end.
-  startBell: false,
-  endBell: false,
   reminderEnabled: false,
   reminderHour: 8,
   reminderMinute: 0,

@@ -109,10 +109,9 @@ export default function SessionScreen() {
     audioRef.current = audio;
     let cancelled = false;
     // Start the timer only once audio is ready, so the render doesn't eat into
-    // the session. Rings the start bell at the true beginning.
+    // the session.
     const startCountdown = () => {
       if (cancelled) return;
-      if (settings.startBell) audioRef.current?.ringBell();
       endAtRef.current = Date.now() + totalSec * 1000;
       setRemaining(totalSec);
       setPhase('running');
@@ -177,11 +176,10 @@ export default function SessionScreen() {
     setPhase('finished');
     setRemaining(0);
     persist(totalSec, true);
-    if (settings.endBell) audioRef.current?.ringBell();
     haptic();
     engineRef.current?.stop();
     void audioRef.current?.stopAmbient();
-  }, [persist, settings.endBell, totalSec]);
+  }, [persist, totalSec]);
 
   // The ticking clock — only runs while the session is active.
   useEffect(() => {

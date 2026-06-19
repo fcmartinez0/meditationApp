@@ -254,26 +254,8 @@ export default function SettingsScreen() {
 
       <Card style={styles.card}>
         <AppText variant="label" muted>
-          BELLS
+          INTERVAL BELL
         </AppText>
-        <Row label="Starting bell" hint="Ring when a session begins">
-          <Switch
-            value={settings.startBell}
-            onValueChange={(v) => set({ startBell: v })}
-            trackColor={{ true: colors.accent, false: colors.surfaceMuted }}
-            thumbColor={Platform.OS === 'android' ? colors.surface : undefined}
-          />
-        </Row>
-        <Row label="Ending bell" hint="Ring when a session ends">
-          <Switch
-            value={settings.endBell}
-            onValueChange={(v) => set({ endBell: v })}
-            trackColor={{ true: colors.accent, false: colors.surfaceMuted }}
-            thumbColor={Platform.OS === 'android' ? colors.surface : undefined}
-          />
-        </Row>
-        <View style={[styles.divider, { backgroundColor: colors.border }]} />
-        <AppText variant="body">Interval bell</AppText>
         <AppText variant="caption" muted style={{ marginBottom: spacing.sm }}>
           Ring periodically during a session
         </AppText>
