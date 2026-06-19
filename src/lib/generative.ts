@@ -80,12 +80,14 @@ const PROGRESSIONS = [
 ];
 
 // Loop length and seamless-crossfade window. The render runs on a native
-// background thread and node-building yields to the UI, so this can be
-// generous without freezing anything.
-const LOOP_SECONDS = 40;
-const XFADE_SECONDS = 4;
+// background thread, but a long window means a large node graph and a heavy
+// offline convolution that can saturate a slow device (notably the iOS
+// simulator) to the point of an apparent freeze. Keep the window modest — the
+// crossfade-fold still yields a seamless, varied loop.
+const LOOP_SECONDS = 24;
+const XFADE_SECONDS = 3;
 const RENDER_SECONDS = LOOP_SECONDS + XFADE_SECONDS;
-const IMPULSE_SECONDS = 1.4;
+const IMPULSE_SECONDS = 1.0;
 // 32 kHz (Nyquist 16 kHz) leaves headroom for air/shimmer; playback resamples.
 const RENDER_SR = 32000;
 // The offline mix is baked at this level; the player's master scales on top.
@@ -807,9 +809,20 @@ class Composer {
   }
 }
 
-/** Equal-power crossfade-fold a rendered buffer into a seamless loop. */
-function foldLoop(rendered: AudioBuffer, loopSamples: number, xfSamples: number): Float32Array[] {
+/**
+ * Equal-power crossfade-fold a rendered buffer into a seamless loop. Runs on the
+ * JS thread (no native nodes), so it yields between chunks: a full-length pass of
+ * per-sample soft-clip would otherwise block the UI for a noticeable beat right
+ * as the "Composing" screen hands off to playback. Only samples that actually
+ * approach clipping pay for the tanh; the rest pass through untouched.
+ */
+async function foldLoop(
+  rendered: AudioBuffer,
+  loopSamples: number,
+  xfSamples: number,
+): Promise<Float32Array[]> {
   const out: Float32Array[] = [];
+  const CHUNK = 65536; // yield roughly every ~2 s of samples
   for (let c = 0; c < rendered.numberOfChannels; c++) {
     const src = rendered.getChannelData(c);
     const dst = new Float32Array(loopSamples);
@@ -819,8 +832,15 @@ function foldLoop(rendered: AudioBuffer, loopSamples: number, xfSamples: number)
       const t = i / xfSamples;
       dst[i] = src[i] * Math.sqrt(t) + src[loopSamples + i] * Math.sqrt(1 - t);
     }
-    // Master glue: gentle JS soft-clip (no native nodes involved).
-    for (let i = 0; i < loopSamples; i++) dst[i] = softClip(dst[i]);
+    // Master glue: gentle soft-clip, chunked so the UI thread can breathe.
+    for (let i = 0; i < loopSamples; i++) {
+      const x = dst[i];
+      if (x > 0.6 || x < -0.6) dst[i] = softClip(x);
+      if (i > 0 && i % CHUNK === 0) {
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise<void>((r) => setTimeout(r, 0));
+      }
+    }
     out.push(dst);
   }
   return out;
@@ -836,7 +856,8 @@ async function renderLoop(spec: PieceSpec): Promise<LoopData | null> {
   dlog('[generative] render complete, folding loop');
   const loopSamples = Math.floor(LOOP_SECONDS * sr);
   const xfSamples = Math.floor(XFADE_SECONDS * sr);
-  return { data: foldLoop(rendered, loopSamples, xfSamples), length: loopSamples, sampleRate: sr };
+  const data = await foldLoop(rendered, loopSamples, xfSamples);
+  return { data, length: loopSamples, sampleRate: sr };
 }
 
 // --- Background pre-render -------------------------------------------------
@@ -906,7 +927,7 @@ export class GenerativeEngine {
           // Never hang forever — if the render stalls, fall back to a track.
           loop = await Promise.race([
             renderLoop(spec),
-            new Promise<null>((resolve) => setTimeout(() => resolve(null), 20000)),
+            new Promise<null>((resolve) => setTimeout(() => resolve(null), 10000)),
           ]);
         } catch (e) {
           dwarn('[generative] offline render threw', e);
