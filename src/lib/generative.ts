@@ -855,6 +855,13 @@ export type LoopData = { data: Float32Array[]; length: number; sampleRate: numbe
 // any live realtime context for the render's duration.
 let renderLock: Promise<void> = Promise.resolve();
 
+// Hard ceiling on a single render. If the native render ever stalls, the lock
+// MUST still release and the realtime context MUST be restored — otherwise the
+// next session would wait on the lock forever and freeze on "Composing" (the
+// exact failure we serialize to avoid). The render window is short, so a real
+// device finishes well within this; the simulator falls back instead of hanging.
+const RENDER_TIMEOUT_MS = 12000;
+
 async function renderLoop(spec: PieceSpec): Promise<LoopData | null> {
   const prev = renderLock;
   let release!: () => void;
@@ -863,6 +870,7 @@ async function renderLoop(spec: PieceSpec): Promise<LoopData | null> {
 
   const realtime = sharedCtx;
   const wasRunning = !!realtime && realtime.state === 'running';
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     if (wasRunning && realtime) {
       try {
@@ -874,13 +882,25 @@ async function renderLoop(spec: PieceSpec): Promise<LoopData | null> {
     const sr = RENDER_SR;
     dlog('[generative] creating OfflineAudioContext', RENDER_SECONDS, 's @', sr, 'Hz');
     const offline = new OfflineAudioContext(2, Math.ceil(RENDER_SECONDS * sr), sr);
-    const rendered = await new Composer(offline, spec).render();
-    dlog('[generative] render complete, folding loop');
-    const loopSamples = Math.floor(LOOP_SECONDS * sr);
-    const xfSamples = Math.floor(XFADE_SECONDS * sr);
-    const data = await foldLoop(rendered, loopSamples, xfSamples);
-    return { data, length: loopSamples, sampleRate: sr };
+    const work = (async (): Promise<LoopData> => {
+      const rendered = await new Composer(offline, spec).render();
+      dlog('[generative] render complete, folding loop');
+      const loopSamples = Math.floor(LOOP_SECONDS * sr);
+      const xfSamples = Math.floor(XFADE_SECONDS * sr);
+      const data = await foldLoop(rendered, loopSamples, xfSamples);
+      return { data, length: loopSamples, sampleRate: sr };
+    })();
+    // Bound the render so a stall can never wedge the lock; the abandoned
+    // offline context is left to GC. Callers treat null as "fall back".
+    const timeout = new Promise<null>((resolve) => {
+      timer = setTimeout(() => {
+        dwarn('[generative] render timed out, abandoning');
+        resolve(null);
+      }, RENDER_TIMEOUT_MS);
+    });
+    return await Promise.race([work, timeout]);
   } finally {
+    if (timer) clearTimeout(timer);
     if (wasRunning && realtime) {
       try {
         await realtime.resume();
@@ -956,11 +976,9 @@ export class GenerativeEngine {
       if (!loop) {
         const t0 = Date.now();
         try {
-          // Never hang forever — if the render stalls, fall back to a track.
-          loop = await Promise.race([
-            renderLoop(spec),
-            new Promise<null>((resolve) => setTimeout(() => resolve(null), 10000)),
-          ]);
+          // renderLoop self-bounds (RENDER_TIMEOUT_MS) and returns null on a
+          // stall, so a hung render falls back to a track instead of hanging.
+          loop = await renderLoop(spec);
         } catch (e) {
           dwarn('[generative] offline render threw', e);
           return false;

@@ -75,6 +75,8 @@ export default function SessionScreen() {
   const [specLabel, setSpecLabel] = useState<string | null>(null);
   const [liked, setLiked] = useState(false);
   const [composing, setComposing] = useState(false);
+  // Surfaced if audio setup fails so the user isn't left in unexplained silence.
+  const [audioFailed, setAudioFailed] = useState(false);
 
   const audioRef = useRef<SessionAudio | null>(null);
   const engineRef = useRef<GenerativeEngine | null>(null);
@@ -117,47 +119,53 @@ export default function SessionScreen() {
       setPhase('running');
     };
     (async () => {
-      await audio.prepare(effectiveAmbient);
-      if (cancelled) return;
-      audio.setVolume(settings.volume);
-      if (useEngine) {
-        const section = sectionFor(ambient as GenerativeSound);
-        // Prefer a piece pre-rendered on the home for an instant start; else
-        // choose one now (learning from ratings) and render on demand.
-        const claimed = claimGenerative(section);
-        let spec: PieceSpec;
-        let preloaded: LoopData | null = null;
-        if (claimed) {
-          spec = claimed.spec;
-          preloaded = claimed.loop;
-        } else {
-          const ratings = await loadRatings();
-          if (cancelled) return;
-          spec = nextSpec(section, ratings);
-        }
-        specRef.current = spec;
-        setSpecLabel(describeSpec(spec));
-        setComposing(true);
-        const engine = new GenerativeEngine();
-        engineRef.current = engine;
-        let ok = false;
-        try {
-          ok = await engine.start(spec, preloaded);
-        } finally {
-          if (!cancelled) setComposing(false);
-        }
+      try {
+        await audio.prepare(effectiveAmbient);
         if (cancelled) return;
-        if (ok) {
-          engine.setVolume(settings.volume);
-        } else {
-          // Render failed — fall back to a bundled track so it's never silent.
-          await audio.prepare(GENERATIVE_FALLBACK[ambient as GenerativeSound]);
+        audio.setVolume(settings.volume);
+        if (useEngine) {
+          const section = sectionFor(ambient as GenerativeSound);
+          // Prefer a piece pre-rendered on the home for an instant start; else
+          // choose one now (learning from ratings) and render on demand.
+          const claimed = claimGenerative(section);
+          let spec: PieceSpec;
+          let preloaded: LoopData | null = null;
+          if (claimed) {
+            spec = claimed.spec;
+            preloaded = claimed.loop;
+          } else {
+            const ratings = await loadRatings();
+            if (cancelled) return;
+            spec = nextSpec(section, ratings);
+          }
+          specRef.current = spec;
+          setSpecLabel(describeSpec(spec));
+          setComposing(true);
+          const engine = new GenerativeEngine();
+          engineRef.current = engine;
+          let ok = false;
+          try {
+            ok = await engine.start(spec, preloaded);
+          } finally {
+            if (!cancelled) setComposing(false);
+          }
           if (cancelled) return;
-          audio.setVolume(settings.volume);
+          if (ok) {
+            engine.setVolume(settings.volume);
+          } else {
+            // Render failed — fall back to a bundled track so it's never silent.
+            await audio.prepare(GENERATIVE_FALLBACK[ambient as GenerativeSound]);
+            if (cancelled) return;
+            audio.setVolume(settings.volume);
+            audio.startAmbient();
+          }
+        } else {
           audio.startAmbient();
         }
-      } else {
-        audio.startAmbient();
+      } catch (e) {
+        // Audio setup failed — let the session run silently but tell the user,
+        // rather than leaving them in unexplained silence.
+        if (!cancelled) setAudioFailed(true);
       }
       startCountdown();
     })();
@@ -424,6 +432,14 @@ export default function SessionScreen() {
         </Animated.View>
 
         <View style={styles.controls}>
+          {audioFailed && (
+            <View style={[styles.audioWarn, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Ionicons name="volume-mute-outline" size={18} color={colors.warning} />
+              <AppText variant="caption" muted style={styles.audioWarnText}>
+                Audio couldn’t start — your session is still running in silence.
+              </AppText>
+            </View>
+          )}
           {useEngine && specLabel && (
             <View style={[styles.nowPlaying, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <View style={styles.nowPlayingText}>
@@ -504,6 +520,16 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     borderWidth: StyleSheet.hairlineWidth,
   },
+  audioWarn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  audioWarnText: { flex: 1, lineHeight: 16 },
   nowPlayingText: { flex: 1, gap: 2 },
   npBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }, // ≥44pt target
   progressTrack: { height: 4, borderRadius: radius.pill, overflow: 'hidden' },
