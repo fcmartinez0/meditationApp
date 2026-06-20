@@ -159,8 +159,6 @@ export interface SessionRecord {
 export interface Settings {
   /** Default session length in minutes. */
   durationMin: number;
-  /** Interval bell every N minutes (0 = off). */
-  intervalMin: number;
   ambient: AmbientSound;
   /** Daily reminder enabled. */
   reminderEnabled: boolean;
@@ -190,7 +188,6 @@ export interface Stats {
 
 export const DEFAULT_SETTINGS: Settings = {
   durationMin: 10,
-  intervalMin: 0,
   ambient: 'none',
   reminderEnabled: false,
   reminderHour: 8,

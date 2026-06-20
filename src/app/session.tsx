@@ -86,7 +86,6 @@ export default function SessionScreen() {
   const specRef = useRef<PieceSpec | null>(null);
   const endAtRef = useRef<number>(Date.now() + totalSec * 1000);
   const startAtRef = useRef<number>(Date.now());
-  const lastBellMarkRef = useRef(0);
   const recordedRef = useRef(false);
 
   const haptic = () => {
@@ -202,32 +201,20 @@ export default function SessionScreen() {
   // The ticking clock — only runs while the session is active.
   useEffect(() => {
     if (phase !== 'running') return;
-    const intervalBell = (elapsedSec: number) => {
-      const intervalSec = settings.intervalMin * 60;
-      if (intervalSec <= 0 || elapsedSec <= 0) return;
-      const mark = Math.floor(elapsedSec / intervalSec);
-      if (mark > lastBellMarkRef.current) {
-        lastBellMarkRef.current = mark;
-        audioRef.current?.ringBell();
-        haptic();
-      }
-    };
     const tick = () => {
       if (useEngine) {
         // Open-ended: count up and never auto-finish.
         const el = Math.max(0, Math.round((Date.now() - startAtRef.current) / 1000));
         setElapsed(el);
-        intervalBell(el);
         return;
       }
       const rem = Math.max(0, Math.round((endAtRef.current - Date.now()) / 1000));
       setRemaining(rem);
-      if (rem > 0) intervalBell(totalSec - rem);
       if (rem <= 0) finish();
     };
     const id = setInterval(tick, 500);
     return () => clearInterval(id);
-  }, [phase, totalSec, settings.intervalMin, finish, useEngine]);
+  }, [phase, totalSec, finish, useEngine]);
 
   const togglePause = () => {
     Haptics.selectionAsync().catch(() => {});

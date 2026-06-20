@@ -21,14 +21,6 @@ import { useAppData } from '@/store/AppData';
 import { radius, spacing } from '@/theme';
 import { CATEGORY_STYLES } from '@/theme/categories';
 
-const INTERVALS = [
-  { value: 0, label: 'Off' },
-  { value: 1, label: '1 min' },
-  { value: 2, label: '2 min' },
-  { value: 5, label: '5 min' },
-  { value: 10, label: '10 min' },
-];
-
 const TIMER_STYLES: { value: TimerStyle; label: string }[] = [
   { value: 'orb', label: 'Breathing orb' },
   { value: 'tide', label: 'Tide' },
@@ -244,37 +236,6 @@ export default function SettingsScreen() {
                   { backgroundColor: selected ? colors.accent : colors.surfaceMuted },
                 ]}>
                 <AppText variant="caption" color={selected ? colors.textOnAccent : colors.text}>
-                  {opt.label}
-                </AppText>
-              </Pressable>
-            );
-          })}
-        </View>
-      </Card>
-
-      <Card style={styles.card}>
-        <AppText variant="label" muted>
-          INTERVAL BELL
-        </AppText>
-        <AppText variant="caption" muted style={{ marginBottom: spacing.sm }}>
-          Ring periodically during a session
-        </AppText>
-        <View style={styles.chipWrap}>
-          {INTERVALS.map((opt) => {
-            const selected = settings.intervalMin === opt.value;
-            return (
-              <Pressable
-                key={opt.value}
-                onPress={() => set({ intervalMin: opt.value })}
-                style={[
-                  styles.intervalChip,
-                  {
-                    backgroundColor: selected ? colors.accent : colors.surfaceMuted,
-                  },
-                ]}>
-                <AppText
-                  variant="caption"
-                  color={selected ? colors.textOnAccent : colors.text}>
                   {opt.label}
                 </AppText>
               </Pressable>

@@ -1,6 +1,6 @@
 /**
  * Thin imperative wrapper around expo-audio for the meditation session:
- * a one-shot bell and a looping ambient bed.
+ * a looping ambient bed.
  */
 
 import {
@@ -11,8 +11,6 @@ import {
 
 import type { AmbientSound, FileSound } from './types';
 import { isGenerative } from './types';
-
-const BELL_SOURCE = require('@/assets/audio/bell.wav');
 
 const AMBIENT_SOURCES: Record<FileSound, number> = {
   rain: require('@/assets/audio/ambient/rain.wav'),
@@ -60,7 +58,6 @@ async function ensureAudioMode() {
 }
 
 export class SessionAudio {
-  private bell: AudioPlayer | null = null;
   private ambient: AudioPlayer | null = null;
   private targetVol = 0.6;
 
@@ -78,24 +75,11 @@ export class SessionAudio {
 
   async prepare(ambient: AmbientSound) {
     await ensureAudioMode();
-    if (!this.bell) {
-      this.bell = createAudioPlayer(BELL_SOURCE);
-    }
     if (ambient !== 'none' && !isGenerative(ambient)) {
       this.ambient = createAudioPlayer(AMBIENT_SOURCES[ambient]);
       this.ambient.loop = true;
       // Start silent so startAmbient() can fade in and avoid a click.
       this.ambient.volume = 0;
-    }
-  }
-
-  ringBell() {
-    if (!this.bell) return;
-    try {
-      this.bell.seekTo(0);
-      this.bell.play();
-    } catch {
-      // ignore transient playback errors
     }
   }
 
@@ -156,12 +140,8 @@ export class SessionAudio {
   /** Release native resources. Call when leaving the session. */
   release() {
     try {
-      this.bell?.remove();
-    } catch {}
-    try {
       this.ambient?.remove();
     } catch {}
-    this.bell = null;
     this.ambient = null;
   }
 }
