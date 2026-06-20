@@ -273,6 +273,19 @@ class Composer {
     if (++this.ops % 16 === 0) await new Promise<void>((r) => setTimeout(r, 0));
   }
 
+  // Micro-timing: nudge a scheduled event by a few ms so grid-locked layers
+  // (arp, comps, melody) feel played by hand rather than quantized. Clamped at 0
+  // so a nudged-early event never schedules at a negative time.
+  private hum(when: number, amt: number): number {
+    return Math.max(0, when + (this.rng() * 2 - 1) * amt);
+  }
+
+  // Velocity: gentle per-note level variation around a base, for a human,
+  // breathing dynamic instead of every note hitting at exactly the same volume.
+  private vel(base: number, range = 0.3): number {
+    return base * (1 - range / 2 + this.rng() * range);
+  }
+
   private build(): void {
     const { ctx, spec } = this;
     const sustained = spec.instrument === 'pad' || spec.instrument === 'choir';
@@ -301,7 +314,12 @@ class Composer {
     delay.connect(delayWet).connect(master);
     const delaySend = ctx.createGain();
     delaySend.gain.value = 1;
-    delaySend.connect(delay);
+    // High-pass the echo input so bass notes don't pile up into a boomy mess in
+    // the feedback line; the echoes stay clear and out of the low end's way.
+    const delayHp = ctx.createBiquadFilter();
+    delayHp.type = 'highpass';
+    delayHp.frequency.value = 200;
+    delaySend.connect(delayHp).connect(delay);
     this.delaySend = delaySend;
 
     // Reverb send (one convolver node — cheap to create; its cost is in the
@@ -312,9 +330,15 @@ class Composer {
     const reverbWet = ctx.createGain();
     reverbWet.gain.value = spec.section === 'rest' ? 0.42 : 0.3;
     convolver.connect(reverbWet).connect(master);
+    // High-pass the reverb input so sub/bass energy doesn't wash the tail into
+    // mud; keeps the space airy and the low end tight (a standard mixing move).
+    const reverbHp = ctx.createBiquadFilter();
+    reverbHp.type = 'highpass';
+    reverbHp.frequency.value = 300;
+    reverbHp.connect(convolver);
     const reverbSend = ctx.createGain();
     reverbSend.gain.value = 1;
-    reverbSend.connect(convolver);
+    reverbSend.connect(reverbHp);
     this.reverbSend = reverbSend;
 
     const pulse = ctx.createGain();
@@ -472,7 +496,7 @@ class Composer {
         const tones = this.chordAt(when);
         const order = this.rng() < 0.5 ? tones : [...tones].reverse();
         order.forEach((m, i) =>
-          this.compNote(when + i * 0.05, midiToFreq(m), spec.instrument, bellWave, i % 2 ? 0.4 : -0.4),
+          this.compNote(this.hum(when + i * 0.05, 0.012), midiToFreq(m), spec.instrument, bellWave, i % 2 ? 0.4 : -0.4),
         );
         await this.breathe();
       }
@@ -482,7 +506,7 @@ class Composer {
     if (spec.chimeDensity > 0.02) {
       let when = 3 + this.rng() * 16;
       while (when < renderLen) {
-        if (this.rng() < arc(when)) this.playChime(when);
+        if (this.rng() < arc(when)) this.playChime(this.hum(when, 0.02));
         when += (8 + this.rng() * 16) / Math.max(0.05, spec.chimeDensity);
         await this.breathe();
       }
@@ -491,12 +515,15 @@ class Composer {
     // Steady arp + percussion grid.
     if (spec.arp || spec.percussion !== 'none') {
       const stepDur = 60 / spec.tempo / 4;
+      // A little swing on the groovier Flow pieces delays the off-16ths so the
+      // arp lilts instead of marching; Rest stays dead straight and still.
+      const swing = spec.section === 'chill' ? stepDur * 0.16 : 0;
       let s = 0;
       for (let when = 0; when < renderLen; when += stepDur, s++) {
         this.chordTones = this.chordAt(when);
         const st = s % 16;
         if (spec.percussion !== 'none') this.triggerPercussion(st, when);
-        if (spec.arp && this.rng() < arc(when)) this.triggerArp(st, when);
+        if (spec.arp && this.rng() < arc(when)) this.triggerArp(st, when + (st % 2 ? swing : 0));
         await this.breathe();
       }
     }
@@ -601,7 +628,8 @@ class Composer {
     const midi = this.chordTones[deg] + 12;
     const pan = this.arpIdx % 2 === 0 ? -0.6 : 0.6;
     this.arpIdx++;
-    this.arpNote(when, midiToFreq(midi), pan, this.spec.section === 'rest' ? 0.05 : 0.08);
+    const base = this.spec.section === 'rest' ? 0.05 : 0.08;
+    this.arpNote(this.hum(when, 0.008), midiToFreq(midi), pan, this.vel(base));
   }
 
   private softKick(when: number, gain: number): void {
@@ -700,7 +728,7 @@ class Composer {
           last && isAnswer && tones.length
             ? tones[Math.floor(this.rng() * tones.length)] + 12 // resolve the answer
             : spec.root + deg(degIdx) + 12;
-        this.leadNote(t, midiToFreq(midi), len * (0.8 + this.rng() * 0.6), this.rng() * 0.4 - 0.2, gain);
+        this.leadNote(this.hum(t, 0.014), midiToFreq(midi), len * (0.8 + this.rng() * 0.6), this.rng() * 0.4 - 0.2, this.vel(gain));
         t += len;
       }
       degIdx += invert ? -motif[i] : motif[i];
@@ -765,7 +793,7 @@ class Composer {
     }
     const g = ctx.createGain();
     g.gain.setValueAtTime(0.0001, when);
-    g.gain.exponentialRampToValueAtTime(0.1, when + 0.006);
+    g.gain.exponentialRampToValueAtTime(this.vel(0.1), when + 0.006);
     g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
     const p = ctx.createStereoPanner();
     p.pan.value = pan;
@@ -788,7 +816,7 @@ class Composer {
     osc.frequency.value = midiToFreq(midi);
     const g = ctx.createGain();
     g.gain.setValueAtTime(0.0001, when);
-    g.gain.exponentialRampToValueAtTime(0.06, when + 0.02);
+    g.gain.exponentialRampToValueAtTime(this.vel(0.06), when + 0.02);
     g.gain.exponentialRampToValueAtTime(0.0001, when + 3);
     const pan = ctx.createStereoPanner();
     pan.pan.value = this.rng() * 2 - 1;
