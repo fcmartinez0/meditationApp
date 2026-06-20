@@ -14,13 +14,21 @@ interface AppTextProps extends TextProps {
   center?: boolean;
 }
 
-const VARIANTS: Record<Variant, { fontSize: number; fontWeight: TextProps['style'] extends never ? never : any; letterSpacing?: number }> = {
-  display: { fontSize: fontSize.display, fontWeight: '200', letterSpacing: 1 },
-  title: { fontSize: fontSize.xxl, fontWeight: '700' },
-  heading: { fontSize: fontSize.lg, fontWeight: '600' },
-  body: { fontSize: fontSize.md, fontWeight: '400' },
-  label: { fontSize: fontSize.sm, fontWeight: '600', letterSpacing: 0.5 },
-  caption: { fontSize: fontSize.xs, fontWeight: '500' },
+const VARIANTS: Record<
+  Variant,
+  { fontSize: number; fontWeight: TextProps['style'] extends never ? never : any; letterSpacing?: number; maxScale: number }
+> = {
+  // maxScale honors iOS/Android Dynamic Type for readability while capping how
+  // far each variant can grow, so large accessibility text sizes don't overflow
+  // and break the layout. Big display/title text caps tighter (it's already
+  // huge, e.g. the 52–76px session clock); body/caption scale further since
+  // that's where extra legibility matters most for low-vision users.
+  display: { fontSize: fontSize.display, fontWeight: '200', letterSpacing: 1, maxScale: 1.3 },
+  title: { fontSize: fontSize.xxl, fontWeight: '700', maxScale: 1.4 },
+  heading: { fontSize: fontSize.lg, fontWeight: '600', maxScale: 1.5 },
+  body: { fontSize: fontSize.md, fontWeight: '400', maxScale: 1.8 },
+  label: { fontSize: fontSize.sm, fontWeight: '600', letterSpacing: 0.5, maxScale: 1.6 },
+  caption: { fontSize: fontSize.xs, fontWeight: '500', maxScale: 1.8 },
 };
 
 export function AppText({
@@ -36,8 +44,10 @@ export function AppText({
   return (
     <Text
       // Section/screen titles act as headers so VoiceOver can navigate by them.
-      // Callers can still override via props (spread after this).
+      // maxFontSizeMultiplier caps Dynamic Type growth per variant. Both are set
+      // before {...rest} so callers can still override either.
       accessibilityRole={variant === 'title' || variant === 'heading' ? 'header' : undefined}
+      maxFontSizeMultiplier={v.maxScale}
       {...rest}
       style={[
         {
