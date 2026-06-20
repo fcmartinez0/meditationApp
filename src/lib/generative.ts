@@ -145,11 +145,24 @@ function leadVoices(prev: number[], chordMidi: number[], count: number, root: nu
   return out;
 }
 
-// Gentle tanh soft-clip for master "glue" and warmth — applied in JS to the
-// rendered samples (stands in for the DynamicsCompressor that isn't available
-// natively, and tames stray peaks without any native nodes).
+// Gentle tanh soft-clip for the crossfade-fold safety net — applied in JS only
+// to stray peaks that the fold's summing can create after the render.
 function softClip(x: number): number {
   return Math.tanh(1.5 * x);
+}
+
+// A gentle tanh saturation curve for the master "glue": adds subtle analog
+// warmth and rounds off peaks the way a mix-bus compressor would, baked into the
+// off-thread render as one WaveShaper node. Near-linear at low levels, so it
+// only colours the sound as the mix gets loud, never obviously distorting.
+function makeSaturationCurve(amount = 1.6, n = 1024): Float32Array {
+  const curve = new Float32Array(n);
+  const k = Math.tanh(amount);
+  for (let i = 0; i < n; i++) {
+    const x = (i / (n - 1)) * 2 - 1;
+    curve[i] = Math.tanh(amount * x) / k;
+  }
+  return curve;
 }
 
 function makeWave(ctx: OfflineAudioContext, kind: string): PeriodicWave | null {
@@ -298,7 +311,13 @@ class Composer {
     air.type = 'highshelf';
     air.frequency.value = 6500;
     air.gain.value = 4;
-    master.connect(air).connect(ctx.destination);
+    // Master glue: a gentle tanh saturator on the sum for warmth and cohesion,
+    // and to round off peaks (the native engine has no compressor). 2x oversample
+    // keeps the added harmonics from aliasing on bright material.
+    const glue = ctx.createWaveShaper();
+    glue.curve = makeSaturationCurve();
+    glue.oversample = '2x';
+    master.connect(glue).connect(air).connect(ctx.destination);
 
     // Tempo-synced feedback delay.
     const delay = ctx.createDelay(2);
