@@ -357,8 +357,8 @@ export default function SessionScreen() {
                   />
                   <AppText variant="caption" muted>
                     {rated > 0
-                      ? "Noted — I'll lean this way next time."
-                      : "Got it — I'll try something different."}
+                      ? "Got it. I'll lean this way next time."
+                      : "Okay, I'll try something different next time."}
                   </AppText>
                 </View>
               )}
@@ -396,9 +396,9 @@ export default function SessionScreen() {
           <View style={[styles.tip, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Ionicons name="heart" size={20} color={cat.accent} />
             <AppText variant="caption" muted style={styles.tipText}>
-              Tap the <AppText variant="caption" color={cat.accent}>♥</AppText> on a piece you enjoy and{' '}
-              <AppText variant="caption" color={cat.accent}>shuffle</AppText> for a new one — your
-              generative music quietly learns what you love.
+              Tap the <AppText variant="caption" color={cat.accent}>♥</AppText> on a piece you love, or{' '}
+              <AppText variant="caption" color={cat.accent}>shuffle</AppText> for a new one. Your music
+              quietly learns your taste over time.
             </AppText>
           </View>
         </SafeAreaView>
@@ -470,7 +470,7 @@ export default function SessionScreen() {
             <View style={[styles.audioWarn, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <Ionicons name="volume-mute-outline" size={18} color={colors.warning} />
               <AppText variant="caption" muted style={styles.audioWarnText}>
-                Audio couldn’t start — your session is still running in silence.
+                Audio couldn’t start, but your session is still running in silence.
               </AppText>
             </View>
           )}

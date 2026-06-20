@@ -253,10 +253,10 @@ export default function SettingsScreen() {
             What the live music has learned from your likes.
           </AppText>
         </View>
-        <Row label="Rest" hint={restTaste ?? 'No ratings yet — like a Rest piece to begin.'}>
+        <Row label="Rest" hint={restTaste ?? 'No ratings yet. Like a Rest piece to get started.'}>
           <Ionicons name="sparkles" size={18} color={CATEGORY_STYLES.generative.accent} />
         </Row>
-        <Row label="Flow" hint={chillTaste ?? 'No ratings yet — like a Flow piece to begin.'}>
+        <Row label="Flow" hint={chillTaste ?? 'No ratings yet. Like a Flow piece to get started.'}>
           <Ionicons name="infinite" size={18} color={CATEGORY_STYLES.generative.accent} />
         </Row>
         {(restTaste || chillTaste) && (
