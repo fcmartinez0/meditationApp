@@ -11,7 +11,8 @@ import { spacing } from '@/theme';
 // A peer-reviewed meta-analysis of binaural beats (Garcia-Argibay, Santed &
 // Reales, 2019, Psychological Research). Linked from the wellness disclaimer so
 // the claims are honest and the curious can read the evidence for themselves.
-const STUDY_URL = 'https://link.springer.com/article/10.1007/s00426-018-1066-8';
+// Points to the free PubMed abstract rather than the paywalled publisher page.
+const STUDY_URL = 'https://pubmed.ncbi.nlm.nih.gov/30073406/';
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
