@@ -860,12 +860,19 @@ class Composer {
 }
 
 /**
- * Equal-power crossfade-fold a rendered buffer into a seamless loop. Runs on the
- * JS thread (no native nodes), so it yields between chunks: a full-length pass of
- * per-sample soft-clip would otherwise block the UI for a noticeable beat right
- * as the "Composing" screen hands off to playback. Only samples that actually
- * approach clipping pay for the tanh; the rest pass through untouched.
+ * Equal-power crossfade-fold a rendered buffer into a seamless loop, then
+ * normalize it to a consistent loudness so pieces don't jump in volume from one
+ * to the next. Runs on the JS thread (no native nodes), so it yields between
+ * chunks: a full-length pass would otherwise block the UI for a noticeable beat
+ * right as the "Composing" screen hands off to playback. Only samples that
+ * actually approach clipping pay for the tanh; the rest pass through untouched.
  */
+// Target loudness (RMS) and a hard peak ceiling. RMS targeting gives consistent
+// *perceived* level (a lone loud transient won't drag the whole piece down the
+// way peak-only normalization does), and the ceiling guarantees no clipping.
+const TARGET_RMS = 0.15;
+const PEAK_CEILING = 0.95;
+
 async function foldLoop(
   rendered: AudioBuffer,
   loopSamples: number,
@@ -873,6 +880,9 @@ async function foldLoop(
 ): Promise<Float32Array[]> {
   const out: Float32Array[] = [];
   const CHUNK = 65536; // yield roughly every ~2 s of samples
+  let sumSquares = 0;
+  let sampleCount = 0;
+  let peak = 0;
   for (let c = 0; c < rendered.numberOfChannels; c++) {
     const src = rendered.getChannelData(c);
     const dst = new Float32Array(loopSamples);
@@ -882,16 +892,41 @@ async function foldLoop(
       const t = i / xfSamples;
       dst[i] = src[i] * Math.sqrt(t) + src[loopSamples + i] * Math.sqrt(1 - t);
     }
-    // Master glue: gentle soft-clip, chunked so the UI thread can breathe.
+    // Safety soft-clip stray fold peaks, and measure level for normalization.
     for (let i = 0; i < loopSamples; i++) {
-      const x = dst[i];
-      if (x > 0.6 || x < -0.6) dst[i] = softClip(x);
+      let x = dst[i];
+      if (x > 0.6 || x < -0.6) {
+        x = softClip(x);
+        dst[i] = x;
+      }
+      const a = x < 0 ? -x : x;
+      if (a > peak) peak = a;
+      sumSquares += x * x;
+      sampleCount++;
       if (i > 0 && i % CHUNK === 0) {
         // eslint-disable-next-line no-await-in-loop
         await new Promise<void>((r) => setTimeout(r, 0));
       }
     }
     out.push(dst);
+  }
+
+  // Normalize toward a steady loudness, clamped so we never wildly boost a near-
+  // silent piece, then pulled under the peak ceiling so it can't clip.
+  const rms = Math.sqrt(sumSquares / Math.max(1, sampleCount));
+  let gain = rms > 1e-5 ? TARGET_RMS / rms : 1;
+  gain = Math.max(0.6, Math.min(2.2, gain));
+  if (peak * gain > PEAK_CEILING) gain = peak > 1e-5 ? PEAK_CEILING / peak : gain;
+  if (Math.abs(gain - 1) > 0.02) {
+    for (const dst of out) {
+      for (let i = 0; i < dst.length; i++) {
+        dst[i] *= gain;
+        if (i > 0 && i % CHUNK === 0) {
+          // eslint-disable-next-line no-await-in-loop
+          await new Promise<void>((r) => setTimeout(r, 0));
+        }
+      }
+    }
   }
   return out;
 }
