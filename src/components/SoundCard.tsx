@@ -26,7 +26,7 @@ export function SoundCard({
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={item.label}
+      accessibilityLabel={item.hint ? `${item.label}. ${item.hint}` : item.label}
       accessibilityState={{ selected }}
       style={({ pressed }) => [styles.card, { transform: [{ scale: pressed ? 0.97 : 1 }] }]}>
       <LinearGradient

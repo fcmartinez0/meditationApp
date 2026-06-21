@@ -88,7 +88,7 @@ export function DurationPicker({
         <View style={[styles.sheet, { backgroundColor: colors.surface, paddingBottom: insets.bottom + spacing.lg }]}>
           <View style={styles.header}>
             <AppText variant="heading">Session length · {current} min</AppText>
-            <Pressable onPress={commitAndClose} hitSlop={12}>
+            <Pressable onPress={commitAndClose} hitSlop={12} accessibilityRole="button" accessibilityLabel="Done">
               <AppText variant="body" color={colors.accent}>
                 Done
               </AppText>
@@ -108,7 +108,13 @@ export function DurationPicker({
               onScrollEndDrag={onSettle}
               contentContainerStyle={{ paddingVertical: PAD }}>
               {VALUES.map((v) => (
-                <Pressable key={v} style={styles.item} onPress={() => selectValue(v)}>
+                <Pressable
+                  key={v}
+                  style={styles.item}
+                  onPress={() => selectValue(v)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${v} minute${v === 1 ? '' : 's'}`}
+                  accessibilityState={{ selected: v === current }}>
                   <AppText
                     variant="title"
                     color={v === current ? colors.text : colors.textSecondary}
