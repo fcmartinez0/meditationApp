@@ -65,6 +65,21 @@ export class SessionAudio {
   private targetVol = 0.6;
   private mixWithMusic = false;
   private lockTitle: string | null = null;
+  private statusSub: ReturnType<AudioPlayer['addListener']> | null = null;
+  private onPlaying?: (playing: boolean) => void;
+  private lastPlaying: boolean | null = null;
+  // Only forward transport changes once we've actually started playing, so the
+  // player's initial "not playing" status can't trip a spurious pause at startup.
+  private emitStatus = false;
+
+  /**
+   * Notify when playback is toggled from *outside* the app (the lock screen /
+   * control center), so the session UI can mirror a pause/resume it didn't
+   * initiate. Deduped to real play/paused transitions.
+   */
+  setOnPlayingChange(cb: (playing: boolean) => void) {
+    this.onPlaying = cb;
+  }
 
   /** Set the background volume (0..1). */
   setVolume(v: number) {
@@ -87,6 +102,13 @@ export class SessionAudio {
       this.ambient.loop = true;
       // Start silent so startAmbient() can fade in and avoid a click.
       this.ambient.volume = 0;
+      // Mirror external (lock-screen) play/pause back to the session UI.
+      this.statusSub = this.ambient.addListener('playbackStatusUpdate', (status) => {
+        const playing = !!status.playing;
+        if (this.lastPlaying === playing) return;
+        this.lastPlaying = playing;
+        if (this.emitStatus) this.onPlaying?.(playing);
+      });
     }
   }
 
@@ -95,6 +117,10 @@ export class SessionAudio {
     const player = this.ambient;
     if (!player) return;
     player.play();
+    // We know we're playing now; baseline the state and start forwarding any
+    // later external (lock-screen) transport changes.
+    this.lastPlaying = true;
+    this.emitStatus = true;
     // Show lock-screen / control-center playback info, but only when we own the
     // audio session (the API requires it). Best-effort: never let it break audio.
     if (!this.mixWithMusic) {
@@ -159,6 +185,11 @@ export class SessionAudio {
 
   /** Release native resources. Call when leaving the session. */
   release() {
+    this.onPlaying = undefined;
+    try {
+      this.statusSub?.remove();
+    } catch {}
+    this.statusSub = null;
     try {
       this.ambient?.clearLockScreenControls();
     } catch {}

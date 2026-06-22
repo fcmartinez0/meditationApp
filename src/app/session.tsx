@@ -88,6 +88,20 @@ export default function SessionScreen() {
   const endAtRef = useRef<number>(Date.now() + totalSec * 1000);
   const startAtRef = useRef<number>(Date.now());
   const recordedRef = useRef(false);
+  // Mirrors for the lock-screen sync listener, which is set up once and must read
+  // current values without a stale closure.
+  const phaseRef = useRef<Phase>(phase);
+  const remainingRef = useRef(remaining);
+  const elapsedRef = useRef(elapsed);
+  useEffect(() => {
+    phaseRef.current = phase;
+  }, [phase]);
+  useEffect(() => {
+    remainingRef.current = remaining;
+  }, [remaining]);
+  useEffect(() => {
+    elapsedRef.current = elapsed;
+  }, [elapsed]);
 
   const haptic = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
@@ -114,6 +128,20 @@ export default function SessionScreen() {
     const audio = new SessionAudio();
     audioRef.current = audio;
     let cancelled = false;
+    // Mirror a pause/resume triggered from the lock screen or control center
+    // (file-based sounds only) back into the session UI and its clocks.
+    audio.setOnPlayingChange((playing) => {
+      if (cancelled) return;
+      const cur = phaseRef.current;
+      if (playing && cur === 'paused') {
+        const now = Date.now();
+        endAtRef.current = now + remainingRef.current * 1000; // countdown resume
+        startAtRef.current = now - elapsedRef.current * 1000; // count-up resume
+        setPhase('running');
+      } else if (!playing && cur === 'running') {
+        setPhase('paused');
+      }
+    });
     // Start the timer only once audio is ready, so the render doesn't eat into
     // the session.
     const startCountdown = () => {

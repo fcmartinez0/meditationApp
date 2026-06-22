@@ -95,6 +95,9 @@ export class SessionAudio {
   private ambientGain: GainNode | null = null;
   private targetVol = TARGET_VOLUME;
 
+  // No external transport (lock screen) on web; accepted for API parity.
+  setOnPlayingChange(_cb: (playing: boolean) => void) {}
+
   /** Set the background volume (0..1). */
   setVolume(v: number) {
     this.targetVol = TARGET_VOLUME * Math.max(0, Math.min(1, v));
