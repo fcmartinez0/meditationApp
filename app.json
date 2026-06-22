@@ -49,7 +49,13 @@
     },
     "plugins": [
       "expo-router",
-      "expo-audio",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ],
       [
         "expo-notifications",
         {
@@ -69,18 +75,17 @@
         {
           "backgroundColor": "#5B6CF0",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 120,
+          "imageWidth": 200,
           "android": {
             "image": "./assets/images/splash-icon.png",
-            "imageWidth": 100
+            "imageWidth": 180
           }
         }
       ]
     ],
     "experiments": {
       "typedRoutes": true,
-      "reactCompiler": true,
-      "baseUrl": "/meditationApp"
+      "reactCompiler": true
     }
   }
 }
