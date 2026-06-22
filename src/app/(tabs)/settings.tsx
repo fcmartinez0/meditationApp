@@ -11,6 +11,7 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { formatTime } from '@/lib/date';
 import {
   cancelDailyReminder,
+  getPermissionGranted,
   NOTIFICATIONS_SUPPORTED,
   requestPermission,
   scheduleDailyReminder,
@@ -58,17 +59,28 @@ export default function SettingsScreen() {
     void updateSettings(patch);
   };
 
-  // Refresh learned-taste summaries whenever the screen comes into focus.
+  // Refresh learned-taste summaries whenever the screen comes into focus, and
+  // reconcile the reminder toggle with the OS: if the user revoked notification
+  // permission in system settings, flip our stored flag off and cancel the
+  // schedule so the UI never claims a reminder is on while nothing will fire.
   useFocusEffect(
     useCallback(() => {
       let active = true;
       void loadRatings().then((r) => {
         if (active) setRatings(r);
       });
+      if (NOTIFICATIONS_SUPPORTED && settings.reminderEnabled) {
+        void getPermissionGranted().then((granted) => {
+          if (active && !granted) {
+            void cancelDailyReminder();
+            void updateSettings({ reminderEnabled: false });
+          }
+        });
+      }
       return () => {
         active = false;
       };
-    }, []),
+    }, [settings.reminderEnabled, updateSettings]),
   );
 
   const restTaste = summarizePreference('rest', ratings);
