@@ -63,6 +63,8 @@ async function ensureAudioMode(mixWithMusic: boolean) {
 export class SessionAudio {
   private ambient: AudioPlayer | null = null;
   private targetVol = 0.6;
+  private mixWithMusic = false;
+  private lockTitle: string | null = null;
 
   /** Set the background volume (0..1). */
   setVolume(v: number) {
@@ -76,7 +78,9 @@ export class SessionAudio {
     }
   }
 
-  async prepare(ambient: AmbientSound, mixWithMusic = false) {
+  async prepare(ambient: AmbientSound, mixWithMusic = false, lockScreenTitle?: string) {
+    this.mixWithMusic = mixWithMusic;
+    this.lockTitle = lockScreenTitle ?? null;
     await ensureAudioMode(mixWithMusic);
     if (ambient !== 'none' && !isGenerative(ambient)) {
       this.ambient = createAudioPlayer(AMBIENT_SOURCES[ambient]);
@@ -91,6 +95,19 @@ export class SessionAudio {
     const player = this.ambient;
     if (!player) return;
     player.play();
+    // Show lock-screen / control-center playback info, but only when we own the
+    // audio session (the API requires it). Best-effort: never let it break audio.
+    if (!this.mixWithMusic) {
+      try {
+        player.setActiveForLockScreen(
+          true,
+          { title: this.lockTitle ?? 'Stillness', artist: 'Stillness' },
+          { isLiveStream: true, showSeekForward: false, showSeekBackward: false },
+        );
+      } catch {
+        // Lock-screen controls are a bonus; ignore if unavailable.
+      }
+    }
     void (async () => {
       const steps = 8;
       const target = this.targetVol;
@@ -142,6 +159,9 @@ export class SessionAudio {
 
   /** Release native resources. Call when leaving the session. */
   release() {
+    try {
+      this.ambient?.clearLockScreenControls();
+    } catch {}
     try {
       this.ambient?.remove();
     } catch {}

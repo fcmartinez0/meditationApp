@@ -14,6 +14,7 @@ import { BreathingOrb } from '@/components/BreathingOrb';
 import { TideTimer } from '@/components/TideTimer';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { SessionAudio } from '@/lib/audio';
+import { soundMeta } from '@/lib/catalog';
 import { dayKey, formatClock } from '@/lib/date';
 import { GENERATIVE_SUPPORTED, GenerativeEngine, takeGenerative, type LoopData } from '@/lib/generative';
 import { describeSpec, loadRatings, nextSpec, recordRating } from '@/lib/preferences';
@@ -126,7 +127,7 @@ export default function SessionScreen() {
     };
     (async () => {
       try {
-        await audio.prepare(effectiveAmbient, settings.mixWithMusic);
+        await audio.prepare(effectiveAmbient, settings.mixWithMusic, soundMeta(ambient).label);
         if (cancelled) return;
         audio.setVolume(settings.volume);
         if (useEngine) {
@@ -163,7 +164,7 @@ export default function SessionScreen() {
             engine.setVolume(settings.volume);
           } else {
             // Render failed — fall back to a bundled track so it's never silent.
-            await audio.prepare(GENERATIVE_FALLBACK[ambient as GenerativeSound], settings.mixWithMusic);
+            await audio.prepare(GENERATIVE_FALLBACK[ambient as GenerativeSound], settings.mixWithMusic, soundMeta(ambient).label);
             if (cancelled) return;
             audio.setVolume(settings.volume);
             audio.startAmbient();

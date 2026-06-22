@@ -108,9 +108,9 @@ export class SessionAudio {
     }
   }
 
-  // mixWithMusic is honoured natively via the audio session; the browser mixes
-  // by default, so the flag is accepted for API parity and otherwise unused.
-  async prepare(ambient: AmbientSound, _mixWithMusic = false) {
+  // mixWithMusic / lock-screen title are honoured natively; the browser mixes by
+  // default and has no lock screen, so they're accepted for API parity only.
+  async prepare(ambient: AmbientSound, _mixWithMusic = false, _lockScreenTitle?: string) {
     this.ctx = getCtx();
     if (!this.ctx) return;
     if (this.ctx.state === 'suspended') {
