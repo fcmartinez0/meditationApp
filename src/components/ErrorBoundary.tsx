@@ -30,8 +30,12 @@ export class ErrorBoundary extends Component<Props, State> {
     if (this.state.error) {
       return (
         <View style={styles.container}>
-          <Text style={styles.emoji}>🌿</Text>
-          <Text style={styles.title}>Something went wrong</Text>
+          <Text style={styles.emoji} accessibilityElementsHidden importantForAccessibility="no">
+            🌿
+          </Text>
+          <Text style={styles.title} accessibilityRole="header">
+            Something went wrong
+          </Text>
           <Text style={styles.message}>
             The app hit an unexpected error. Your streak and settings are safe.
           </Text>
