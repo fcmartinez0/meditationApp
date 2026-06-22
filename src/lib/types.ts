@@ -167,6 +167,12 @@ export interface Settings {
   reminderMinute: number;
   /** Background sound volume, 0..1. */
   volume: number;
+  /**
+   * When true, Stillness plays *alongside* other audio (so you can layer it over
+   * your own music). When false (default) it takes over the audio session —
+   * pausing other apps, which also enables reliable background/lock-screen use.
+   */
+  mixWithMusic: boolean;
   /** Visual shown during a session. */
   timerStyle: TimerStyle;
   /** Whether the first-run intro has been completed. */
@@ -193,6 +199,7 @@ export const DEFAULT_SETTINGS: Settings = {
   reminderHour: 8,
   reminderMinute: 0,
   volume: 0.85,
+  mixWithMusic: false,
   timerStyle: 'orb',
   onboarded: false,
   settingsVersion: 3,

@@ -39,19 +39,22 @@ const AMBIENT_SOURCES: Record<FileSound, number> = {
   synthwave: require('@/assets/audio/beats/synthwave.wav'),
 };
 
-let configured = false;
+// Track the last-applied mix mode so we re-apply only when it actually changes.
+let appliedMix: boolean | null = null;
 
-async function ensureAudioMode() {
-  if (configured) return;
+async function ensureAudioMode(mixWithMusic: boolean) {
+  if (appliedMix === mixWithMusic) return;
   try {
     await setAudioModeAsync({
       playsInSilentMode: true,
       // Keep playing when the screen locks mid-session (matches the app's
       // background-audio capability), so meditation isn't cut off.
       shouldPlayInBackground: true,
-      interruptionMode: 'mixWithOthers',
+      // Default: take over the session (pause other apps). Opt-in mixing lets
+      // users lay Stillness over their own music.
+      interruptionMode: mixWithMusic ? 'mixWithOthers' : 'doNotMix',
     });
-    configured = true;
+    appliedMix = mixWithMusic;
   } catch {
     // Non-fatal: audio mode just falls back to platform defaults.
   }
@@ -73,8 +76,8 @@ export class SessionAudio {
     }
   }
 
-  async prepare(ambient: AmbientSound) {
-    await ensureAudioMode();
+  async prepare(ambient: AmbientSound, mixWithMusic = false) {
+    await ensureAudioMode(mixWithMusic);
     if (ambient !== 'none' && !isGenerative(ambient)) {
       this.ambient = createAudioPlayer(AMBIENT_SOURCES[ambient]);
       this.ambient.loop = true;

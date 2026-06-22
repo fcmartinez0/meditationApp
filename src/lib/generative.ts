@@ -216,12 +216,14 @@ function getCtx(): AudioContext | null {
   }
 }
 
-function configureSession(): void {
+function configureSession(mixWithMusic: boolean): void {
   try {
     AudioManager.setAudioSessionOptions({
       iosCategory: 'playback',
       iosMode: 'default',
-      iosOptions: ['mixWithOthers'],
+      // Default: take over playback. Opt-in mixing lets the piece sit over the
+      // user's own music instead of pausing it.
+      iosOptions: mixWithMusic ? ['mixWithOthers'] : [],
     });
   } catch {
     /* platform defaults */
@@ -1054,10 +1056,10 @@ export class GenerativeEngine {
    * Returns true once the loop is playing; false on any failure.
    * Pass a pre-rendered `preloaded` loop (from takeGenerative) to start instantly.
    */
-  async start(spec: PieceSpec, preloaded?: LoopData | null): Promise<boolean> {
+  async start(spec: PieceSpec, preloaded?: LoopData | null, mixWithMusic = false): Promise<boolean> {
     this.stopped = false;
     try {
-      configureSession();
+      configureSession(mixWithMusic);
       try {
         await AudioManager.setAudioSessionActivity(true);
       } catch (e) {

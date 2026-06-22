@@ -207,7 +207,7 @@ export class GenerativeEngine {
   private motifRhythm: number[] = [];
   private phraseCount = 0;
 
-  async start(spec: PieceSpec, _preloaded?: unknown): Promise<boolean> {
+  async start(spec: PieceSpec, _preloaded?: unknown, _mixWithMusic = false): Promise<boolean> {
     const ctx = getCtx();
     if (!ctx) return false;
     this.ctx = ctx;

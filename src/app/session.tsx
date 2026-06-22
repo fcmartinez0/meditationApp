@@ -126,7 +126,7 @@ export default function SessionScreen() {
     };
     (async () => {
       try {
-        await audio.prepare(effectiveAmbient);
+        await audio.prepare(effectiveAmbient, settings.mixWithMusic);
         if (cancelled) return;
         audio.setVolume(settings.volume);
         if (useEngine) {
@@ -154,7 +154,7 @@ export default function SessionScreen() {
           engineRef.current = engine;
           let ok = false;
           try {
-            ok = await engine.start(spec, preloaded);
+            ok = await engine.start(spec, preloaded, settings.mixWithMusic);
           } finally {
             if (!cancelled) setComposing(false);
           }
@@ -163,7 +163,7 @@ export default function SessionScreen() {
             engine.setVolume(settings.volume);
           } else {
             // Render failed — fall back to a bundled track so it's never silent.
-            await audio.prepare(GENERATIVE_FALLBACK[ambient as GenerativeSound]);
+            await audio.prepare(GENERATIVE_FALLBACK[ambient as GenerativeSound], settings.mixWithMusic);
             if (cancelled) return;
             audio.setVolume(settings.volume);
             audio.startAmbient();
@@ -287,7 +287,7 @@ export default function SessionScreen() {
       engineRef.current = engine;
       let ok = false;
       try {
-        ok = await engine.start(spec);
+        ok = await engine.start(spec, null, settings.mixWithMusic);
       } finally {
         setComposing(false);
       }

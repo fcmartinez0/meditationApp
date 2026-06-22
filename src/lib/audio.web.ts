@@ -108,7 +108,9 @@ export class SessionAudio {
     }
   }
 
-  async prepare(ambient: AmbientSound) {
+  // mixWithMusic is honoured natively via the audio session; the browser mixes
+  // by default, so the flag is accepted for API parity and otherwise unused.
+  async prepare(ambient: AmbientSound, _mixWithMusic = false) {
     this.ctx = getCtx();
     if (!this.ctx) return;
     if (this.ctx.state === 'suspended') {

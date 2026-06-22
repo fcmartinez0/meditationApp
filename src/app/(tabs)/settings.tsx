@@ -235,6 +235,17 @@ export default function SettingsScreen() {
           </View>
         </Row>
         <View style={[styles.divider, { backgroundColor: colors.border }]} />
+        <Row
+          label="Play over my music"
+          hint="Keep your own music playing underneath, instead of taking over audio">
+          <Switch
+            value={settings.mixWithMusic}
+            onValueChange={(v) => set({ mixWithMusic: v })}
+            trackColor={{ true: colors.accent, false: colors.surfaceMuted }}
+            thumbColor={Platform.OS === 'android' ? colors.surface : undefined}
+          />
+        </Row>
+        <View style={[styles.divider, { backgroundColor: colors.border }]} />
         <AppText variant="body">Session visual</AppText>
         <View style={styles.chipWrap}>
           {TIMER_STYLES.map((opt) => {
