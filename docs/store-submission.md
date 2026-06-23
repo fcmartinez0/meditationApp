@@ -78,9 +78,12 @@ meditation,breathe,sleep,calm,focus,relax,mindfulness,binaural,white noise,timer
 - **4+ / Everyone.** No objectionable content. (See the medical-claim note in the checklist.)
 
 ### Support / marketing URLs
-- **Support URL:** _(required)_ — a contact page or `mailto:fcmartinez0@outlook.com` landing page.
-- **Privacy Policy URL:** _(required)_ — host `public/privacy.html` publicly (your GitHub Pages
-  deploy already serves it).
+Once the GitHub Pages deploy is live (the `deploy-web.yml` workflow publishes `public/`),
+these are your ready-to-use URLs:
+- **Support URL:** `https://fcmartinez0.github.io/meditationApp/support.html`
+- **Privacy Policy URL:** `https://fcmartinez0.github.io/meditationApp/privacy.html`
+
+Both pages live in `public/` and are exported to the Pages site automatically.
 
 ---
 
