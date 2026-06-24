@@ -414,7 +414,7 @@ export default function SessionScreen() {
             <Ionicons name="close" size={26} color={colors.textSecondary} />
           </Pressable>
           <View style={styles.center} pointerEvents="none">
-            <BreathingOrb active core={cat.accent} halo={cat.colors[0]}>
+            <BreathingOrb active core={cat.accent} halo={cat.colors[0]} colors={cat.colors}>
               <Ionicons name="sparkles-outline" size={40} color="#FFFFFF" />
             </BreathingOrb>
             <AppText variant="label" muted style={styles.hint}>
@@ -472,7 +472,7 @@ export default function SessionScreen() {
               {formatClock(clockSeconds)}
             </AppText>
           ) : (
-            <BreathingOrb active={phase === 'running'} core={cat.accent} halo={cat.colors[0]}>
+            <BreathingOrb active={phase === 'running'} core={cat.accent} halo={cat.colors[0]} colors={cat.colors}>
               <AppText
                 variant="display"
                 color="#FFFFFF"
