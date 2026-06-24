@@ -129,7 +129,7 @@ export interface PieceSpec {
 }
 
 /** Number of chord progressions the generative engine can choose from. */
-export const PROGRESSION_COUNT = 8;
+export const PROGRESSION_COUNT = 12;
 
 /** A user rating of a generated piece, used to learn preferences per section. */
 export interface PieceRating {

@@ -27,6 +27,9 @@ const SCALES: Record<string, number[]> = {
   mixolydian: [0, 2, 4, 5, 7, 9, 10],
   phrygian: [0, 1, 3, 5, 7, 8, 10],
   harmonic_minor: [0, 2, 3, 5, 7, 8, 11],
+  major: [0, 2, 4, 5, 7, 9, 11], // bright, open
+  lydian_dominant: [0, 2, 4, 6, 7, 9, 10], // dreamy, floating
+  hirajoshi: [0, 2, 3, 7, 8], // Japanese pentatonic — spacious, meditative
 };
 
 // Four-note chord voicings as scale-degree offsets from the chord root.
@@ -36,6 +39,8 @@ const VOICINGS = [
   [0, 3, 4, 6], // sus4
   [0, 2, 4, 8], // add9
   [0, 4, 6, 8], // open / quartal
+  [0, 4, 8, 10], // wide stacked — spacious
+  [0, 2, 6, 8], // open with 11th colour
 ];
 
 const ARP_PATTERNS = [
@@ -44,6 +49,9 @@ const ARP_PATTERNS = [
   [0, 2, 4, 2, 1, 3, 1, 0],
   [0, 3, 1, 4, 2, 0, 3, 1], // wider leaps
   [4, 3, 2, 1, 0, 1, 2, 3], // descending
+  [0, 2, 4, 6, 4, 2, 0, 2], // arch
+  [0, 4, 1, 5, 2, 6, 3, 0], // wide skips
+  [2, 0, 3, 1, 4, 2, 5, 3], // interleaved climb
 ];
 
 // Chord-root movement as scale-degree sequences (index 0 is a static drone).
@@ -56,6 +64,10 @@ const PROGRESSIONS = [
   [0, 5, 1, 4],
   [0, 6, 4, 5],
   [0, 3, 0, 4],
+  [0, 4, 1, 5], // gentle circle
+  [0, 2, 5, 3],
+  [0, 6, 3, 4],
+  [0, 1, 4, 5],
 ];
 
 function midiToFreq(m: number): number {

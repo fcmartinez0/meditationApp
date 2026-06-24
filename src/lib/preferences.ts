@@ -37,6 +37,9 @@ const SCALES = [
   'mixolydian',
   'phrygian',
   'harmonic_minor',
+  'major',
+  'lydian_dominant',
+  'hirajoshi',
 ] as const;
 
 // Pad timbres only — bell/glass are covered by the 'bells' instrument, so
