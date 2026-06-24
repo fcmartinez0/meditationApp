@@ -59,6 +59,32 @@ const dbToLin = (db) => Math.pow(10, db / 20);
 // tanh soft clip: transparent below the ceiling, gently saturates above it.
 const softClip = (x, ceiling) => ceiling * Math.tanh(x / ceiling);
 
+// Single perceptual-loudness target for every looping sound, so switching
+// between any two of them never jumps in volume. Calibrated for the K-weighting
+// proxy below; the soft limiter catches any peaks the make-up gain creates.
+const LOUDNESS_TARGET_DB = -22;
+
+/**
+ * A rough K-weighting loudness measure (à la ITU-R BS.1770): drop the inaudible
+ * sub, lift the presence range the ear is most sensitive to, then take RMS of
+ * the mono sum. Bright and dark sounds that measure equal here are perceived at
+ * about the same volume — which plain RMS does not capture.
+ */
+function kWeightedRms(channels) {
+  const n = channels[0].length;
+  const mono = new Float32Array(n);
+  for (const ch of channels) for (let i = 0; i < n; i++) mono[i] += ch[i];
+  if (channels.length > 1) for (let i = 0; i < n; i++) mono[i] /= channels.length;
+  const body = highPass(mono, 90); // ignore rumble the ear barely registers
+  const presence = highPass(mono, 1800); // the band a high-shelf would lift
+  let sum = 0;
+  for (let i = 0; i < n; i++) {
+    const s = body[i] + 0.7 * presence[i];
+    sum += s * s;
+  }
+  return Math.sqrt(sum / n);
+}
+
 /**
  * A small mastering chain so every track sits at a similar, full loudness:
  * a linked soft-knee compressor for glue, RMS normalisation to a target, then
@@ -104,11 +130,11 @@ function master(channels, { targetDb = -14, thresholdDb = -18, ratio = 3, air = 
     for (const ch of channels) ch[i] *= g;
   }
 
-  // 2) RMS normalise to the target loudness.
-  let sum = 0;
-  for (const ch of channels) for (let i = 0; i < n; i++) sum += ch[i] * ch[i];
-  const rms = Math.sqrt(sum / (n * channels.length));
-  let makeup = rms > 0 ? Math.min(dbToLin(targetDb) / rms, 12) : 1;
+  // 2) Perceptual-loudness normalise to one shared target (see kWeightedRms),
+  //    so every sound sits at the same apparent volume. Clamped so a very dark
+  //    or very bright sound is nudged, not violently re-gained.
+  const loud = kWeightedRms(channels);
+  let makeup = loud > 0 ? Math.max(0.2, Math.min(2.2, dbToLin(LOUDNESS_TARGET_DB) / loud)) : 1;
 
   // 3) Soft limiter.
   for (const ch of channels) for (let i = 0; i < n; i++) ch[i] = softClip(ch[i] * makeup, 0.97);
@@ -123,8 +149,10 @@ function writeWav(filePath, samples, opts = {}) {
     const a = Math.abs(samples[i]);
     if (a > peak) peak = a;
   }
-  // When mastered, levels are already set; otherwise peak-normalise with headroom.
-  const gain = opts.master === false ? (peak > 0 ? 0.92 / peak : 1) : 1;
+  // When mastered, levels are already set; otherwise peak-normalise to a target
+  // (a one-shot like the bell is set by peak, not loudness — its long decay
+  //  would otherwise fool a mean-square measure into over-boosting the strike).
+  const gain = opts.master === false ? (peak > 0 ? (opts.peak ?? 0.92) / peak : 1) : 1;
 
   const numSamples = samples.length;
   const dataSize = numSamples * 2;
@@ -1434,7 +1462,9 @@ function generateAmbient(kind) {
 
 function buildAll() {
 console.log('Generating audio assets...');
-writeWav(path.join(OUT_DIR, 'bell.wav'), generateBell(), { master: false });
+// Gentle chime: peak-normalise well below full scale so the bell sits as a soft
+// accent over the beds rather than startling (it was the loudest asset before).
+writeWav(path.join(OUT_DIR, 'bell.wav'), generateBell(), { master: false, peak: 0.5 });
 // Nature textures are now stereo for width and depth.
 const rain = generateAmbient('rain');
 writeWavStereo(path.join(AMBIENT_DIR, 'rain.wav'), rain.left, rain.right, { targetDb: -16 });
