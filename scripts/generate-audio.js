@@ -1210,8 +1210,8 @@ function pinkChannel(total, rng) {
  * nicer to fall asleep to — without changing the spectral character.
  */
 function generateBrownNoise() {
-  const loopSamples = 12 * SAMPLE_RATE;
-  const crossSamples = 2 * SAMPLE_RATE;
+  const loopSamples = 20 * SAMPLE_RATE;
+  const crossSamples = 3 * SAMPLE_RATE;
   const total = loopSamples + crossSamples;
   const rng = makeRng(4404);
   return seamlessStereo(brownNoise(total, rng), brownNoise(total, rng), loopSamples, crossSamples);
@@ -1219,8 +1219,8 @@ function generateBrownNoise() {
 
 /** White noise: a bright, even hush (the top of the room). */
 function generateWhiteNoise() {
-  const loopSamples = 12 * SAMPLE_RATE;
-  const crossSamples = 2 * SAMPLE_RATE;
+  const loopSamples = 20 * SAMPLE_RATE;
+  const crossSamples = 3 * SAMPLE_RATE;
   const total = loopSamples + crossSamples;
   const rng = makeRng(4505);
   const L = lowPass(whiteNoise(total, rng), 13000); // tame the very top slightly
@@ -1230,8 +1230,8 @@ function generateWhiteNoise() {
 
 /** Pink noise: equal energy per octave — softer than white (Kellet's filter). */
 function generatePink() {
-  const loopSamples = 12 * SAMPLE_RATE;
-  const crossSamples = 2 * SAMPLE_RATE;
+  const loopSamples = 20 * SAMPLE_RATE;
+  const crossSamples = 3 * SAMPLE_RATE;
   const total = loopSamples + crossSamples;
   const rng = makeRng(4606);
   return seamlessStereo(pinkChannel(total, rng), pinkChannel(total, rng), loopSamples, crossSamples);
