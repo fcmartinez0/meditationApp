@@ -1400,9 +1400,23 @@ function generateAmbient(kind) {
     R = lowPass(R, 6000);
     for (let i = 0; i < total; i++) {
       const t = i / SAMPLE_RATE;
-      // Gentle intensity waves, offset per ear so the rain breathes across you.
-      L[i] *= 0.82 + 0.18 * Math.sin(2 * Math.PI * 0.08 * t);
-      R[i] *= 0.82 + 0.18 * Math.sin(2 * Math.PI * 0.073 * t + 0.7);
+      // Quick per-ear breathing plus a slow macro ebb so the whole shower swells
+      // and eases over the loop instead of sitting at one steady intensity.
+      const macro = 0.9 + 0.1 * Math.sin(2 * Math.PI * 0.02 * t);
+      L[i] *= (0.82 + 0.18 * Math.sin(2 * Math.PI * 0.08 * t)) * macro;
+      R[i] *= (0.82 + 0.18 * Math.sin(2 * Math.PI * 0.073 * t + 0.7)) * macro;
+    }
+    // A soft, distant rumble swelling once or twice across the loop — depth and a
+    // hint of weather, never a startling thunderclap.
+    const rumble = lowPass(brownNoise(total, rng), 110);
+    for (let i = 0; i < total; i++) {
+      const t = i / SAMPLE_RATE;
+      const env =
+        0.5 * Math.exp(-0.5 * Math.pow((t - 6) / 2.2, 2)) +
+        0.4 * Math.exp(-0.5 * Math.pow((t - 15) / 3, 2));
+      const s = rumble[i] * env * 0.5;
+      L[i] += s;
+      R[i] += s;
     }
     return seamlessStereo(L, R, loopSamples, crossSamples);
   }
@@ -1455,6 +1469,45 @@ function generateAmbient(kind) {
         L[k + j] += s * gl;
         R[k + j] += s * gr;
       }
+    }
+  }
+  // Airy wind gusts: a brighter whoosh that swells in and out a few times over
+  // the low bed — wind moving through the canopy.
+  const gustBed = lowPass(highPass(brownNoise(total, rng), 220), 2200);
+  for (const gt of [2.5, 8, 13.5, 18]) {
+    const pan = rng() * 2 - 1;
+    const [gl, gr] = panGains(pan);
+    const dur = 2.4 + rng() * 2.2;
+    const len = Math.floor(dur * SAMPLE_RATE);
+    const start = Math.floor(gt * SAMPLE_RATE);
+    for (let j = 0; j < len && start + j < total; j++) {
+      const win = Math.sin((Math.PI * j) / len); // swell up then down
+      const s = gustBed[start + j] * win * 0.22;
+      L[start + j] += s * gl;
+      R[start + j] += s * gr;
+    }
+  }
+  // A few soft, distant bird calls — sparse FM whistles panned around you.
+  for (const bt of [3.4, 9.1, 16.2]) {
+    const pan = rng() * 2 - 1;
+    const [gl, gr] = panGains(pan);
+    const calls = 2 + Math.floor(rng() * 3); // 2–4 quick tweets per call
+    let tt = bt;
+    for (let c = 0; c < calls; c++) {
+      const f0 = 2600 + rng() * 1500;
+      const sweep = (rng() < 0.5 ? 1 : -1) * (250 + rng() * 600);
+      const dur = 0.06 + rng() * 0.05;
+      const len = Math.floor(dur * SAMPLE_RATE);
+      const start = Math.floor(tt * SAMPLE_RATE);
+      for (let j = 0; j < len && start + j < total; j++) {
+        const p = j / len;
+        const win = Math.sin(Math.PI * p); // soft bell window, no clicks
+        const f = f0 + sweep * p;
+        const s = Math.sin(2 * Math.PI * f * (j / SAMPLE_RATE)) * win * 0.045;
+        L[start + j] += s * gl;
+        R[start + j] += s * gr;
+      }
+      tt += dur + 0.05 + rng() * 0.07; // small gap between tweets
     }
   }
   return seamlessStereo(L, R, loopSamples, crossSamples);
