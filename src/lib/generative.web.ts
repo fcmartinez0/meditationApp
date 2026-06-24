@@ -429,7 +429,12 @@ export class GenerativeEngine {
     // ear, differing by spec.binauralHz, tuned to the root. Straight to master
     // (no filter/reverb) so the beat stays pure. Subtle; needs headphones.
     if (spec.binauralHz > 0) {
-      const carrier = midiToFreq(spec.root);
+      // Lift the carrier into the ~300–600 Hz band where binaural beats are
+      // perceived strongest (the study used a 500 Hz carrier); the musical root
+      // is too low. Octave shifts keep it in tune with the piece. See native.
+      let carrier = midiToFreq(spec.root);
+      while (carrier < 300) carrier *= 2;
+      while (carrier > 600) carrier /= 2;
       for (const [offset, side] of [
         [0, -1],
         [spec.binauralHz, 1],

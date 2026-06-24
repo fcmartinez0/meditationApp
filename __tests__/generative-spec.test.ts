@@ -21,7 +21,7 @@ const SCALES = [
 const WAVES = ['sine', 'triangle', 'warm'];
 const INSTRUMENTS = ['pad', 'choir', 'bells', 'pluck', 'keys'];
 const PERCUSSION = ['none', 'heartbeat', 'pulse', 'shaker', 'broken', 'offbeat', 'tribal'];
-const BAND: Record<Section, number[]> = { rest: [3, 4, 5, 6], chill: [9, 10, 11] };
+const BAND: Record<Section, number[]> = { rest: [3, 4.6, 6], chill: [9, 10, 11] };
 
 function fullSpec(section: Section, overrides: Partial<PieceSpec> = {}): PieceSpec {
   return {
@@ -31,7 +31,7 @@ function fullSpec(section: Section, overrides: Partial<PieceSpec> = {}): PieceSp
     root: section === 'rest' ? 50 : 53,
     brightness: 0.4,
     chordChangeSec: 12,
-    binauralHz: section === 'rest' ? 4 : 10,
+    binauralHz: section === 'rest' ? 6 : 10,
     chimeDensity: 0.1,
     tempo: section === 'rest' ? 60 : 90,
     pulseDepth: 0,

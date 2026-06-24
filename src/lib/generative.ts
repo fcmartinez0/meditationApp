@@ -475,7 +475,14 @@ class Composer {
     // so they blend musically. Routed straight to master (no filter/reverb) so
     // the beat stays pure. Subtle; needs headphones to perceive.
     if (spec.binauralHz > 0) {
-      const carrier = midiToFreq(spec.root);
+      // Binaural beats are perceived most strongly with carriers in roughly the
+      // 300–600 Hz range (the entrainment study used a 500 Hz carrier). The
+      // musical root sits at ~110–230 Hz, too low for a reliable beat — so lift
+      // it by whole octaves until it lands in that band. It stays an octave of
+      // the root, so it still blends in tune, but the entrainment actually lands.
+      let carrier = midiToFreq(spec.root);
+      while (carrier < 300) carrier *= 2;
+      while (carrier > 600) carrier /= 2;
       for (const [offset, side] of [
         [0, -1],
         [spec.binauralHz, 1],

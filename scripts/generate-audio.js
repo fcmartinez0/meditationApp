@@ -13,8 +13,15 @@
  * carriers offset by the beat frequency, so the listener perceives a pulse at
  * that difference (best with headphones). Frequencies are chosen from common
  * brainwave-entrainment associations:
- *   assets/audio/music/calm.wav   – 432 Hz-tuned drone, 7.83 Hz beat (Schumann / theta-alpha, grounding calm)
- *   assets/audio/music/focus.wav  – 256 Hz carrier, 14 Hz beat (low-beta / SMR, alert focus)
+ * Beat frequencies follow the entrainment study referenced in the README
+ * (PMC8636003, "Personalized Theta and Beta Binaural Beats"): theta ~4.6/6 Hz
+ * for relaxation & meditation, beta ~18 Hz for focus & working memory. Carriers
+ * sit in the ~300–500 Hz band where binaural beats are perceived best (the study
+ * used a 500 Hz carrier).
+ *   assets/audio/music/calm.wav   – 432 Hz drone, 7.83 Hz beat (Schumann / theta-alpha, grounding calm)
+ *   assets/audio/music/focus.wav  – 384 Hz carrier, 18 Hz beat (beta — study's focus / working-memory band)
+ *   assets/audio/music/dream.wav  – 396 Hz drone, 6 Hz beat (theta — study's meditative-state beat)
+ *   assets/audio/music/clarity.wav– 240 Hz carrier, 10 Hz beat (alpha, relaxed clear presence)
  *   assets/audio/music/deep.wav   – 144 Hz drone, 3 Hz beat (delta, deep rest / sleep)
  *
  * Beat tracks (STEREO, looping) — original synthesized grooves by genre:
@@ -1377,13 +1384,23 @@ function generateAmbient(kind) {
     // waves roll across the stereo field rather than pumping in mono.
     const L = lowPass(brownNoise(total, rng), 1200);
     const R = lowPass(brownNoise(total, rng), 1200);
+    // Airy "spray" — high-passed noise that only appears at the top of a swell,
+    // so you hear the wave actually break rather than just a rise in rumble.
+    const sprayL = lowPass(highPass(whiteNoise(total, rng), 1400), 7000);
+    const sprayR = lowPass(highPass(whiteNoise(total, rng), 1400), 7000);
     for (let i = 0; i < total; i++) {
       const t = i / SAMPLE_RATE;
       // Asymmetric swell (slow rise, quicker fall) reads more like real surf.
       const baseL = 0.5 + 0.35 * Math.sin(2 * Math.PI * 0.07 * t) + 0.15 * Math.sin(2 * Math.PI * 0.11 * t + 1.3);
       const baseR = 0.5 + 0.35 * Math.sin(2 * Math.PI * 0.07 * t + 0.9) + 0.15 * Math.sin(2 * Math.PI * 0.13 * t);
-      L[i] *= Math.pow(Math.max(0, baseL), 1.3);
-      R[i] *= Math.pow(Math.max(0, baseR), 1.3);
+      const eL = Math.pow(Math.max(0, baseL), 1.3);
+      const eR = Math.pow(Math.max(0, baseR), 1.3);
+      // Crest = the part of the swell above a threshold, shaped so spray rushes
+      // in near the peak and fades as the wave recedes.
+      const crestL = Math.pow(Math.max(0, eL - 0.5), 1.6);
+      const crestR = Math.pow(Math.max(0, eR - 0.5), 1.6);
+      L[i] = L[i] * eL + sprayL[i] * crestL * 0.7;
+      R[i] = R[i] * eR + sprayR[i] * crestR * 0.7;
     }
     return seamlessStereo(L, R, loopSamples, crossSamples);
   }
@@ -1441,7 +1458,7 @@ writeWav(path.join(OUT_DIR, 'purr.wav'), generatePurr());
 
 // Frequency music — binaural-beat pads (stereo).
 const calm = generateMusic({
-  carrierHz: 216, // A3 in 432 Hz tuning
+  carrierHz: 432, // A4, 432 Hz tuning — also in the band where binaural beats land best
   beatHz: 7.83, // Schumann resonance (theta/alpha border) — grounding calm
   partials: [
     { ratio: 1.0, amp: 1.0 },
@@ -1454,8 +1471,8 @@ const calm = generateMusic({
 writeWavStereo(path.join(MUSIC_DIR, 'calm.wav'), calm.left, calm.right, { targetDb: -16 });
 
 const focus = generateMusic({
-  carrierHz: 256, // "scientific" C
-  beatHz: 14, // low-beta / SMR — alert, calm focus
+  carrierHz: 384, // "scientific" G (3× 128) — in the effective binaural carrier band
+  beatHz: 18, // beta — the study's focus/working-memory band (PMC8636003: 18.42 Hz ±2.82)
   partials: [
     { ratio: 1.0, amp: 0.9 },
     { ratio: 1.5, amp: 0.42 }, // a perfect fifth adds brightness
@@ -1480,8 +1497,8 @@ const deep = generateMusic({
 writeWavStereo(path.join(MUSIC_DIR, 'deep.wav'), deep.left, deep.right, { targetDb: -16 });
 
 const dream = generateMusic({
-  carrierHz: 198, // soft low-mid drone
-  beatHz: 6, // theta — dreamy, meditative
+  carrierHz: 396, // soft mid drone (octave up) — lands in the effective binaural band
+  beatHz: 6, // theta — the study's meditative-state beat (PMC8636003 companion finding)
   partials: [
     { ratio: 1.0, amp: 1.0 },
     { ratio: 2.0, amp: 0.3 },
