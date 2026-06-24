@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRef, useState } from 'react';
 import {
   Dimensions,
@@ -22,17 +21,17 @@ const SLIDES: { icon: keyof typeof Ionicons.glyphMap; title: string; body: strin
   {
     icon: 'leaf-outline',
     title: 'Welcome to Stillness',
-    body: 'A calm space to breathe, focus and rest — a few quiet minutes whenever you need them.',
+    body: 'A calm place to breathe, focus, and rest. Just a few quiet minutes, whenever you need them.',
   },
   {
     icon: 'musical-notes-outline',
     title: 'Sound that fits your mood',
-    body: 'Ambient beds, brainwave frequencies, artist-style beats, or music composed live that learns what you like.',
+    body: 'Choose from ambient textures, calming frequencies, and mellow beats, or let it compose music on the spot that slowly learns what you like.',
   },
   {
     icon: 'flame-outline',
     title: 'Build a gentle habit',
-    body: 'Track your streak and minutes, set an optional daily reminder, and let it grow at your pace.',
+    body: 'Keep an eye on your streak and minutes, add a daily reminder if you want one, and let it grow at your own pace.',
   },
 ];
 
@@ -58,7 +57,7 @@ export function Onboarding() {
 
   return (
     <View style={styles.overlay}>
-      <LinearGradient colors={colors.gradient} style={styles.fill}>
+      <View style={[styles.fill, { backgroundColor: colors.background }]}>
         <SafeAreaView style={styles.fill}>
           <Pressable onPress={complete} hitSlop={12} style={styles.skip}>
             <AppText variant="label" muted>
@@ -104,7 +103,7 @@ export function Onboarding() {
             <Button label={index >= SLIDES.length - 1 ? 'Get started' : 'Next'} onPress={next} />
           </View>
         </SafeAreaView>
-      </LinearGradient>
+      </View>
     </View>
   );
 }

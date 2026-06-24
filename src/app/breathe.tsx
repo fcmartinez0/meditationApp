@@ -1,7 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useKeepAwake } from 'expo-keep-awake';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -70,7 +69,7 @@ export default function BreatheScreen() {
   const [patternKey, setPatternKey] = useState<string | null>(null);
 
   return (
-    <LinearGradient colors={colors.gradient} style={styles.fill}>
+    <View style={[styles.fill, { backgroundColor: colors.background }]}>
       <SafeAreaView style={styles.fill} edges={['left', 'right', 'bottom']}>
         <View style={[styles.header, { paddingTop: Math.max(insets.top, 44) + spacing.xs }]}>
           <Pressable
@@ -98,7 +97,6 @@ export default function BreatheScreen() {
                 key={key}
                 onPress={() => setPatternKey(key)}
                 style={[styles.row, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <Ionicons name="ellipse" size={20} color={colors.accent} />
                 <View style={{ flex: 1 }}>
                   <AppText variant="body">{p.label}</AppText>
                   <AppText variant="caption" muted>
@@ -111,7 +109,7 @@ export default function BreatheScreen() {
           </View>
         )}
       </SafeAreaView>
-    </LinearGradient>
+    </View>
   );
 }
 
@@ -177,7 +175,7 @@ function BreathingRunner({ pattern, onEnd }: { pattern: { label: string; phases:
           <AppText variant="heading" color="#FFFFFF">
             {label}
           </AppText>
-          <AppText variant="title" color="#FFFFFF" style={styles.count}>
+          <AppText variant="display" color="#FFFFFF" style={styles.count}>
             {count}
           </AppText>
         </View>
@@ -227,6 +225,6 @@ const styles = StyleSheet.create({
   halo: { position: 'absolute', width: SIZE, height: SIZE, borderRadius: SIZE / 2 },
   circle: { position: 'absolute', width: SIZE, height: SIZE, borderRadius: SIZE / 2, opacity: 0.9 },
   orbCenter: { alignItems: 'center', gap: spacing.xs },
-  count: { fontSize: 40, fontWeight: '200' },
+  count: { fontWeight: '200' },
   runnerFooter: { paddingHorizontal: spacing.xl, gap: spacing.md },
 });

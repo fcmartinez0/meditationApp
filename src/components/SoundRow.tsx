@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
@@ -42,13 +41,9 @@ export function SoundRow({
           transform: [{ scale: pressed ? 0.98 : 1 }],
         },
       ]}>
-      <LinearGradient
-        colors={cat.colors}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.art}>
-        <Ionicons name={item.icon} size={22} color="#FFFFFF" />
-      </LinearGradient>
+      <View style={[styles.art, { backgroundColor: withAlpha(cat.accent, 0.12) }]}>
+        <Ionicons name={item.icon} size={22} color={cat.accent} />
+      </View>
 
       <View style={styles.text}>
         <AppText variant="body" numberOfLines={1} color={selected ? cat.accent : colors.text}>

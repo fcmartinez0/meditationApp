@@ -20,7 +20,7 @@ export const SECTIONS: Section[] = [
   {
     title: 'Generative',
     caption:
-      'Composed live, never the same twice — with a binaural beat woven in. Headphones recommended; it learns what you like.',
+      'Composed live, so it’s never the same twice, with a gentle binaural beat woven in. Best with headphones, and it learns what you like.',
     items: [
       { key: 'gen_rest', label: 'Rest', icon: 'sparkles-outline', hint: 'live ambient · 3–6 Hz deep rest' },
       { key: 'gen_chill', label: 'Flow', icon: 'infinite-outline', hint: 'live groove · 10 Hz alpha' },
@@ -29,18 +29,18 @@ export const SECTIONS: Section[] = [
   {
     title: 'Frequencies',
     caption:
-      'Binaural beats — use headphones for the full effect. A wellness aid, not medical treatment.',
+      'Binaural beats that come through best on headphones. A wellness aid, not a medical treatment.',
     items: [
       { key: 'calm', label: 'Calm', icon: 'heart-outline', hint: '7.83 Hz · grounding (432 Hz tuned)' },
       { key: 'clarity', label: 'Clarity', icon: 'flash-outline', hint: '10 Hz · relaxed, clear presence' },
-      { key: 'focus', label: 'Focus', icon: 'bulb-outline', hint: '14 Hz · alert concentration' },
+      { key: 'focus', label: 'Focus', icon: 'bulb-outline', hint: '18 Hz · beta, alert concentration' },
       { key: 'dream', label: 'Dream', icon: 'cloud-outline', hint: '6 Hz · dreamy & meditative' },
       { key: 'deep', label: 'Deep', icon: 'bed-outline', hint: '3 Hz · deep rest & sleep' },
     ],
   },
   {
     title: 'Beats',
-    caption: 'Instrumental grooves to focus or unwind. Stereo — headphones recommended.',
+    caption: 'Instrumental grooves to focus or unwind. They’re in stereo, so headphones help.',
     items: [
       { key: 'melodic', label: 'Melodic House', icon: 'sunny-outline', hint: '123 BPM · warm & euphoric' },
       { key: 'deephouse', label: 'Deep House', icon: 'moon-outline', hint: '122 BPM · dark & sultry' },

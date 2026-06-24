@@ -1,0 +1,40 @@
+App Store Connect — Notes for Reviewer
+(paste into the "Notes" field when submitting; trim for Google Play if needed)
+
+----------------------------------------------------------------------
+
+Stillness is a sound + breathing app for focus, sleep, and calm.
+
+NO SIGN-IN REQUIRED
+There is no account, login, or server. Open the app and everything is
+immediately available — no demo credentials are needed.
+
+BACKGROUND AUDIO
+The app plays continuous background audio so a session keeps running with the
+screen locked (for sleep and meditation). This is why UIBackgroundModes
+includes "audio".
+
+NO MICROPHONE / NO RECORDING
+All audio is synthesized on-device. The app does not record audio and requests
+no microphone access.
+
+PRIVACY
+No tracking, no analytics, no ads. All data (preferences, streak, history,
+music ratings) stays on the device. Data safety / App Privacy is "Data Not
+Collected." Privacy policy: <PUBLIC_PRIVACY_URL>
+
+NOTIFICATIONS ARE OPTIONAL
+Daily reminders are off by default. Enabling them in Settings triggers the
+standard notification permission prompt. The app is fully functional without
+granting notification permission.
+
+WELLNESS, NOT MEDICAL
+The binaural/frequency tracks are a wellness aid, not a medical treatment, and
+the app states this in-app and in the privacy policy.
+
+Support: <PUBLIC_SUPPORT_URL>
+
+----------------------------------------------------------------------
+Replace the two URLs above once GitHub Pages is live, e.g.:
+  Privacy: https://fcmartinez0.github.io/meditationApp/privacy.html
+  Support: https://fcmartinez0.github.io/meditationApp/support.html

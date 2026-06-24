@@ -12,9 +12,9 @@
 
 import type { PieceSpec, Section } from './types';
 
-// Web synthesizes live and instantly, so there's nothing to pre-render.
+// Web synthesizes live and instantly, so there's nothing to pre-render or take.
 export async function prefetchGenerative(_section: Section): Promise<void> {}
-export function claimGenerative(_section: Section): null {
+export async function takeGenerative(_section: Section): Promise<null> {
   return null;
 }
 
@@ -60,6 +60,63 @@ const PROGRESSIONS = [
 
 function midiToFreq(m: number): number {
   return 440 * Math.pow(2, (m - 69) / 12);
+}
+
+// A short melodic motif: scale-degree steps plus a relative rhythm. Phrases
+// develop it through repetition, transposition and inversion so the lead reads
+// as a composed line rather than a fresh random walk. Returns [steps, rhythm].
+function makeMotif(rng: () => number): [number[], number[]] {
+  const len = 3 + Math.floor(rng() * 3);
+  const steps: number[] = [];
+  const rhythm: number[] = [];
+  for (let i = 0; i < len; i++) {
+    const r = rng();
+    const step = r < 0.55 ? (rng() < 0.5 ? 1 : -1) : r < 0.78 ? 0 : rng() < 0.5 ? 2 : -2;
+    steps.push(step);
+    rhythm.push(rng() < 0.7 ? 1 : rng() < 0.5 ? 0.5 : 2);
+  }
+  return [steps, rhythm];
+}
+
+// Nearest-neighbour voice leading: move each pad voice to the closest tone of
+// the new chord, keeping voices distinct so the chord never collapses. Minimal
+// motion reads as musical part-writing rather than the whole pad lurching to a
+// new root. Returns one MIDI note per voice.
+function leadVoices(prev: number[], chordMidi: number[], count: number, root: number): number[] {
+  if (prev.length < count) {
+    const out: number[] = [];
+    for (let i = 0; i < count; i++) {
+      out.push(chordMidi[i % chordMidi.length] + (i >= chordMidi.length ? 12 : 0));
+    }
+    return out;
+  }
+  const lo = root - 2;
+  const hi = root + 26;
+  const cand: number[] = [];
+  for (const t of chordMidi) {
+    for (let m = t - 24; m <= t + 24; m += 12) {
+      if (m >= lo && m <= hi) cand.push(m);
+    }
+  }
+  const uniq = Array.from(new Set(cand)).sort((a, b) => a - b);
+  const order = prev.map((_, i) => i).sort((a, b) => prev[a] - prev[b]);
+  const used = new Set<number>();
+  const out = new Array<number>(count);
+  for (const i of order) {
+    let best = uniq[0];
+    let bestD = Infinity;
+    for (const c of uniq) {
+      if (used.has(c)) continue;
+      const d = Math.abs(c - prev[i]);
+      if (d < bestD) {
+        bestD = d;
+        best = c;
+      }
+    }
+    used.add(best);
+    out[i] = best;
+  }
+  return out;
 }
 
 // Custom timbres so pieces sound like different instruments, not just a sine pad.
@@ -145,13 +202,18 @@ export class GenerativeEngine {
   private arpPattern: number[] = ARP_PATTERNS[0];
   private arpEvery = 2;
   private voicing: number[] = VOICINGS[0];
+  private voiceMidi: number[] = [];
+  private motif: number[] = [];
+  private motifRhythm: number[] = [];
+  private phraseCount = 0;
 
-  async start(spec: PieceSpec, _preloaded?: unknown): Promise<boolean> {
+  async start(spec: PieceSpec, _preloaded?: unknown, _mixWithMusic = false): Promise<boolean> {
     const ctx = getCtx();
     if (!ctx) return false;
     this.ctx = ctx;
     this.spec = spec;
     this.rng = makeRng(spec.seed);
+    this.voiceMidi = [];
     // Fire-and-forget: do NOT await — resume() can stay pending until a user
     // gesture, which would hang start() and freeze the session. The resume
     // hooks (hookResume) reactivate audio on the next interaction.
@@ -167,6 +229,13 @@ export class GenerativeEngine {
     const master = ctx.createGain();
     master.gain.setValueAtTime(0.0001, now);
     master.gain.exponentialRampToValueAtTime(this.targetGain, now + fadeIn);
+    // A gentle high-shelf adds air without the dark, muffled feel the web build
+    // had before. Kept lower than the native +4 dB because the full-band
+    // oscillators here already carry more top end than the band-limited preview.
+    const air = ctx.createBiquadFilter();
+    air.type = 'highshelf';
+    air.frequency.value = 6500;
+    air.gain.value = 2;
     // Master glue: a gentle compressor for an even, polished level.
     const comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -22;
@@ -174,8 +243,8 @@ export class GenerativeEngine {
     comp.ratio.value = 3;
     comp.attack.value = 0.01;
     comp.release.value = 0.25;
-    master.connect(comp).connect(ctx.destination);
-    this.extras.push(comp);
+    master.connect(air).connect(comp).connect(ctx.destination);
+    this.extras.push(air, comp);
 
     // Tempo-synced feedback delay (dotted-eighth) for space and movement.
     const delay = ctx.createDelay(2);
@@ -191,21 +260,30 @@ export class GenerativeEngine {
     delay.connect(delayWet).connect(master);
     const delaySend = ctx.createGain();
     delaySend.gain.value = 1;
-    delaySend.connect(delay);
+    // High-pass the echo input so bass notes don't pile up in the feedback line.
+    const delayHp = ctx.createBiquadFilter();
+    delayHp.type = 'highpass';
+    delayHp.frequency.value = 200;
+    delaySend.connect(delayHp).connect(delay);
     this.delaySend = delaySend;
-    this.extras.push(delay, delayLp, delayFb, delayWet, delaySend);
+    this.extras.push(delay, delayLp, delayFb, delayWet, delayHp, delaySend);
 
     // Reverb send: a generated impulse gives a lush, spacious tail.
     const convolver = ctx.createConvolver();
     convolver.buffer = this.makeImpulse(ctx, 2.6, 2.6);
     const reverbWet = ctx.createGain();
-    reverbWet.gain.value = spec.section === 'rest' ? 0.4 : 0.28;
+    reverbWet.gain.value = spec.section === 'rest' ? 0.42 : 0.3;
     convolver.connect(reverbWet).connect(master);
+    // High-pass the reverb input so sub/bass energy doesn't wash the tail to mud.
+    const reverbHp = ctx.createBiquadFilter();
+    reverbHp.type = 'highpass';
+    reverbHp.frequency.value = 300;
+    reverbHp.connect(convolver);
     const reverbSend = ctx.createGain();
     reverbSend.gain.value = 1;
-    reverbSend.connect(convolver);
+    reverbSend.connect(reverbHp);
     this.reverbSend = reverbSend;
-    this.extras.push(convolver, reverbWet, reverbSend);
+    this.extras.push(convolver, reverbWet, reverbHp, reverbSend);
 
     const pulse = ctx.createGain();
     pulse.gain.value = 1;
@@ -213,7 +291,11 @@ export class GenerativeEngine {
 
     const filter = ctx.createBiquadFilter();
     filter.type = 'lowpass';
-    const baseCut = 500 + spec.brightness * 3800;
+    // The preview synth is band-limited (~24 harmonics, rolling off near 3-4 kHz)
+    // but the live oscillators here run full-band to Nyquist, so an identical
+    // cutoff over-brightens. Tune the web cutoff to match the preview's
+    // perceived brightness rather than its nominal filter value.
+    const baseCut = 1400 + spec.brightness * 5000;
     filter.frequency.value = baseCut;
     filter.Q.value = 0.4;
     filter.connect(pulse);
@@ -275,20 +357,20 @@ export class GenerativeEngine {
     this.voicing = VOICINGS[Math.floor(this.rng() * VOICINGS.length)];
     this.arpPattern = ARP_PATTERNS[Math.floor(this.rng() * ARP_PATTERNS.length)];
     this.arpEvery = [2, 2, 2, 1, 4][Math.floor(this.rng() * 5)];
+    [this.motif, this.motifRhythm] = makeMotif(this.rng);
+    this.phraseCount = 0;
 
-    const voiceCount = spec.section === 'chill' ? 6 : 5;
+    // Match the native engine / preview density (extra voices just thickened
+    // and muddied the web pad relative to the build the previews come from).
+    const voiceCount = spec.section === 'chill' ? 5 : 4;
 
     if (sustained) {
       // Sustained pad / choir: held oscillators that glide between chords.
       const choir = spec.instrument === 'choir';
       const periodicWave = choir ? null : makeWave(ctx, spec.wave);
-      const oscType: OscillatorType = choir
-        ? 'sawtooth' // airy ensemble
-        : spec.wave === 'warm'
-          ? 'sawtooth'
-          : spec.wave === 'triangle'
-            ? 'triangle'
-            : 'sine';
+      // Triangle (never a pure sine) is the dark-end floor so the pad keeps
+      // some upper harmonics — matches the native engine. Warm/choir use saw.
+      const oscType: OscillatorType = choir || spec.wave === 'warm' ? 'sawtooth' : 'triangle';
       for (let i = 0; i < voiceCount; i++) {
         const osc = ctx.createOscillator();
         if (periodicWave) osc.setPeriodicWave(periodicWave);
@@ -322,7 +404,7 @@ export class GenerativeEngine {
         const tones = this.chordTones;
         const order = this.rng() < 0.5 ? tones : [...tones].reverse();
         order.forEach((m, i) => {
-          this.compNote(when + i * 0.05, midiToFreq(m), spec.instrument, bellWave, i % 2 ? 0.4 : -0.4);
+          this.compNote(this.hum(when + i * 0.05, 0.012), midiToFreq(m), spec.instrument, bellWave, i % 2 ? 0.4 : -0.4);
         });
         this.timers.push(setTimeout(strum, every * 1000));
       };
@@ -347,7 +429,12 @@ export class GenerativeEngine {
     // ear, differing by spec.binauralHz, tuned to the root. Straight to master
     // (no filter/reverb) so the beat stays pure. Subtle; needs headphones.
     if (spec.binauralHz > 0) {
-      const carrier = midiToFreq(spec.root);
+      // Lift the carrier into the ~300–600 Hz band where binaural beats are
+      // perceived strongest (the study used a 500 Hz carrier); the musical root
+      // is too low. Octave shifts keep it in tune with the piece. See native.
+      let carrier = midiToFreq(spec.root);
+      while (carrier < 300) carrier *= 2;
+      while (carrier > 600) carrier /= 2;
       for (const [offset, side] of [
         [0, -1],
         [spec.binauralHz, 1],
@@ -387,13 +474,15 @@ export class GenerativeEngine {
     // Step grid for arp + percussion — the groove builds in after a varied delay.
     if (spec.arp || spec.percussion !== 'none') {
       const stepDur = 60 / spec.tempo / 4;
+      // A little swing on the groovier Flow pieces; Rest stays dead straight.
+      const swing = spec.section === 'chill' ? stepDur * 0.16 : 0;
       const tick = () => {
         const c = this.ctx;
         if (!c) return;
         const when = c.currentTime + 0.06;
         const s = this.step % 16;
         if (spec.percussion !== 'none') this.triggerPercussion(s, when);
-        if (spec.arp) this.triggerArp(s, when);
+        if (spec.arp) this.triggerArp(s, when + (s % 2 ? swing : 0));
         this.step++;
       };
       const grooveEntry = (sustained ? this.rng() * 14 : this.rng() * 8) * 1000;
@@ -430,13 +519,10 @@ export class GenerativeEngine {
     const now = ctx.currentTime;
     const glide = initial ? 2 : 6;
     if (this.voices.length) {
-      // Spread the chord across the sustained voices (with an octave on top).
-      const notes: number[] = [spec.root + chord[0], spec.root + chord[0] + 12];
-      for (let i = 0; i < this.voices.length - 2; i++) {
-        notes.push(spec.root + chord[i % 4] + (i >= 4 ? 12 : 0));
-      }
+      const next = leadVoices(this.voiceMidi, this.chordTones, this.voices.length, spec.root);
+      this.voiceMidi = next;
       this.voices.forEach((v, idx) => {
-        const midi = notes[idx % notes.length];
+        const midi = next[idx];
         // Pad plays in tune; the binaural beat is a dedicated clean layer.
         v.osc.frequency.cancelScheduledValues(now);
         v.osc.frequency.setTargetAtTime(midiToFreq(midi), now, glide / 3);
@@ -451,6 +537,18 @@ export class GenerativeEngine {
       this.bass.osc.frequency.cancelScheduledValues(now);
       this.bass.osc.frequency.setTargetAtTime(midiToFreq(spec.root + chord[0] - 12), now, glide / 3);
     }
+  }
+
+  // Micro-timing: nudge an event a few ms so grid layers feel played, not
+  // quantized. Clamped so a nudged-early note never lands before "now".
+  private hum(when: number, amt: number): number {
+    const floor = this.ctx ? this.ctx.currentTime : 0;
+    return Math.max(floor, when + (this.rng() * 2 - 1) * amt);
+  }
+
+  // Velocity: gentle per-note level variation for a human, breathing dynamic.
+  private vel(base: number, range = 0.3): number {
+    return base * (1 - range / 2 + this.rng() * range);
   }
 
   private triggerPercussion(s: number, when: number): void {
@@ -495,7 +593,8 @@ export class GenerativeEngine {
     const midi = this.chordTones[deg] + 12;
     const pan = this.arpIdx % 2 === 0 ? -0.6 : 0.6;
     this.arpIdx++;
-    this.arpNote(when, midiToFreq(midi), pan, this.spec?.section === 'rest' ? 0.05 : 0.08);
+    const base = this.spec?.section === 'rest' ? 0.05 : 0.08;
+    this.arpNote(this.hum(when, 0.008), midiToFreq(midi), pan, this.vel(base));
   }
 
   private softKick(when: number, gain: number): void {
@@ -573,30 +672,40 @@ export class GenerativeEngine {
     const deg = (x: number) => 12 * Math.floor(x / L) + scale[((x % L) + L) % L];
 
     const beat = 60 / spec.tempo;
-    const noteLen = beat * (this.rng() < 0.5 ? 1 : 0.5);
-    const notes = 3 + Math.floor(this.rng() * 4);
-    const gain = spec.section === 'rest' ? 0.1 : 0.13;
+    const baseLen = beat * (this.rng() < 0.5 ? 1 : 0.5);
+    const gain = spec.section === 'rest' ? 0.08 : 0.1;
     let t = ctx.currentTime + 0.1;
-    let degIdx = L + Math.floor(this.rng() * L); // sit ~an octave above the root
     const start = t;
     const tones = this.chordTones; // resolve the phrase onto the current chord
-    for (let i = 0; i < notes; i++) {
-      const last = i === notes - 1;
-      if (!last && this.rng() < 0.18) {
-        t += noteLen; // a rest
+
+    // Alternate a "call" (ends open) with a "response" (resolves to a chord
+    // tone), developing the motif by exact repeat, transposition or inversion.
+    const isAnswer = this.phraseCount % 2 === 1;
+    const v = this.rng();
+    const invert = v < 0.3;
+    const transpose = v >= 0.3 && v < 0.6 ? (this.rng() < 0.5 ? 2 : -2) : 0;
+    this.phraseCount++;
+
+    const motif = this.motif.length ? this.motif : [1, -1, 1];
+    const rhythm = this.motifRhythm.length ? this.motifRhythm : [1, 1, 1];
+    let degIdx = L + Math.floor(this.rng() * L) + transpose;
+    for (let i = 0; i < motif.length; i++) {
+      const last = i === motif.length - 1;
+      const len = baseLen * rhythm[i];
+      if (!last && this.rng() < 0.12) {
+        t += len; // a breath
       } else {
         const midi =
-          last && tones.length
-            ? tones[Math.floor(this.rng() * tones.length)] + 12 // land on a chord tone
+          last && isAnswer && tones.length
+            ? tones[Math.floor(this.rng() * tones.length)] + 12 // resolve the answer
             : spec.root + deg(degIdx) + 12;
-        this.leadNote(t, midiToFreq(midi), noteLen * (0.8 + this.rng() * 0.7), this.rng() * 0.4 - 0.2, gain);
-        t += noteLen;
+        this.leadNote(this.hum(t, 0.014), midiToFreq(midi), len * (0.8 + this.rng() * 0.6), this.rng() * 0.4 - 0.2, this.vel(gain));
+        t += len;
       }
-      // Mostly stepwise motion for a singable contour; occasional small leap.
-      degIdx += this.rng() < 0.8 ? (this.rng() < 0.5 ? 1 : -1) : this.rng() < 0.5 ? 2 : -2;
+      degIdx += invert ? -motif[i] : motif[i];
       degIdx = Math.max(L - 1, Math.min(2 * L + 2, degIdx));
     }
-    const wait = t - start + (2 + this.rng() * 4); // rest between phrases
+    const wait = t - start + (isAnswer ? 3 + this.rng() * 4 : 1.5 + this.rng() * 1.5);
     this.timers.push(setTimeout(() => this.scheduleMelody(), wait * 1000));
   }
 
@@ -657,7 +766,7 @@ export class GenerativeEngine {
     }
     const g = ctx.createGain();
     g.gain.setValueAtTime(0.0001, when);
-    g.gain.exponentialRampToValueAtTime(0.1, when + 0.006);
+    g.gain.exponentialRampToValueAtTime(this.vel(0.1), when + 0.006);
     g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
     const p = ctx.createStereoPanner();
     p.pan.value = pan;
@@ -682,7 +791,7 @@ export class GenerativeEngine {
     const g = ctx.createGain();
     const now = ctx.currentTime;
     g.gain.setValueAtTime(0.0001, now);
-    g.gain.exponentialRampToValueAtTime(0.09, now + 0.02);
+    g.gain.exponentialRampToValueAtTime(this.vel(0.09), now + 0.02);
     g.gain.exponentialRampToValueAtTime(0.0001, now + 3);
     const pan = ctx.createStereoPanner();
     pan.pan.value = this.rng() * 2 - 1;

@@ -13,8 +13,15 @@
  * carriers offset by the beat frequency, so the listener perceives a pulse at
  * that difference (best with headphones). Frequencies are chosen from common
  * brainwave-entrainment associations:
- *   assets/audio/music/calm.wav   – 432 Hz-tuned drone, 7.83 Hz beat (Schumann / theta-alpha, grounding calm)
- *   assets/audio/music/focus.wav  – 256 Hz carrier, 14 Hz beat (low-beta / SMR, alert focus)
+ * Beat frequencies follow the entrainment study referenced in the README
+ * (PMC8636003, "Personalized Theta and Beta Binaural Beats"): theta ~4.6/6 Hz
+ * for relaxation & meditation, beta ~18 Hz for focus & working memory. Carriers
+ * sit in the ~300–500 Hz band where binaural beats are perceived best (the study
+ * used a 500 Hz carrier).
+ *   assets/audio/music/calm.wav   – 432 Hz drone, 7.83 Hz beat (Schumann / theta-alpha, grounding calm)
+ *   assets/audio/music/focus.wav  – 384 Hz carrier, 18 Hz beat (beta — study's focus / working-memory band)
+ *   assets/audio/music/dream.wav  – 396 Hz drone, 6 Hz beat (theta — study's meditative-state beat)
+ *   assets/audio/music/clarity.wav– 240 Hz carrier, 10 Hz beat (alpha, relaxed clear presence)
  *   assets/audio/music/deep.wav   – 144 Hz drone, 3 Hz beat (delta, deep rest / sleep)
  *
  * Beat tracks (STEREO, looping) — original synthesized grooves by genre:
@@ -58,7 +65,7 @@ const softClip = (x, ceiling) => ceiling * Math.tanh(x / ceiling);
  * a soft limiter. Channels are gain-linked so stereo / binaural imaging (and
  * the binaural beat) is preserved.
  */
-function master(channels, { targetDb = -14, thresholdDb = -18, ratio = 3, air = 0 } = {}) {
+function master(channels, { targetDb = -14, thresholdDb = -18, ratio = 3, air = 0, widen = 1 } = {}) {
   const n = channels[0].length;
   const thr = dbToLin(thresholdDb);
   const atk = Math.exp(-1 / (0.005 * SAMPLE_RATE));
@@ -70,6 +77,19 @@ function master(channels, { targetDb = -14, thresholdDb = -18, ratio = 3, air = 
     for (const ch of channels) {
       const hp = highPass(ch, 7000);
       for (let i = 0; i < n; i++) ch[i] += air * hp[i];
+    }
+  }
+
+  // 0.5) Stereo widening (mid/side): scale the side signal for a wider image.
+  // The mono sum is preserved, so it stays mono-compatible and the bass (which
+  // lives mostly in the centre) is untouched.
+  if (widen !== 1 && channels.length === 2) {
+    const [l, r] = channels;
+    for (let i = 0; i < n; i++) {
+      const m = (l[i] + r[i]) / 2;
+      const s = ((l[i] - r[i]) / 2) * widen;
+      l[i] = m + s;
+      r[i] = m - s;
     }
   }
 
@@ -136,7 +156,8 @@ function writeWav(filePath, samples, opts = {}) {
 
 function writeWavStereo(filePath, left, right, opts = {}) {
   const n = Math.min(left.length, right.length);
-  if (opts.master !== false) master([left, right], { targetDb: opts.targetDb ?? -14, air: opts.air ?? 0 });
+  if (opts.master !== false)
+    master([left, right], { targetDb: opts.targetDb ?? -14, air: opts.air ?? 0, widen: opts.widen ?? 1 });
   // Joint normalization keeps the stereo image balanced.
   let peak = 0;
   for (let i = 0; i < n; i++) {
@@ -940,10 +961,10 @@ function generateTripHop() {
     // Half-time feel: heavy kick on 1, snare on beat 3, sparse swung hats.
     for (let s = 0; s < 16; s++) {
       const p = pos(base + s);
-      if (s === 0) kit.kick(p, { gain: 0.95, pitchStart: 95, pitchEnd: 44, decay: 10 });
-      if (s === 6) kit.kick(p, { gain: 0.5, pitchStart: 90, pitchEnd: 44, decay: 12 });
+      if (s === 0) kit.kick(p, { gain: 0.82, pitchStart: 95, pitchEnd: 44, decay: 10 });
+      if (s === 6) kit.kick(p, { gain: 0.42, pitchStart: 90, pitchEnd: 44, decay: 12 });
       if (s === 8) kit.snare(p, { gain: 0.5, decay: 14, noiseAmt: 0.6, tone: 170, toneAmt: 0.3 });
-      if (s % 4 === 2) kit.hat(p, { gain: 0.08, open: s === 14, pan: s % 8 === 2 ? -0.5 : 0.5 });
+      if (s % 4 === 2) kit.hat(p, { gain: 0.08, open: s === 14, pan: s % 8 === 2 ? -0.7 : 0.7 });
     }
   }
   addFill(kit, pos, (bars - 1) * 16, false);
@@ -978,8 +999,11 @@ function generateSynthwave() {
     const base = bar * 16;
     if (bar % 2 === 0) {
       kit.pad(pos(base), chord.map(midiToFreq), 2 * 16 * stepDur * 0.98, {
-        gain: 0.1, attack: 0.4, release: 0.6, detune: 8, bright: 0.12,
+        gain: 0.1, attack: 0.4, release: 0.6, detune: 12, bright: 0.2,
       });
+      // Shimmer: the chord an octave up, soft and wide, for retro sparkle.
+      const sp = (bar / 2) % 2 ? 0.7 : -0.7;
+      for (const m of chord) kit.key(pos(base + 0), midiToFreq(m + 24), 1.6, { gain: 0.035, decay: 3, pan: sp });
     }
     kit.sub(pos(base + 0), midiToFreq(bassRoots[ci]), stepDur * 8, { gain: 0.5 });
     kit.sub(pos(base + 8), midiToFreq(bassRoots[ci]), stepDur * 6, { gain: 0.42 });
@@ -987,10 +1011,10 @@ function generateSynthwave() {
       const p = pos(base + s);
       if (s % 4 === 0) kit.kick(p, { gain: 0.8, pitchStart: 90, pitchEnd: 46, decay: 13 });
       if (s === 4 || s === 12) kit.clap(p, { gain: 0.18 });
-      if (s % 2 === 0) kit.hat(p, { gain: 0.07, open: s === 14, pan: s % 4 === 0 ? -0.5 : 0.5 });
+      if (s % 2 === 0) kit.hat(p, { gain: 0.07, open: s === 14, pan: s % 4 === 0 ? -0.6 : 0.6 });
       if (s % 2 === 0) {
         const m = chord[arpIdx[(s / 2) % arpIdx.length]] + 12;
-        kit.key(p, midiToFreq(m), 0.42, { gain: 0.08, decay: 5, pan: (s / 2) % 2 ? 0.4 : -0.4 });
+        kit.key(p, midiToFreq(m), 0.42, { gain: 0.08, decay: 5, pan: (s / 2) % 2 ? 0.6 : -0.6 });
       }
     }
   }
@@ -1029,100 +1053,113 @@ function generatePurr() {
 
 /** A babbling stream: bright band-passed water with bubbling amplitude motion. */
 function generateStream() {
-  const loopSamples = 12 * SAMPLE_RATE;
-  const crossSamples = 2 * SAMPLE_RATE;
+  const loopSamples = 20 * SAMPLE_RATE;
+  const crossSamples = 3 * SAMPLE_RATE;
   const total = loopSamples + crossSamples;
   const rng = makeRng(4101);
-  let n = whiteNoise(total, rng);
-  n = highPass(n, 450);
-  n = lowPass(n, 5500);
+  // Decorrelated water per ear so the brook surrounds you instead of sitting in
+  // the middle of your head.
+  let L = lowPass(highPass(whiteNoise(total, rng), 450), 5500);
+  let R = lowPass(highPass(whiteNoise(total, rng), 450), 5500);
   for (let i = 0; i < total; i++) {
     const t = i / SAMPLE_RATE;
-    const bubble =
-      0.55 +
-      0.2 * Math.sin(2 * Math.PI * 3.1 * t) +
-      0.12 * Math.sin(2 * Math.PI * 7.3 * t + 1) +
-      0.13 * Math.sin(2 * Math.PI * 1.6 * t);
-    n[i] *= Math.max(0.2, bubble);
+    const bubbleL =
+      0.55 + 0.2 * Math.sin(2 * Math.PI * 3.1 * t) + 0.12 * Math.sin(2 * Math.PI * 7.3 * t + 1) + 0.13 * Math.sin(2 * Math.PI * 1.6 * t);
+    const bubbleR =
+      0.55 + 0.2 * Math.sin(2 * Math.PI * 2.7 * t + 0.8) + 0.12 * Math.sin(2 * Math.PI * 6.1 * t) + 0.13 * Math.sin(2 * Math.PI * 1.9 * t + 1.4);
+    L[i] *= Math.max(0.2, bubbleL);
+    R[i] *= Math.max(0.2, bubbleR);
   }
-  return makeSeamless(n, loopSamples, crossSamples);
+  // Sparse "plips" — short resonant water blips panned across the field.
+  for (let k = 0; k < total; k++) {
+    if (rng() < 0.0012) {
+      const f = 900 + rng() * 2200;
+      const len = Math.floor((0.01 + rng() * 0.05) * SAMPLE_RATE);
+      const amp = 0.06 + rng() * 0.12;
+      const pan = rng() * 2 - 1;
+      const [gl, gr] = panGains(pan);
+      for (let j = 0; j < len && k + j < total; j++) {
+        const env = Math.exp(-j / (len * 0.35));
+        const s = Math.sin((2 * Math.PI * f * j) / SAMPLE_RATE) * amp * env;
+        L[k + j] += s * gl;
+        R[k + j] += s * gr;
+      }
+    }
+  }
+  return seamlessStereo(L, R, loopSamples, crossSamples);
 }
 
 /** A campfire: a warm low rumble with random crackle pops and a soft hiss. */
 function generateFire() {
-  const loopSamples = 12 * SAMPLE_RATE;
-  const crossSamples = 2 * SAMPLE_RATE;
+  const loopSamples = 20 * SAMPLE_RATE;
+  const crossSamples = 3 * SAMPLE_RATE;
   const total = loopSamples + crossSamples;
   const rng = makeRng(4202);
-  let bed = brownNoise(total, rng);
-  bed = lowPass(bed, 240);
-  const out = new Float32Array(total);
-  for (let i = 0; i < total; i++) out[i] = bed[i] * 0.5 + (rng() * 2 - 1) * 0.04;
-  // Crackle pops: short decaying clicks scattered through the loop.
+  // Shared low rumble stays centred (mono-compatible warmth); the airy hiss is
+  // decorrelated per ear for width.
+  const rumble = lowPass(brownNoise(total, rng), 240);
+  const hissL = lowPass(whiteNoise(total, rng), 5000);
+  const hissR = lowPass(whiteNoise(total, rng), 5000);
+  const L = new Float32Array(total);
+  const R = new Float32Array(total);
+  for (let i = 0; i < total; i++) {
+    L[i] = rumble[i] * 0.5 + hissL[i] * 0.04;
+    R[i] = rumble[i] * 0.5 + hissR[i] * 0.04;
+  }
+  // Crackle pops scattered across the stereo field — the fire surrounds you.
   for (let k = 0; k < total; k++) {
-    if (rng() < 0.0009) {
+    if (rng() < 0.0011) {
       const len = Math.floor((0.004 + rng() * 0.02) * SAMPLE_RATE);
       const amp = 0.3 + rng() * 0.5;
-      for (let j = 0; j < len && k + j < total; j++) {
-        out[k + j] += (rng() * 2 - 1) * amp * Math.exp(-j / (len * 0.4));
-      }
+      addTransient(L, R, k, len, amp, 0.4, rng() * 2 - 1, rng);
     }
   }
-  return makeSeamless(lowPass(out, 6500), loopSamples, crossSamples);
+  return seamlessStereo(lowPass(L, 6500), lowPass(R, 6500), loopSamples, crossSamples);
 }
 
 /** A summer night: low ambience under a few chirping crickets. */
 function generateNight() {
-  const loopSamples = 12 * SAMPLE_RATE;
-  const crossSamples = 2 * SAMPLE_RATE;
+  const loopSamples = 20 * SAMPLE_RATE;
+  const crossSamples = 3 * SAMPLE_RATE;
   const total = loopSamples + crossSamples;
   const rng = makeRng(4303);
-  let bed = brownNoise(total, rng);
-  bed = lowPass(bed, 320);
-  const out = new Float32Array(total);
-  for (let i = 0; i < total; i++) out[i] = bed[i] * 0.22 + (rng() * 2 - 1) * 0.008;
+  // Shared low ambience (centred) keeps the night warm and mono-compatible.
+  const bed = lowPass(brownNoise(total, rng), 320);
+  const L = new Float32Array(total);
+  const R = new Float32Array(total);
+  for (let i = 0; i < total; i++) {
+    const air = (rng() * 2 - 1) * 0.008;
+    L[i] = bed[i] * 0.22 + air;
+    R[i] = bed[i] * 0.22 + (rng() * 2 - 1) * 0.008;
+  }
+  // Each cricket sits at its own spot in the field, so they spread out around
+  // you instead of stacking dead-centre. A softer trill replaces the old hard
+  // square wave (which buzzed).
   const crickets = [
-    { f: 4300, rate: 1.6 },
-    { f: 4850, rate: 1.9 },
-    { f: 5250, rate: 2.3 },
+    { f: 4300, rate: 1.6, pan: -0.7 },
+    { f: 4850, rate: 1.9, pan: 0.5 },
+    { f: 5250, rate: 2.3, pan: -0.2 },
+    { f: 4550, rate: 1.4, pan: 0.85 },
   ];
   for (const c of crickets) {
+    const [gl, gr] = panGains(c.pan);
     for (let i = 0; i < total; i++) {
       const t = i / SAMPLE_RATE;
-      const win = (t * c.rate) % 1 < 0.4 ? 1 : 0; // short chirp windows
-      const trill = 0.5 + 0.5 * Math.sign(Math.sin(2 * Math.PI * 28 * t)); // rapid pulse
-      out[i] += Math.sin(2 * Math.PI * c.f * t) * win * trill * 0.05;
+      const phase = (t * c.rate) % 1;
+      if (phase >= 0.4) continue; // short chirp windows
+      // Raised-cosine window over the chirp so it swells and fades, not clicks.
+      const win = 0.5 - 0.5 * Math.cos((2 * Math.PI * phase) / 0.4);
+      const trill = 0.5 + 0.5 * Math.sin(2 * Math.PI * 28 * t); // smooth rapid pulse
+      const s = Math.sin(2 * Math.PI * c.f * t) * win * trill * 0.05;
+      L[i] += s * gl;
+      R[i] += s * gr;
     }
   }
-  return makeSeamless(lowPass(out, 8000), loopSamples, crossSamples);
+  return seamlessStereo(lowPass(L, 8000), lowPass(R, 8000), loopSamples, crossSamples);
 }
 
-/** Brown noise: a deep, warm, even hush (great for focus/sleep). */
-function generateBrownNoise() {
-  const loopSamples = 12 * SAMPLE_RATE;
-  const crossSamples = 2 * SAMPLE_RATE;
-  const total = loopSamples + crossSamples;
-  const rng = makeRng(4404);
-  const n = brownNoise(total, rng);
-  return makeSeamless(n, loopSamples, crossSamples);
-}
-
-/** White noise: a bright, even hush (the top of the room). */
-function generateWhiteNoise() {
-  const loopSamples = 12 * SAMPLE_RATE;
-  const crossSamples = 2 * SAMPLE_RATE;
-  const total = loopSamples + crossSamples;
-  const rng = makeRng(4505);
-  const n = lowPass(whiteNoise(total, rng), 13000); // tame the very top slightly
-  return makeSeamless(n, loopSamples, crossSamples);
-}
-
-/** Pink noise: equal energy per octave — softer than white (Kellet's filter). */
-function generatePink() {
-  const loopSamples = 12 * SAMPLE_RATE;
-  const crossSamples = 2 * SAMPLE_RATE;
-  const total = loopSamples + crossSamples;
-  const rng = makeRng(4606);
+// One channel of pink noise via Paul Kellet's filter.
+function pinkChannel(total, rng) {
   const out = new Float32Array(total);
   let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
   for (let i = 0; i < total; i++) {
@@ -1136,7 +1173,40 @@ function generatePink() {
     out[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.11;
     b6 = w * 0.115926;
   }
-  return makeSeamless(out, loopSamples, crossSamples);
+  return out;
+}
+
+/**
+ * The noise hushes are decorrelated per ear (independent noise streams). Stereo
+ * noise is noticeably wider, calmer and less fatiguing than a mono wall — much
+ * nicer to fall asleep to — without changing the spectral character.
+ */
+function generateBrownNoise() {
+  const loopSamples = 12 * SAMPLE_RATE;
+  const crossSamples = 2 * SAMPLE_RATE;
+  const total = loopSamples + crossSamples;
+  const rng = makeRng(4404);
+  return seamlessStereo(brownNoise(total, rng), brownNoise(total, rng), loopSamples, crossSamples);
+}
+
+/** White noise: a bright, even hush (the top of the room). */
+function generateWhiteNoise() {
+  const loopSamples = 12 * SAMPLE_RATE;
+  const crossSamples = 2 * SAMPLE_RATE;
+  const total = loopSamples + crossSamples;
+  const rng = makeRng(4505);
+  const L = lowPass(whiteNoise(total, rng), 13000); // tame the very top slightly
+  const R = lowPass(whiteNoise(total, rng), 13000);
+  return seamlessStereo(L, R, loopSamples, crossSamples);
+}
+
+/** Pink noise: equal energy per octave — softer than white (Kellet's filter). */
+function generatePink() {
+  const loopSamples = 12 * SAMPLE_RATE;
+  const crossSamples = 2 * SAMPLE_RATE;
+  const total = loopSamples + crossSamples;
+  const rng = makeRng(4606);
+  return seamlessStereo(pinkChannel(total, rng), pinkChannel(total, rng), loopSamples, crossSamples);
 }
 
 /**
@@ -1240,85 +1310,155 @@ function brownNoise(n, rng) {
   return out;
 }
 
+// Equal-power pan gains [left, right] for a position in [-1, 1].
+function panGains(pan) {
+  const a = (pan + 1) * (Math.PI / 4); // 0 .. pi/2
+  return [Math.cos(a), Math.sin(a)];
+}
+
+// Scatter one short decaying transient (a droplet, crackle, plip…) into stereo
+// buffers at a stereo position, so events spread across the field for depth.
+function addTransient(L, R, start, len, amp, decay, pan, rng) {
+  const [gl, gr] = panGains(pan);
+  for (let j = 0; j < len; j++) {
+    const idx = start + j;
+    if (idx >= L.length) break;
+    const s = (rng() * 2 - 1) * amp * Math.exp(-j / (len * decay));
+    L[idx] += s * gl;
+    R[idx] += s * gr;
+  }
+}
+
+// Seamless-loop a stereo pair with the same crossfade.
+function seamlessStereo(left, right, loopSamples, crossSamples) {
+  return {
+    left: makeSeamless(left, loopSamples, crossSamples),
+    right: makeSeamless(right, loopSamples, crossSamples),
+  };
+}
+
 function generateAmbient(kind) {
-  const loopSeconds = 12;
-  const crossSeconds = 2;
+  // Longer loops + true stereo: far less obvious repetition, and real width and
+  // depth instead of a flat mono wall.
+  const loopSeconds = 20;
+  const crossSeconds = 3;
   const loopSamples = loopSeconds * SAMPLE_RATE;
   const crossSamples = crossSeconds * SAMPLE_RATE;
   const total = loopSamples + crossSamples;
   const rng = makeRng(kind === 'rain' ? 1337 : kind === 'ocean' ? 2024 : 7); // per-sound seed
 
-  let raw;
   if (kind === 'rain') {
-    // A "rushing" bed (darker than static): mid noise + low body, not bright hiss.
-    let bed = lowPass(highPass(whiteNoise(total, rng), 320), 2800);
-    let body = lowPass(brownNoise(total, rng), 700);
-    const out = new Float32Array(total);
-    for (let i = 0; i < total; i++) out[i] = bed[i] * 0.5 + body[i] * 0.28;
-
-    // Droplet patter: many tiny decaying ticks scattered through the loop —
-    // this is what makes it read as rain rather than white noise.
+    // Decorrelated "rushing" beds per ear for width; a shared low body keeps the
+    // rumble centred and mono-compatible.
+    const bedL = lowPass(highPass(whiteNoise(total, rng), 320), 2800);
+    const bedR = lowPass(highPass(whiteNoise(total, rng), 320), 2800);
+    const body = lowPass(brownNoise(total, rng), 700);
+    let L = new Float32Array(total);
+    let R = new Float32Array(total);
+    for (let i = 0; i < total; i++) {
+      L[i] = bedL[i] * 0.5 + body[i] * 0.28;
+      R[i] = bedR[i] * 0.5 + body[i] * 0.28;
+    }
+    // Spatialised droplet patter scattered across the stereo field — this is
+    // what makes it read as rain rather than white noise.
     for (let k = 0; k < total; k++) {
-      if (rng() < 0.0016) {
+      if (rng() < 0.0022) {
         const len = Math.floor((0.002 + rng() * 0.01) * SAMPLE_RATE);
         const amp = 0.12 + rng() * 0.32;
-        for (let j = 0; j < len && k + j < total; j++) {
-          out[k + j] += (rng() * 2 - 1) * amp * Math.exp(-j / (len * 0.3));
-        }
+        addTransient(L, R, k, len, amp, 0.3, rng() * 2 - 1, rng);
       }
     }
-    let n = lowPass(out, 6000); // glue the droplets into the bed
+    L = lowPass(L, 6000); // glue the droplets into the bed
+    R = lowPass(R, 6000);
     for (let i = 0; i < total; i++) {
       const t = i / SAMPLE_RATE;
-      n[i] *= 0.82 + 0.18 * Math.sin(2 * Math.PI * 0.08 * t); // gentle intensity waves
+      // Gentle intensity waves, offset per ear so the rain breathes across you.
+      L[i] *= 0.82 + 0.18 * Math.sin(2 * Math.PI * 0.08 * t);
+      R[i] *= 0.82 + 0.18 * Math.sin(2 * Math.PI * 0.073 * t + 0.7);
     }
-    raw = n;
-  } else if (kind === 'ocean') {
-    // Brown noise swelling slowly like waves.
-    let n = brownNoise(total, rng);
-    n = lowPass(n, 1200);
-    for (let i = 0; i < total; i++) {
-      const t = i / SAMPLE_RATE;
-      // Two slow LFOs combine into an irregular swell.
-      const swell =
-        0.5 +
-        0.35 * Math.sin(2 * Math.PI * 0.07 * t) +
-        0.15 * Math.sin(2 * Math.PI * 0.11 * t + 1.3);
-      n[i] *= Math.max(0, swell);
-    }
-    raw = n;
-  } else {
-    // forest: soft low wind with gentle movement.
-    let n = brownNoise(total, rng);
-    n = lowPass(n, 600);
-    for (let i = 0; i < total; i++) {
-      const t = i / SAMPLE_RATE;
-      const gust = 0.6 + 0.4 * Math.sin(2 * Math.PI * 0.05 * t + 0.5);
-      n[i] *= gust;
-    }
-    raw = n;
+    return seamlessStereo(L, R, loopSamples, crossSamples);
   }
 
-  return makeSeamless(raw, loopSamples, crossSamples);
+  if (kind === 'ocean') {
+    // Decorrelated swelling brown noise; the swell LFOs are offset per ear so
+    // waves roll across the stereo field rather than pumping in mono.
+    const L = lowPass(brownNoise(total, rng), 1200);
+    const R = lowPass(brownNoise(total, rng), 1200);
+    // Airy "spray" — high-passed noise that only appears at the top of a swell,
+    // so you hear the wave actually break rather than just a rise in rumble.
+    const sprayL = lowPass(highPass(whiteNoise(total, rng), 1400), 7000);
+    const sprayR = lowPass(highPass(whiteNoise(total, rng), 1400), 7000);
+    for (let i = 0; i < total; i++) {
+      const t = i / SAMPLE_RATE;
+      // Asymmetric swell (slow rise, quicker fall) reads more like real surf.
+      const baseL = 0.5 + 0.35 * Math.sin(2 * Math.PI * 0.07 * t) + 0.15 * Math.sin(2 * Math.PI * 0.11 * t + 1.3);
+      const baseR = 0.5 + 0.35 * Math.sin(2 * Math.PI * 0.07 * t + 0.9) + 0.15 * Math.sin(2 * Math.PI * 0.13 * t);
+      const eL = Math.pow(Math.max(0, baseL), 1.3);
+      const eR = Math.pow(Math.max(0, baseR), 1.3);
+      // Crest = the part of the swell above a threshold, shaped so spray rushes
+      // in near the peak and fades as the wave recedes.
+      const crestL = Math.pow(Math.max(0, eL - 0.5), 1.6);
+      const crestR = Math.pow(Math.max(0, eR - 0.5), 1.6);
+      L[i] = L[i] * eL + sprayL[i] * crestL * 0.7;
+      R[i] = R[i] * eR + sprayR[i] * crestR * 0.7;
+    }
+    return seamlessStereo(L, R, loopSamples, crossSamples);
+  }
+
+  // forest: soft low wind with gentle gusts, plus sparse leaf rustles for life.
+  const L = lowPass(brownNoise(total, rng), 600);
+  const R = lowPass(brownNoise(total, rng), 600);
+  for (let i = 0; i < total; i++) {
+    const t = i / SAMPLE_RATE;
+    L[i] *= 0.6 + 0.4 * Math.sin(2 * Math.PI * 0.05 * t + 0.5);
+    R[i] *= 0.6 + 0.4 * Math.sin(2 * Math.PI * 0.045 * t + 1.6);
+  }
+  // Occasional soft, high-passed rustles drifting across the field.
+  for (let k = 0; k < total; k++) {
+    if (rng() < 0.00035) {
+      const len = Math.floor((0.05 + rng() * 0.18) * SAMPLE_RATE);
+      const amp = 0.06 + rng() * 0.1;
+      const pan = rng() * 2 - 1;
+      const [gl, gr] = panGains(pan);
+      for (let j = 0; j < len && k + j < total; j++) {
+        // Soft-edged noise burst (raised-cosine window) so it whispers, not clicks.
+        const w = 0.5 - 0.5 * Math.cos((2 * Math.PI * j) / len);
+        const s = (rng() * 2 - 1) * amp * w;
+        L[k + j] += s * gl;
+        R[k + j] += s * gr;
+      }
+    }
+  }
+  return seamlessStereo(L, R, loopSamples, crossSamples);
 }
 
 function buildAll() {
 console.log('Generating audio assets...');
 writeWav(path.join(OUT_DIR, 'bell.wav'), generateBell(), { master: false });
-writeWav(path.join(AMBIENT_DIR, 'rain.wav'), generateAmbient('rain'));
-writeWav(path.join(AMBIENT_DIR, 'ocean.wav'), generateAmbient('ocean'));
-writeWav(path.join(AMBIENT_DIR, 'forest.wav'), generateAmbient('forest'));
-writeWav(path.join(AMBIENT_DIR, 'stream.wav'), generateStream());
-writeWav(path.join(AMBIENT_DIR, 'fire.wav'), generateFire());
-writeWav(path.join(AMBIENT_DIR, 'night.wav'), generateNight());
-writeWav(path.join(AMBIENT_DIR, 'brown.wav'), generateBrownNoise());
-writeWav(path.join(AMBIENT_DIR, 'white.wav'), generateWhiteNoise());
-writeWav(path.join(AMBIENT_DIR, 'pink.wav'), generatePink());
+// Nature textures are now stereo for width and depth.
+const rain = generateAmbient('rain');
+writeWavStereo(path.join(AMBIENT_DIR, 'rain.wav'), rain.left, rain.right, { targetDb: -16 });
+const ocean = generateAmbient('ocean');
+writeWavStereo(path.join(AMBIENT_DIR, 'ocean.wav'), ocean.left, ocean.right, { targetDb: -16 });
+const forest = generateAmbient('forest');
+writeWavStereo(path.join(AMBIENT_DIR, 'forest.wav'), forest.left, forest.right, { targetDb: -16 });
+const stream = generateStream();
+writeWavStereo(path.join(AMBIENT_DIR, 'stream.wav'), stream.left, stream.right, { targetDb: -16 });
+const fire = generateFire();
+writeWavStereo(path.join(AMBIENT_DIR, 'fire.wav'), fire.left, fire.right, { targetDb: -16 });
+const night = generateNight();
+writeWavStereo(path.join(AMBIENT_DIR, 'night.wav'), night.left, night.right, { targetDb: -16 });
+const brown = generateBrownNoise();
+writeWavStereo(path.join(AMBIENT_DIR, 'brown.wav'), brown.left, brown.right, { targetDb: -16 });
+const white = generateWhiteNoise();
+writeWavStereo(path.join(AMBIENT_DIR, 'white.wav'), white.left, white.right, { targetDb: -16 });
+const pink = generatePink();
+writeWavStereo(path.join(AMBIENT_DIR, 'pink.wav'), pink.left, pink.right, { targetDb: -16 });
 writeWav(path.join(OUT_DIR, 'purr.wav'), generatePurr());
 
 // Frequency music — binaural-beat pads (stereo).
 const calm = generateMusic({
-  carrierHz: 216, // A3 in 432 Hz tuning
+  carrierHz: 432, // A4, 432 Hz tuning — also in the band where binaural beats land best
   beatHz: 7.83, // Schumann resonance (theta/alpha border) — grounding calm
   partials: [
     { ratio: 1.0, amp: 1.0 },
@@ -1331,8 +1471,8 @@ const calm = generateMusic({
 writeWavStereo(path.join(MUSIC_DIR, 'calm.wav'), calm.left, calm.right, { targetDb: -16 });
 
 const focus = generateMusic({
-  carrierHz: 256, // "scientific" C
-  beatHz: 14, // low-beta / SMR — alert, calm focus
+  carrierHz: 384, // "scientific" G (3× 128) — in the effective binaural carrier band
+  beatHz: 18, // beta — the study's focus/working-memory band (PMC8636003: 18.42 Hz ±2.82)
   partials: [
     { ratio: 1.0, amp: 0.9 },
     { ratio: 1.5, amp: 0.42 }, // a perfect fifth adds brightness
@@ -1357,8 +1497,8 @@ const deep = generateMusic({
 writeWavStereo(path.join(MUSIC_DIR, 'deep.wav'), deep.left, deep.right, { targetDb: -16 });
 
 const dream = generateMusic({
-  carrierHz: 198, // soft low-mid drone
-  beatHz: 6, // theta — dreamy, meditative
+  carrierHz: 396, // soft mid drone (octave up) — lands in the effective binaural band
+  beatHz: 6, // theta — the study's meditative-state beat (PMC8636003 companion finding)
   partials: [
     { ratio: 1.0, amp: 1.0 },
     { ratio: 2.0, amp: 0.3 },
@@ -1398,9 +1538,9 @@ writeWavStereo(path.join(BEATS_DIR, 'melodic.wav'), melodic.left, melodic.right,
 const techno = generateTechno();
 writeWavStereo(path.join(BEATS_DIR, 'techno.wav'), techno.left, techno.right, { targetDb: -16, air: 0.3 });
 const triphop = generateTripHop();
-writeWavStereo(path.join(BEATS_DIR, 'triphop.wav'), triphop.left, triphop.right, { targetDb: -16, air: 0.3 });
+writeWavStereo(path.join(BEATS_DIR, 'triphop.wav'), triphop.left, triphop.right, { targetDb: -16, air: 0.3, widen: 1.4 });
 const synthwave = generateSynthwave();
-writeWavStereo(path.join(BEATS_DIR, 'synthwave.wav'), synthwave.left, synthwave.right, { targetDb: -16, air: 0.3 });
+writeWavStereo(path.join(BEATS_DIR, 'synthwave.wav'), synthwave.left, synthwave.right, { targetDb: -16, air: 0.45, widen: 1.7 });
 
 console.log('Done.');
 }

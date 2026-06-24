@@ -32,6 +32,10 @@ jobs:
         run: npm ci
       - name: Export web build
         run: npx expo export -p web --output-dir dist
+        env:
+          # Serve from the repository subpath on GitHub Pages. This is web-only;
+          # native builds intentionally omit baseUrl (see app.config.js).
+          EXPO_WEB_BASE_URL: /meditationApp
       - name: Disable Jekyll (serve _expo/ directory)
         run: touch dist/.nojekyll
       - name: Setup Pages

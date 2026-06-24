@@ -1,4 +1,3 @@
-import { LinearGradient } from 'expo-linear-gradient';
 import type { ReactNode } from 'react';
 import { ScrollView, StyleSheet, View, type ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -16,13 +15,13 @@ interface ScreenProps {
   footer?: ReactNode;
 }
 
-/** Full-screen calming gradient background with a safe-area content area. */
+/** Full-screen calm flat background with a safe-area content area. */
 export function Screen({ children, scroll = false, bare = false, contentStyle, footer }: ScreenProps) {
   const colors = useThemeColors();
   const padding = bare ? undefined : styles.padded;
 
   return (
-    <LinearGradient colors={colors.gradient} style={styles.fill}>
+    <View style={[styles.fill, { backgroundColor: colors.background }]}>
       <SafeAreaView style={styles.fill} edges={['top', 'left', 'right']}>
         {scroll ? (
           <ScrollView
@@ -36,7 +35,7 @@ export function Screen({ children, scroll = false, bare = false, contentStyle, f
         )}
         {footer}
       </SafeAreaView>
-    </LinearGradient>
+    </View>
   );
 }
 

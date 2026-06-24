@@ -159,13 +159,7 @@ export interface SessionRecord {
 export interface Settings {
   /** Default session length in minutes. */
   durationMin: number;
-  /** Interval bell every N minutes (0 = off). */
-  intervalMin: number;
   ambient: AmbientSound;
-  /** Play a bell at the start of a session. */
-  startBell: boolean;
-  /** Play a bell at the end of a session. */
-  endBell: boolean;
   /** Daily reminder enabled. */
   reminderEnabled: boolean;
   /** Reminder time, 24h. */
@@ -173,6 +167,12 @@ export interface Settings {
   reminderMinute: number;
   /** Background sound volume, 0..1. */
   volume: number;
+  /**
+   * When true, Stillness plays *alongside* other audio (so you can layer it over
+   * your own music). When false (default) it takes over the audio session —
+   * pausing other apps, which also enables reliable background/lock-screen use.
+   */
+  mixWithMusic: boolean;
   /** Visual shown during a session. */
   timerStyle: TimerStyle;
   /** Whether the first-run intro has been completed. */
@@ -194,15 +194,12 @@ export interface Stats {
 
 export const DEFAULT_SETTINGS: Settings = {
   durationMin: 10,
-  intervalMin: 0,
   ambient: 'none',
-  // Bells are off by default — many people prefer silent start/end.
-  startBell: false,
-  endBell: false,
   reminderEnabled: false,
   reminderHour: 8,
   reminderMinute: 0,
   volume: 0.85,
+  mixWithMusic: false,
   timerStyle: 'orb',
   onboarded: false,
   settingsVersion: 3,

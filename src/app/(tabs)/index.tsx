@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
@@ -11,7 +11,9 @@ import { DurationPicker } from '@/components/DurationPicker';
 import { Screen } from '@/components/Screen';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { greeting, soundMeta } from '@/lib/catalog';
+import { GENERATIVE_SUPPORTED, prefetchGenerative } from '@/lib/generative';
 import type { AmbientSound } from '@/lib/types';
+import { isGenerative, sectionFor } from '@/lib/types';
 import { categoryStyle } from '@/theme/categories';
 import { useAppData } from '@/store/AppData';
 import { radius, spacing } from '@/theme';
@@ -29,8 +31,23 @@ export default function MeditateScreen() {
   // The whole screen's accent follows the chosen sound's category.
   const cat = categoryStyle(settings.ambient);
   const sel = soundMeta(settings.ambient);
+  // Generative pieces play open-ended, so there's no session length to set.
+  const generative = isGenerative(settings.ambient);
 
   const [pickerOpen, setPickerOpen] = useState(false);
+
+  // Pre-render the next generative piece in the background while the user is
+  // here, so starting a session is instant instead of stalling on the
+  // "Composing…" screen. Runs on focus (not just mount) so the *next* session
+  // is also prepared after returning from one. The render runs off the JS
+  // thread and is a no-op on web, so this never blocks the home screen.
+  useFocusEffect(
+    useCallback(() => {
+      if (GENERATIVE_SUPPORTED && isGenerative(settings.ambient)) {
+        void prefetchGenerative(sectionFor(settings.ambient));
+      }
+    }, [settings.ambient]),
+  );
 
   const tap = () => Haptics.selectionAsync().catch(() => {});
 
@@ -61,17 +78,14 @@ export default function MeditateScreen() {
           </AppText>
           <AppText variant="title">Take a breath</AppText>
           {stats.currentStreak > 0 && (
-            <View style={styles.streak}>
-              <Ionicons name="flame" size={15} color={colors.warning} />
-              <AppText variant="caption" muted>
-                {stats.currentStreak}-day streak{stats.meditatedToday ? ' · today ✓' : ''}
-              </AppText>
-            </View>
+            <AppText variant="caption" muted style={styles.streak}>
+              {stats.currentStreak}-day streak
+            </AppText>
           )}
         </View>
 
         <View style={styles.center}>
-          <BreathingOrb still core={cat.accent} halo={cat.colors[0]}>
+          <BreathingOrb still core={cat.accent} halo={cat.colors[0]} colors={cat.colors}>
             <Ionicons name={sel.icon} size={44} color="#FFFFFF" />
           </BreathingOrb>
 
@@ -85,7 +99,6 @@ export default function MeditateScreen() {
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.begin}>
-              <Ionicons name="play" size={20} color="#FFFFFF" />
               <AppText variant="label" color="#FFFFFF" style={styles.beginLabel}>
                 Begin
               </AppText>
@@ -104,23 +117,32 @@ export default function MeditateScreen() {
                 styles.chip,
                 { backgroundColor: colors.surfaceMuted, transform: [{ scale: pressed ? 0.97 : 1 }] },
               ]}>
-              <Ionicons name={sel.icon} size={18} color={cat.accent} />
+              <Ionicons name={sel.icon} size={18} color={colors.textSecondary} />
               <AppText variant="body" numberOfLines={1}>
                 {sel.label}
               </AppText>
             </Pressable>
 
-            <Pressable
-              onPress={openPicker}
-              accessibilityRole="button"
-              accessibilityLabel={`Length: ${settings.durationMin} minutes`}
-              style={({ pressed }) => [
-                styles.chip,
-                { backgroundColor: colors.surfaceMuted, transform: [{ scale: pressed ? 0.97 : 1 }] },
-              ]}>
-              <Ionicons name="timer-outline" size={18} color={cat.accent} />
-              <AppText variant="body">{settings.durationMin} min</AppText>
-            </Pressable>
+            {generative ? (
+              <View
+                accessibilityLabel="Length: open-ended"
+                style={[styles.chip, { backgroundColor: colors.surfaceMuted }]}>
+                <Ionicons name="infinite" size={18} color={colors.textSecondary} />
+                <AppText variant="body">Open-ended</AppText>
+              </View>
+            ) : (
+              <Pressable
+                onPress={openPicker}
+                accessibilityRole="button"
+                accessibilityLabel={`Length: ${settings.durationMin} minutes`}
+                style={({ pressed }) => [
+                  styles.chip,
+                  { backgroundColor: colors.surfaceMuted, transform: [{ scale: pressed ? 0.97 : 1 }] },
+                ]}>
+                <Ionicons name="timer-outline" size={18} color={colors.textSecondary} />
+                <AppText variant="body">{settings.durationMin} min</AppText>
+              </Pressable>
+            )}
           </View>
 
           <Pressable
@@ -150,7 +172,7 @@ export default function MeditateScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   header: { gap: spacing.xs, marginTop: spacing.sm, alignItems: 'center' },
-  streak: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.xs },
+  streak: { marginTop: spacing.xs },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.xl },
   beginWrap: { marginTop: spacing.sm },
   begin: {

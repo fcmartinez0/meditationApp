@@ -70,7 +70,10 @@ const RANGES: Record<Section, Range> = {
     brightMax: 0.55,
     chordMin: 11,
     chordMax: 22,
-    binaurals: [3, 4, 5, 6],
+    // Study-validated theta for meditation/relaxation: a ~4.6 Hz centre and the
+    // 6 Hz beat shown to promote meditative states, plus a 3 Hz delta option for
+    // deep rest / sleep. (PMC8636003: theta 4.60 Hz ±0.70; 6 Hz meditation.)
+    binaurals: [3, 4.6, 6, 6],
     chimeMax: 0.25,
     tempoMin: 48,
     tempoMax: 72,

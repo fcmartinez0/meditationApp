@@ -40,12 +40,6 @@ export async function loadSettings(): Promise<Settings> {
     const stored = JSON.parse(raw) as Partial<Settings>;
     // Merge so new fields added in later versions get sane defaults.
     const merged = { ...DEFAULT_SETTINGS, ...stored };
-    // v2 migration: bells became opt-in, so silence them once for existing users.
-    if ((stored.settingsVersion ?? 1) < 2) {
-      merged.startBell = false;
-      merged.endBell = false;
-      merged.settingsVersion = 2;
-    }
     // v3: don't show onboarding to anyone who already has saved settings.
     if ((stored.settingsVersion ?? 1) < 3) {
       merged.onboarded = true;

@@ -15,8 +15,6 @@ import { Asset } from 'expo-asset';
 import type { AmbientSound, FileSound } from './types';
 import { isGenerative } from './types';
 
-const BELL_SOURCE = require('@/assets/audio/bell.wav');
-
 const AMBIENT_SOURCES: Record<FileSound, number> = {
   rain: require('@/assets/audio/ambient/rain.wav'),
   ocean: require('@/assets/audio/ambient/ocean.wav'),
@@ -92,11 +90,13 @@ const SILENCE = 0.0001; // exponential ramps can't reach exactly 0
 
 export class SessionAudio {
   private ctx: AudioContext | null = null;
-  private bellBuffer: AudioBuffer | null = null;
   private ambientBuffer: AudioBuffer | null = null;
   private ambientSource: AudioBufferSourceNode | null = null;
   private ambientGain: GainNode | null = null;
   private targetVol = TARGET_VOLUME;
+
+  // No external transport (lock screen) on web; accepted for API parity.
+  setOnPlayingChange(_cb: (playing: boolean) => void) {}
 
   /** Set the background volume (0..1). */
   setVolume(v: number) {
@@ -111,7 +111,9 @@ export class SessionAudio {
     }
   }
 
-  async prepare(ambient: AmbientSound) {
+  // mixWithMusic / lock-screen title are honoured natively; the browser mixes by
+  // default and has no lock screen, so they're accepted for API parity only.
+  async prepare(ambient: AmbientSound, _mixWithMusic = false, _lockScreenTitle?: string) {
     this.ctx = getCtx();
     if (!this.ctx) return;
     if (this.ctx.state === 'suspended') {
@@ -121,21 +123,9 @@ export class SessionAudio {
         // playback resumes on the next user interaction
       }
     }
-    this.bellBuffer = await loadBuffer(BELL_SOURCE, this.ctx);
     if (ambient !== 'none' && !isGenerative(ambient)) {
       this.ambientBuffer = await loadBuffer(AMBIENT_SOURCES[ambient], this.ctx);
     }
-  }
-
-  ringBell() {
-    const ctx = this.ctx;
-    if (!ctx || !this.bellBuffer) return;
-    const src = ctx.createBufferSource();
-    src.buffer = this.bellBuffer;
-    const gain = ctx.createGain();
-    gain.gain.value = 0.9;
-    src.connect(gain).connect(ctx.destination);
-    src.start();
   }
 
   startAmbient() {
@@ -225,7 +215,6 @@ export class SessionAudio {
     // Keep the shared context alive for the next session; just stop our source.
     this.disposeSource();
     this.ctx = null;
-    this.bellBuffer = null;
     this.ambientBuffer = null;
   }
 }

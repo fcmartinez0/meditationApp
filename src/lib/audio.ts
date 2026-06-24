@@ -1,6 +1,6 @@
 /**
  * Thin imperative wrapper around expo-audio for the meditation session:
- * a one-shot bell and a looping ambient bed.
+ * a looping ambient bed.
  */
 
 import {
@@ -11,8 +11,6 @@ import {
 
 import type { AmbientSound, FileSound } from './types';
 import { isGenerative } from './types';
-
-const BELL_SOURCE = require('@/assets/audio/bell.wav');
 
 const AMBIENT_SOURCES: Record<FileSound, number> = {
   rain: require('@/assets/audio/ambient/rain.wav'),
@@ -41,28 +39,47 @@ const AMBIENT_SOURCES: Record<FileSound, number> = {
   synthwave: require('@/assets/audio/beats/synthwave.wav'),
 };
 
-let configured = false;
+// Track the last-applied mix mode so we re-apply only when it actually changes.
+let appliedMix: boolean | null = null;
 
-async function ensureAudioMode() {
-  if (configured) return;
+async function ensureAudioMode(mixWithMusic: boolean) {
+  if (appliedMix === mixWithMusic) return;
   try {
     await setAudioModeAsync({
       playsInSilentMode: true,
       // Keep playing when the screen locks mid-session (matches the app's
       // background-audio capability), so meditation isn't cut off.
       shouldPlayInBackground: true,
-      interruptionMode: 'mixWithOthers',
+      // Default: take over the session (pause other apps). Opt-in mixing lets
+      // users lay Stillness over their own music.
+      interruptionMode: mixWithMusic ? 'mixWithOthers' : 'doNotMix',
     });
-    configured = true;
+    appliedMix = mixWithMusic;
   } catch {
     // Non-fatal: audio mode just falls back to platform defaults.
   }
 }
 
 export class SessionAudio {
-  private bell: AudioPlayer | null = null;
   private ambient: AudioPlayer | null = null;
   private targetVol = 0.6;
+  private mixWithMusic = false;
+  private lockTitle: string | null = null;
+  private statusSub: ReturnType<AudioPlayer['addListener']> | null = null;
+  private onPlaying?: (playing: boolean) => void;
+  private lastPlaying: boolean | null = null;
+  // Only forward transport changes once we've actually started playing, so the
+  // player's initial "not playing" status can't trip a spurious pause at startup.
+  private emitStatus = false;
+
+  /**
+   * Notify when playback is toggled from *outside* the app (the lock screen /
+   * control center), so the session UI can mirror a pause/resume it didn't
+   * initiate. Deduped to real play/paused transitions.
+   */
+  setOnPlayingChange(cb: (playing: boolean) => void) {
+    this.onPlaying = cb;
+  }
 
   /** Set the background volume (0..1). */
   setVolume(v: number) {
@@ -76,26 +93,22 @@ export class SessionAudio {
     }
   }
 
-  async prepare(ambient: AmbientSound) {
-    await ensureAudioMode();
-    if (!this.bell) {
-      this.bell = createAudioPlayer(BELL_SOURCE);
-    }
+  async prepare(ambient: AmbientSound, mixWithMusic = false, lockScreenTitle?: string) {
+    this.mixWithMusic = mixWithMusic;
+    this.lockTitle = lockScreenTitle ?? null;
+    await ensureAudioMode(mixWithMusic);
     if (ambient !== 'none' && !isGenerative(ambient)) {
       this.ambient = createAudioPlayer(AMBIENT_SOURCES[ambient]);
       this.ambient.loop = true;
       // Start silent so startAmbient() can fade in and avoid a click.
       this.ambient.volume = 0;
-    }
-  }
-
-  ringBell() {
-    if (!this.bell) return;
-    try {
-      this.bell.seekTo(0);
-      this.bell.play();
-    } catch {
-      // ignore transient playback errors
+      // Mirror external (lock-screen) play/pause back to the session UI.
+      this.statusSub = this.ambient.addListener('playbackStatusUpdate', (status) => {
+        const playing = !!status.playing;
+        if (this.lastPlaying === playing) return;
+        this.lastPlaying = playing;
+        if (this.emitStatus) this.onPlaying?.(playing);
+      });
     }
   }
 
@@ -104,6 +117,23 @@ export class SessionAudio {
     const player = this.ambient;
     if (!player) return;
     player.play();
+    // We know we're playing now; baseline the state and start forwarding any
+    // later external (lock-screen) transport changes.
+    this.lastPlaying = true;
+    this.emitStatus = true;
+    // Show lock-screen / control-center playback info, but only when we own the
+    // audio session (the API requires it). Best-effort: never let it break audio.
+    if (!this.mixWithMusic) {
+      try {
+        player.setActiveForLockScreen(
+          true,
+          { title: this.lockTitle ?? 'Stillness', artist: 'Stillness' },
+          { isLiveStream: true, showSeekForward: false, showSeekBackward: false },
+        );
+      } catch {
+        // Lock-screen controls are a bonus; ignore if unavailable.
+      }
+    }
     void (async () => {
       const steps = 8;
       const target = this.targetVol;
@@ -155,13 +185,17 @@ export class SessionAudio {
 
   /** Release native resources. Call when leaving the session. */
   release() {
+    this.onPlaying = undefined;
     try {
-      this.bell?.remove();
+      this.statusSub?.remove();
+    } catch {}
+    this.statusSub = null;
+    try {
+      this.ambient?.clearLockScreenControls();
     } catch {}
     try {
       this.ambient?.remove();
     } catch {}
-    this.bell = null;
     this.ambient = null;
   }
 }

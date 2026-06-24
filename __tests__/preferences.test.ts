@@ -72,12 +72,12 @@ describe('nextSpec', () => {
     for (let i = 0; i < 15; i++) {
       ratings.push({
         section: 'rest',
-        spec: spec({ scale: 'lydian', instrument: 'bells', binauralHz: 4 }),
+        spec: spec({ scale: 'lydian', instrument: 'bells', binauralHz: 4.6 }),
         score: 1,
         at: i,
       });
     }
-    const band = new Set([3, 4, 5, 6]); // rest's researched delta–theta pool
+    const band = new Set([3, 4.6, 6]); // rest's researched delta–theta pool (study-aligned)
     let lydian = 0;
     for (let k = 0; k < 400; k++) {
       const s = nextSpec('rest', ratings);

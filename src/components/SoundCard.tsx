@@ -1,15 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
 import { EqualizerBars } from '@/components/EqualizerBars';
 import type { SoundItem } from '@/components/SoundRow';
 import { useThemeColors } from '@/hooks/useThemeColors';
-import { categoryStyle } from '@/theme/categories';
+import { categoryStyle, withAlpha } from '@/theme/categories';
 import { radius, spacing } from '@/theme';
 
-/** A grid card: a gradient "art" tile with title + hint. Fills its cell. */
+/** A grid card: a flat tinted tile with title + hint. Fills its cell. */
 export function SoundCard({
   item,
   selected,
@@ -26,21 +25,24 @@ export function SoundCard({
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={item.label}
+      accessibilityLabel={item.hint ? `${item.label}. ${item.hint}` : item.label}
       accessibilityState={{ selected }}
       style={({ pressed }) => [styles.card, { transform: [{ scale: pressed ? 0.97 : 1 }] }]}>
-      <LinearGradient
-        colors={cat.colors}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={[styles.art, selected && styles.artSelected]}>
-        <Ionicons name={item.icon} size={30} color="#FFFFFF" />
+      <View
+        style={[
+          styles.art,
+          {
+            backgroundColor: withAlpha(cat.accent, selected ? 0.2 : 0.1),
+            borderColor: selected ? cat.accent : 'transparent',
+          },
+        ]}>
+        <Ionicons name={item.icon} size={30} color={cat.accent} />
         {selected && (
           <View style={styles.eq}>
-            <EqualizerBars color="#FFFFFF" />
+            <EqualizerBars color={cat.accent} />
           </View>
         )}
-      </LinearGradient>
+      </View>
 
       <AppText variant="body" numberOfLines={1} color={selected ? cat.accent : colors.text} style={styles.label}>
         {item.label}
@@ -59,12 +61,12 @@ const styles = StyleSheet.create({
   art: {
     width: '100%',
     height: 92,
-    borderRadius: radius.lg,
+    borderRadius: radius.md,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
   },
-  artSelected: { borderWidth: 2, borderColor: '#FFFFFF' },
   eq: { position: 'absolute', bottom: spacing.sm, right: spacing.sm },
   label: { marginTop: spacing.xs },
 });

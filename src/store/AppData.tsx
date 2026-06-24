@@ -3,12 +3,14 @@
  * AsyncStorage and exposed with derived stats. Wrap the app once at the root.
  */
 
+import { Alert } from 'react-native';
 import {
   createContext,
   useCallback,
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -71,13 +73,29 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const updateSettings = useCallback(async (patch: Partial<Settings>) => {
-    setSettings((prev) => {
-      const next = { ...prev, ...patch };
-      // Fire-and-forget persistence; state is the source of truth in-session.
-      void saveSettings(next);
-      return next;
-    });
+    setSettings((prev) => ({ ...prev, ...patch }));
   }, []);
+
+  // Persist settings whenever they change (after the initial load). Doing this
+  // in an effect — rather than fire-and-forget inside the setter — lets us
+  // actually catch a write failure and tell the user, instead of silently
+  // losing their change on the next launch.
+  const skipFirstSave = useRef(true);
+  useEffect(() => {
+    if (!ready) return;
+    if (skipFirstSave.current) {
+      // Don't immediately re-write the value we just loaded from disk.
+      skipFirstSave.current = false;
+      return;
+    }
+    saveSettings(settings).catch((e) => {
+      console.warn('[settings] save failed', e);
+      Alert.alert(
+        'Couldn’t save setting',
+        'That change might not stick after you close the app. Please try again.',
+      );
+    });
+  }, [settings, ready]);
 
   const recordSession = useCallback(async (record: SessionRecord) => {
     const updated = await appendSession(record);

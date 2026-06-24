@@ -29,6 +29,8 @@ export function Button({ label, onPress, variant = 'primary', disabled, style }:
       onPress={onPress}
       disabled={disabled}
       accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: !!disabled }}
       style={({ pressed }) => [
         styles.button,
         {

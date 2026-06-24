@@ -18,6 +18,10 @@ expo-env.d.ts
 *.key
 *.mobileprovision
 
+# EAS Submit credentials (keep secrets out of git)
+google-play-service-account.json
+*-service-account.json
+
 # Metro
 .metro-health-check*
 
