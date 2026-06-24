@@ -11,6 +11,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { BreathingOrb } from '@/components/BreathingOrb';
+import { MinimalTimer } from '@/components/MinimalTimer';
 import { TideTimer } from '@/components/TideTimer';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { SessionAudio } from '@/lib/audio';
@@ -464,13 +465,15 @@ export default function SessionScreen() {
               </AppText>
             </TideTimer>
           ) : settings.timerStyle === 'minimal' ? (
-            <AppText
-              variant="display"
-              color={cat.accent}
-              style={styles.clockMinimal}
-              accessibilityLabel={spokenTime}>
-              {formatClock(clockSeconds)}
-            </AppText>
+            <MinimalTimer active={phase === 'running'}>
+              <AppText
+                variant="display"
+                color={cat.accent}
+                style={styles.clockMinimal}
+                accessibilityLabel={spokenTime}>
+                {formatClock(clockSeconds)}
+              </AppText>
+            </MinimalTimer>
           ) : (
             <BreathingOrb active={phase === 'running'} core={cat.accent} halo={cat.colors[0]} colors={cat.colors}>
               <AppText
