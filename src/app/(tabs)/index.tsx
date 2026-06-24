@@ -78,12 +78,9 @@ export default function MeditateScreen() {
           </AppText>
           <AppText variant="title">Take a breath</AppText>
           {stats.currentStreak > 0 && (
-            <View style={styles.streak}>
-              <Ionicons name="flame" size={15} color={colors.warning} />
-              <AppText variant="caption" muted>
-                {stats.currentStreak}-day streak{stats.meditatedToday ? ' · today ✓' : ''}
-              </AppText>
-            </View>
+            <AppText variant="caption" muted style={styles.streak}>
+              {stats.currentStreak}-day streak
+            </AppText>
           )}
         </View>
 
@@ -102,7 +99,6 @@ export default function MeditateScreen() {
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.begin}>
-              <Ionicons name="play" size={20} color="#FFFFFF" />
               <AppText variant="label" color="#FFFFFF" style={styles.beginLabel}>
                 Begin
               </AppText>
@@ -121,7 +117,7 @@ export default function MeditateScreen() {
                 styles.chip,
                 { backgroundColor: colors.surfaceMuted, transform: [{ scale: pressed ? 0.97 : 1 }] },
               ]}>
-              <Ionicons name={sel.icon} size={18} color={cat.accent} />
+              <Ionicons name={sel.icon} size={18} color={colors.textSecondary} />
               <AppText variant="body" numberOfLines={1}>
                 {sel.label}
               </AppText>
@@ -131,7 +127,7 @@ export default function MeditateScreen() {
               <View
                 accessibilityLabel="Length: open-ended"
                 style={[styles.chip, { backgroundColor: colors.surfaceMuted }]}>
-                <Ionicons name="infinite" size={18} color={cat.accent} />
+                <Ionicons name="infinite" size={18} color={colors.textSecondary} />
                 <AppText variant="body">Open-ended</AppText>
               </View>
             ) : (
@@ -143,7 +139,7 @@ export default function MeditateScreen() {
                   styles.chip,
                   { backgroundColor: colors.surfaceMuted, transform: [{ scale: pressed ? 0.97 : 1 }] },
                 ]}>
-                <Ionicons name="timer-outline" size={18} color={cat.accent} />
+                <Ionicons name="timer-outline" size={18} color={colors.textSecondary} />
                 <AppText variant="body">{settings.durationMin} min</AppText>
               </Pressable>
             )}
@@ -176,7 +172,7 @@ export default function MeditateScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   header: { gap: spacing.xs, marginTop: spacing.sm, alignItems: 'center' },
-  streak: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.xs },
+  streak: { marginTop: spacing.xs },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.xl },
   beginWrap: { marginTop: spacing.sm },
   begin: {

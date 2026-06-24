@@ -18,13 +18,12 @@ export default function ProgressScreen() {
   const today = todayWeekIndex();
 
   const maxMinutes = Math.max(...stats.weekMinutes, 1);
-  const weekTotal = stats.weekMinutes.reduce((a, b) => a + b, 0);
 
   const tiles = [
-    { icon: 'flame' as const, label: 'Current streak', value: `${stats.currentStreak}`, unit: 'days', color: colors.warning },
-    { icon: 'trophy' as const, label: 'Longest streak', value: `${stats.longestStreak}`, unit: 'days', color: colors.accent },
-    { icon: 'time' as const, label: 'Total time', value: `${stats.totalMinutes}`, unit: 'min', color: colors.success },
-    { icon: 'leaf' as const, label: 'Sessions', value: `${stats.totalSessions}`, unit: 'total', color: colors.accentSoft },
+    { label: 'Current streak', value: `${stats.currentStreak}`, unit: 'days' },
+    { label: 'Longest streak', value: `${stats.longestStreak}`, unit: 'days' },
+    { label: 'Total time', value: `${stats.totalMinutes}`, unit: 'min' },
+    { label: 'Sessions', value: `${stats.totalSessions}`, unit: 'total' },
   ];
 
   return (
@@ -36,31 +35,27 @@ export default function ProgressScreen() {
         <AppText variant="title">Progress</AppText>
       </View>
 
-      <View style={styles.grid}>
-        {tiles.map((t) => (
-          <Card key={t.label} style={styles.tile}>
-            <Ionicons name={t.icon} size={24} color={t.color} />
-            <View style={styles.tileValueRow}>
-              <AppText variant="title" style={styles.tileValue}>
-                {t.value}
-              </AppText>
+      <Card>
+        <View style={styles.grid}>
+          {tiles.map((t) => (
+            <View key={t.label} style={styles.tile}>
+              <View style={styles.tileValueRow}>
+                <AppText variant="title">{t.value}</AppText>
+                <AppText variant="caption" muted>
+                  {t.unit}
+                </AppText>
+              </View>
               <AppText variant="caption" muted>
-                {t.unit}
+                {t.label}
               </AppText>
             </View>
-            <AppText variant="caption" muted>
-              {t.label}
-            </AppText>
-          </Card>
-        ))}
-      </View>
+          ))}
+        </View>
+      </Card>
 
       <Card>
         <View style={styles.chartHeader}>
           <AppText variant="heading">This week</AppText>
-          <AppText variant="caption" muted>
-            {weekTotal} min total
-          </AppText>
         </View>
         <View style={styles.chart}>
           {stats.weekMinutes.map((minutes, i) => {
@@ -110,14 +105,10 @@ export default function ProgressScreen() {
 
 const styles = StyleSheet.create({
   header: { gap: spacing.xs, marginTop: spacing.sm },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
-  tile: { width: '47%', flexGrow: 1, gap: spacing.sm, padding: spacing.lg },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: spacing.xl, columnGap: spacing.md },
+  tile: { width: '47%', flexGrow: 1, gap: spacing.xs },
   tileValueRow: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.xs },
-  tileValue: { fontSize: 30 },
   chartHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: spacing.lg,
   },
   chart: {

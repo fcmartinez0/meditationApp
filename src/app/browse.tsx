@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -27,7 +26,7 @@ export default function BrowseScreen() {
   };
 
   return (
-    <LinearGradient colors={colors.gradient} style={styles.fill}>
+    <View style={[styles.fill, { backgroundColor: colors.background }]}>
       <SafeAreaView style={styles.fill} edges={['top', 'left', 'right']}>
         <View style={styles.header}>
           <AppText variant="title">Sounds</AppText>
@@ -65,7 +64,7 @@ export default function BrowseScreen() {
           ))}
         </ScrollView>
       </SafeAreaView>
-    </LinearGradient>
+    </View>
   );
 }
 

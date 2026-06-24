@@ -20,7 +20,6 @@ import { clearRatings, loadRatings, summarizePreference } from '@/lib/preference
 import type { PieceRating, TimerStyle } from '@/lib/types';
 import { useAppData } from '@/store/AppData';
 import { radius, spacing } from '@/theme';
-import { CATEGORY_STYLES } from '@/theme/categories';
 
 const TIMER_STYLES: { value: TimerStyle; label: string }[] = [
   { value: 'orb', label: 'Breathing orb' },
@@ -29,7 +28,7 @@ const TIMER_STYLES: { value: TimerStyle; label: string }[] = [
 ];
 
 /** A labelled row with a control on the right. */
-function Row({ children, label, hint }: { children: React.ReactNode; label: string; hint?: string }) {
+function Row({ children, label, hint }: { children?: React.ReactNode; label: string; hint?: string }) {
   return (
     <View style={styles.row}>
       <View style={styles.rowText}>
@@ -126,12 +125,12 @@ export default function SettingsScreen() {
     }
   };
 
-  const adjustTime = async (deltaHours: number, deltaMinutes: number) => {
+  // One control for the whole time: step by 15 minutes, carrying into hours.
+  const adjustTime = async (deltaMinutes: number) => {
     tap();
-    let hour = (settings.reminderHour + deltaHours + 24) % 24;
-    let minute = settings.reminderMinute + deltaMinutes;
-    if (minute >= 60) minute -= 60;
-    if (minute < 0) minute += 60;
+    const total = (settings.reminderHour * 60 + settings.reminderMinute + deltaMinutes + 1440) % 1440;
+    const hour = Math.floor(total / 60);
+    const minute = total % 60;
     await updateSettings({ reminderHour: hour, reminderMinute: minute });
     if (settings.reminderEnabled) await reschedule(hour, minute);
   };
@@ -153,9 +152,6 @@ export default function SettingsScreen() {
       </View>
 
       <Card style={styles.card}>
-        <AppText variant="label" muted>
-          DAILY REMINDER
-        </AppText>
         <Row
           label="Remind me to meditate"
           hint={NOTIFICATIONS_SUPPORTED ? 'A gentle daily nudge' : 'Available in the iOS / Android app'}>
@@ -167,49 +163,33 @@ export default function SettingsScreen() {
             thumbColor={Platform.OS === 'android' ? colors.surface : undefined}
           />
         </Row>
-        <View style={[styles.divider, { backgroundColor: colors.border }]} />
         <Row label="Reminder time">
           <View style={styles.timeAdjust}>
             <Pressable
-              onPress={() => adjustTime(-1, 0)}
+              onPress={() => adjustTime(-15)}
               style={styles.stepBtn}
               hitSlop={8}
               accessibilityRole="button"
-              accessibilityLabel="Reminder one hour earlier">
+              accessibilityLabel="Reminder fifteen minutes earlier">
               <Ionicons name="remove-circle-outline" size={26} color={colors.accent} />
             </Pressable>
             <AppText variant="heading" style={styles.timeLabel}>
               {formatTime(settings.reminderHour, settings.reminderMinute)}
             </AppText>
             <Pressable
-              onPress={() => adjustTime(1, 0)}
+              onPress={() => adjustTime(15)}
               style={styles.stepBtn}
               hitSlop={8}
               accessibilityRole="button"
-              accessibilityLabel="Reminder one hour later">
+              accessibilityLabel="Reminder fifteen minutes later">
               <Ionicons name="add-circle-outline" size={26} color={colors.accent} />
             </Pressable>
           </View>
         </Row>
-        <View style={styles.minuteRow}>
-          <Pressable onPress={() => adjustTime(0, -5)} style={styles.minuteBtn}>
-            <AppText variant="caption" color={colors.accent}>
-              −5 min
-            </AppText>
-          </Pressable>
-          <Pressable onPress={() => adjustTime(0, 5)} style={styles.minuteBtn}>
-            <AppText variant="caption" color={colors.accent}>
-              +5 min
-            </AppText>
-          </Pressable>
-        </View>
       </Card>
 
       <Card style={styles.card}>
-        <AppText variant="label" muted>
-          SOUND
-        </AppText>
-        <Row label="Volume" hint={`${Math.round(settings.volume * 100)}%`}>
+        <Row label="Volume">
           <View style={styles.timeAdjust}>
             <Pressable
               onPress={() => set({ volume: Math.max(0, Math.round((settings.volume - 0.1) * 10) / 10) })}
@@ -234,7 +214,6 @@ export default function SettingsScreen() {
             </Pressable>
           </View>
         </Row>
-        <View style={[styles.divider, { backgroundColor: colors.border }]} />
         <Row
           label="Play over my music"
           hint="Keep your own music playing underneath, instead of taking over audio">
@@ -245,7 +224,6 @@ export default function SettingsScreen() {
             thumbColor={Platform.OS === 'android' ? colors.surface : undefined}
           />
         </Row>
-        <View style={[styles.divider, { backgroundColor: colors.border }]} />
         <AppText variant="body">Session visual</AppText>
         <View style={styles.chipWrap}>
           {TIMER_STYLES.map((opt) => {
@@ -268,37 +246,22 @@ export default function SettingsScreen() {
       </Card>
 
       <Card style={styles.card}>
-        <View style={styles.rowText}>
-          <AppText variant="label" muted>
-            GENERATIVE TASTE
-          </AppText>
-          <AppText variant="caption" muted>
-            What the live music has learned from your likes.
-          </AppText>
-        </View>
-        <Row label="Rest" hint={restTaste ?? 'No ratings yet. Like a Rest piece to get started.'}>
-          <Ionicons name="sparkles" size={18} color={CATEGORY_STYLES.generative.accent} />
-        </Row>
-        <Row label="Flow" hint={chillTaste ?? 'No ratings yet. Like a Flow piece to get started.'}>
-          <Ionicons name="infinite" size={18} color={CATEGORY_STYLES.generative.accent} />
-        </Row>
+        <AppText variant="caption" muted>
+          What the live music has learned from your likes.
+        </AppText>
+        <Row label="Rest" hint={restTaste ?? 'No ratings yet. Like a Rest piece to get started.'} />
+        <Row label="Flow" hint={chillTaste ?? 'No ratings yet. Like a Flow piece to get started.'} />
         {(restTaste || chillTaste) && (
-          <>
-            <View style={[styles.divider, { backgroundColor: colors.border }]} />
-            <Pressable onPress={confirmResetTaste} style={styles.resetRow}>
-              <Ionicons name="refresh-outline" size={20} color={colors.textSecondary} />
-              <AppText variant="body" muted>
-                Reset what I&apos;ve learned
-              </AppText>
-            </Pressable>
-          </>
+          <Pressable onPress={confirmResetTaste} style={styles.resetRow}>
+            <Ionicons name="refresh-outline" size={20} color={colors.textSecondary} />
+            <AppText variant="body" muted>
+              Reset what I&apos;ve learned
+            </AppText>
+          </Pressable>
         )}
       </Card>
 
       <Card style={styles.card}>
-        <AppText variant="label" muted>
-          DATA
-        </AppText>
         <Pressable onPress={confirmReset} style={styles.resetRow}>
           <Ionicons name="trash-outline" size={20} color="#E5484D" />
           <AppText variant="body" color="#E5484D">
@@ -308,11 +271,7 @@ export default function SettingsScreen() {
       </Card>
 
       <Card style={styles.card}>
-        <AppText variant="label" muted>
-          ABOUT
-        </AppText>
         <Pressable onPress={() => router.push('/legal')} style={styles.aboutRow}>
-          <Ionicons name="shield-checkmark-outline" size={20} color={colors.accent} />
           <AppText variant="body" style={{ flex: 1 }}>
             Privacy & disclaimer
           </AppText>
@@ -332,18 +291,11 @@ const styles = StyleSheet.create({
   card: { gap: spacing.md },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
   rowText: { flex: 1, gap: 2 },
-  divider: { height: StyleSheet.hairlineWidth, marginVertical: spacing.xs },
   timeAdjust: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   volumeTrack: { width: 90, height: 6, borderRadius: radius.pill, overflow: 'hidden' },
   volumeFill: { height: '100%', borderRadius: radius.pill },
   timeLabel: { minWidth: 96, textAlign: 'center' },
   stepBtn: { padding: spacing.xs },
-  minuteRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm },
-  minuteBtn: {
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.pill,
-  },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   intervalChip: {
     paddingVertical: spacing.sm,

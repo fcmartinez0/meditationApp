@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useKeepAwake } from 'expo-keep-awake';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -334,7 +333,7 @@ export default function SessionScreen() {
 
   if (phase === 'finished') {
     return (
-      <LinearGradient colors={colors.gradient} style={styles.fill}>
+      <View style={[styles.fill, { backgroundColor: colors.background }]}>
         <SafeAreaView style={styles.completed}>
           <Ionicons
             name={useEngine ? 'musical-notes' : 'checkmark-circle'}
@@ -397,14 +396,14 @@ export default function SessionScreen() {
 
           <Button label="Done" onPress={() => router.back()} style={styles.doneBtn} />
         </SafeAreaView>
-      </LinearGradient>
+      </View>
     );
   }
 
   // Preparing: a calm screen while the piece renders — no countdown yet.
   if (phase === 'preparing') {
     return (
-      <LinearGradient colors={colors.gradient} style={styles.fill}>
+      <View style={[styles.fill, { backgroundColor: colors.background }]}>
         <SafeAreaView style={styles.fill} edges={['left', 'right', 'bottom']}>
           <Pressable
             accessibilityRole="button"
@@ -432,12 +431,12 @@ export default function SessionScreen() {
             </AppText>
           </View>
         </SafeAreaView>
-      </LinearGradient>
+      </View>
     );
   }
 
   return (
-    <LinearGradient colors={colors.gradient} style={styles.fill}>
+    <View style={[styles.fill, { backgroundColor: colors.background }]}>
       <SafeAreaView style={styles.fill} edges={['left', 'right', 'bottom']}>
         <Pressable
           accessibilityRole="button"
@@ -548,7 +547,7 @@ export default function SessionScreen() {
           </View>
         </View>
       </SafeAreaView>
-    </LinearGradient>
+    </View>
   );
 }
 

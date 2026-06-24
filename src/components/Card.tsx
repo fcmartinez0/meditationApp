@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { StyleSheet, View, type ViewStyle } from 'react-native';
 
 import { useThemeColors } from '@/hooks/useThemeColors';
-import { radius, spacing } from '@/theme';
+import { radius } from '@/theme';
 
 interface CardProps {
   children: ReactNode;
@@ -26,14 +26,10 @@ export function Card({ children, style }: CardProps) {
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: radius.lg,
-    padding: spacing.xl,
+    // Flat and quiet: a single hairline border, no drop shadow, gentler corners
+    // and a touch less padding — lets content and whitespace carry the screen.
+    borderRadius: radius.md,
+    padding: 20,
     borderWidth: StyleSheet.hairlineWidth,
-    // Soft shadow (iOS) / elevation (Android).
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 2,
   },
 });

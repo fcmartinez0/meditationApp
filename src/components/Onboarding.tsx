@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRef, useState } from 'react';
 import {
   Dimensions,
@@ -58,7 +57,7 @@ export function Onboarding() {
 
   return (
     <View style={styles.overlay}>
-      <LinearGradient colors={colors.gradient} style={styles.fill}>
+      <View style={[styles.fill, { backgroundColor: colors.background }]}>
         <SafeAreaView style={styles.fill}>
           <Pressable onPress={complete} hitSlop={12} style={styles.skip}>
             <AppText variant="label" muted>
@@ -104,7 +103,7 @@ export function Onboarding() {
             <Button label={index >= SLIDES.length - 1 ? 'Get started' : 'Next'} onPress={next} />
           </View>
         </SafeAreaView>
-      </LinearGradient>
+      </View>
     </View>
   );
 }
