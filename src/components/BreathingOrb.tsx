@@ -127,15 +127,20 @@ export function BreathingOrb({ active = false, still, core, halo, colors: gradie
 
       {/* Outer hexagon. */}
       <Animated.View style={[styles.layer, spinAStyle]} pointerEvents="none">
-        <Polygon sides={6} radius={GEOM * 0.42} color={withAlpha(grad[1], 0.8)} strokeWidth={1.5} />
+        <Polygon sides={6} radius={GEOM * 0.44} color={withAlpha(grad[1], 0.9)} strokeWidth={2} />
       </Animated.View>
 
       {/* Two counter-rotating triangles — a shifting hexagram. */}
       <Animated.View style={[styles.layer, spinBStyle]} pointerEvents="none">
-        <Polygon sides={3} radius={GEOM * 0.37} color={withAlpha('#FFFFFF', 0.55)} strokeWidth={1.5} />
+        <Polygon sides={3} radius={GEOM * 0.38} color={withAlpha('#FFFFFF', 0.6)} strokeWidth={2} />
       </Animated.View>
       <Animated.View style={[styles.layer, spinAStyle]} pointerEvents="none">
-        <Polygon sides={3} radius={GEOM * 0.37} color={withAlpha(grad[0], 0.7)} strokeWidth={1.5} rotate={180} />
+        <Polygon sides={3} radius={GEOM * 0.38} color={withAlpha(grad[0], 0.8)} strokeWidth={2} rotate={180} />
+      </Animated.View>
+
+      {/* Nested inner hexagon for depth. */}
+      <Animated.View style={[styles.layer, spinBStyle]} pointerEvents="none">
+        <Polygon sides={6} radius={GEOM * 0.29} color={withAlpha('#FFFFFF', 0.4)} strokeWidth={1.5} rotate={30} />
       </Animated.View>
 
       {/* Crisp concentric rings. */}
