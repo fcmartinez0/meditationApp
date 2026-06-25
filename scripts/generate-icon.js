@@ -243,6 +243,8 @@ function flat(size, color) {
 
 console.log('Generating stardust app icons...');
 writePNG(path.join(OUT, 'icon.png'), 1024, 1024, render(1024, { bg: 'navy' }), true);
+// Lock-screen / Control Center now-playing artwork (same stardust mark on navy).
+writePNG(path.join(OUT, 'now-playing.png'), 1024, 1024, render(1024, { bg: 'navy' }), true);
 writePNG(path.join(OUT, 'splash-icon.png'), 512, 512, render(512, { bg: 'transparent' }));
 writePNG(path.join(OUT, 'android-icon-foreground.png'), 512, 512, render(512, { bg: 'transparent', scale: 0.7 }));
 writePNG(path.join(OUT, 'android-icon-background.png'), 512, 512, flat(512, NAVY));
