@@ -346,7 +346,7 @@ export default function SessionScreen() {
           {!useEngine && (
             <>
               <AppText variant="body" muted center>
-                You meditated for {Math.round(totalSec / 60)} minutes.
+                {Math.round(totalSec / 60)} minutes of stillness.
               </AppText>
               <View style={styles.streakPill}>
                 <Ionicons name="flame" size={20} color={colors.warning} />

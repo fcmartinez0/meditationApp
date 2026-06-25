@@ -95,7 +95,7 @@ export default function ProgressScreen() {
         <Card style={styles.empty}>
           <Ionicons name="sparkles-outline" size={28} color={colors.accent} />
           <AppText variant="body" muted center>
-            Your stats will appear here after your first session. Head to the Meditate tab to begin.
+            Your stats will appear here after your first session. Head to the Relax tab to begin.
           </AppText>
         </Card>
       )}

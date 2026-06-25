@@ -62,7 +62,7 @@ export async function scheduleDailyReminder(hour: number, minute: number): Promi
   await Notifications.scheduleNotificationAsync({
     identifier: REMINDER_ID,
     content: {
-      title: 'Meditation reminder',
+      title: 'Time for stillness',
       body,
       sound: 'default',
     },

@@ -153,7 +153,7 @@ export default function SettingsScreen() {
 
       <Card style={styles.card}>
         <Row
-          label="Remind me to meditate"
+          label="Daily reminder"
           hint={NOTIFICATIONS_SUPPORTED ? 'A gentle daily nudge' : 'Available in the iOS / Android app'}>
           <Switch
             value={settings.reminderEnabled && NOTIFICATIONS_SUPPORTED}
