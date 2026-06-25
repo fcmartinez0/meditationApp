@@ -40,7 +40,7 @@ export function Screen({ children, scroll = false, bare = false, contentStyle, f
         </>
       ) : null}
       {/* Faint rotating geometric watermark, echoing the session orb. */}
-      <GeometricFlair color={colors.accent} size={380} opacity={bg ? 0.1 : 0.18} style={styles.flair} />
+      <GeometricFlair color={colors.accent} size={480} opacity={bg ? 0.16 : 0.28} style={styles.flair} />
       <SafeAreaView style={styles.fill} edges={['top', 'left', 'right']}>
         {scroll ? (
           <ScrollView
@@ -61,7 +61,7 @@ export function Screen({ children, scroll = false, bare = false, contentStyle, f
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   // Bleed the motif off the top-right corner so it reads as ambient, not central.
-  flair: { position: 'absolute', top: -150, right: -130 },
+  flair: { position: 'absolute', top: -170, right: -170 },
   padded: { paddingHorizontal: spacing.xl },
   scrollContent: { paddingBottom: spacing.xxxl, gap: spacing.lg },
 });

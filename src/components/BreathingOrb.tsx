@@ -12,12 +12,13 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { Polygon } from '@/components/Polygon';
 import { withAlpha } from '@/theme/categories';
 
 const SIZE = 280;
 const CORE = SIZE * 0.46;
 const GEOM = SIZE * 0.92;
-const SPOKES = 12;
+const TICKS = 36;
 const BREATH_MS = 4200;
 
 interface BreathingOrbProps {
@@ -107,28 +108,34 @@ export function BreathingOrb({ active = false, still, core, halo, colors: gradie
     <View style={styles.container}>
       <Animated.View style={[styles.halo, { backgroundColor: haloColor }, haloStyle]} />
 
-      {/* Radial spokes wheel. */}
+      {/* Fine outer tick ring (every third tick longer, like a bezel). */}
       <Animated.View style={[styles.layer, spokesStyle]} pointerEvents="none">
-        {Array.from({ length: SPOKES }).map((_, i) => (
+        {Array.from({ length: TICKS }).map((_, i) => (
           <View
             key={i}
             style={[
-              styles.spoke,
+              styles.tick,
               {
-                backgroundColor: withAlpha(palette[i % palette.length], 0.5),
-                transform: [{ rotate: `${(360 / SPOKES) * i}deg` }, { translateY: -GEOM * 0.27 }],
+                backgroundColor: withAlpha(palette[i % palette.length], i % 3 === 0 ? 0.65 : 0.28),
+                height: i % 3 === 0 ? 12 : 6,
+                transform: [{ rotate: `${(360 / TICKS) * i}deg` }, { translateY: -GEOM * 0.47 }],
               },
             ]}
           />
         ))}
       </Animated.View>
 
-      {/* Two counter-rotating polygons (squares → shifting 8-point geometry). */}
+      {/* Outer hexagon. */}
       <Animated.View style={[styles.layer, spinAStyle]} pointerEvents="none">
-        <View style={[styles.poly, { width: GEOM * 0.62, height: GEOM * 0.62, borderColor: withAlpha(grad[1], 0.85) }]} />
+        <Polygon sides={6} radius={GEOM * 0.42} color={withAlpha(grad[1], 0.8)} strokeWidth={1.5} />
       </Animated.View>
+
+      {/* Two counter-rotating triangles — a shifting hexagram. */}
       <Animated.View style={[styles.layer, spinBStyle]} pointerEvents="none">
-        <View style={[styles.poly, { width: GEOM * 0.46, height: GEOM * 0.46, borderColor: withAlpha(grad[0], 0.85) }]} />
+        <Polygon sides={3} radius={GEOM * 0.37} color={withAlpha('#FFFFFF', 0.55)} strokeWidth={1.5} />
+      </Animated.View>
+      <Animated.View style={[styles.layer, spinAStyle]} pointerEvents="none">
+        <Polygon sides={3} radius={GEOM * 0.37} color={withAlpha(grad[0], 0.7)} strokeWidth={1.5} rotate={180} />
       </Animated.View>
 
       {/* Crisp concentric rings. */}
@@ -172,8 +179,7 @@ const styles = StyleSheet.create({
   container: { width: SIZE, height: SIZE, alignItems: 'center', justifyContent: 'center' },
   halo: { position: 'absolute', width: SIZE, height: SIZE, borderRadius: SIZE / 2 },
   layer: { position: 'absolute', width: SIZE, height: SIZE, alignItems: 'center', justifyContent: 'center' },
-  spoke: { position: 'absolute', width: 2, height: GEOM * 0.34, borderRadius: 1 },
-  poly: { position: 'absolute', borderWidth: 1.5, borderRadius: 6 },
+  tick: { position: 'absolute', width: 2, borderRadius: 1 },
   ringWrap: { position: 'absolute', width: SIZE, height: SIZE, alignItems: 'center', justifyContent: 'center' },
   ring: { position: 'absolute', borderWidth: 1, borderRadius: GEOM },
   core: { position: 'absolute', width: CORE, height: CORE, borderRadius: CORE / 2, overflow: 'hidden' },
