@@ -17,15 +17,9 @@ import {
   scheduleDailyReminder,
 } from '@/lib/notifications';
 import { clearRatings, loadRatings, summarizePreference } from '@/lib/preferences';
-import type { PieceRating, TimerStyle } from '@/lib/types';
+import type { PieceRating } from '@/lib/types';
 import { useAppData } from '@/store/AppData';
 import { radius, spacing } from '@/theme';
-
-const TIMER_STYLES: { value: TimerStyle; label: string }[] = [
-  { value: 'orb', label: 'Breathing orb' },
-  { value: 'tide', label: 'Tide' },
-  { value: 'minimal', label: 'Minimal' },
-];
 
 /** A labelled row with a control on the right. */
 function Row({ children, label, hint }: { children?: React.ReactNode; label: string; hint?: string }) {
@@ -265,25 +259,6 @@ export default function SettingsScreen() {
             thumbColor={Platform.OS === 'android' ? colors.surface : undefined}
           />
         </Row>
-        <AppText variant="body">Session visual</AppText>
-        <View style={styles.chipWrap}>
-          {TIMER_STYLES.map((opt) => {
-            const selected = settings.timerStyle === opt.value;
-            return (
-              <Pressable
-                key={opt.value}
-                onPress={() => set({ timerStyle: opt.value })}
-                style={[
-                  styles.intervalChip,
-                  { backgroundColor: selected ? colors.accent : colors.surfaceMuted },
-                ]}>
-                <AppText variant="caption" color={selected ? colors.textOnAccent : colors.text}>
-                  {opt.label}
-                </AppText>
-              </Pressable>
-            );
-          })}
-        </View>
       </Card>
 
       <Card style={styles.card}>
@@ -360,17 +335,11 @@ const styles = StyleSheet.create({
   volumeFill: { height: '100%', borderRadius: radius.pill },
   timeLabel: { minWidth: 96, textAlign: 'center' },
   stepBtn: { padding: spacing.xs },
-  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   bgButtons: { flexDirection: 'row', gap: spacing.sm },
   bgBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radius.pill,
-  },
-  intervalChip: {
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.lg,
     borderRadius: radius.pill,

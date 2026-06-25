@@ -10,8 +10,6 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { BreathingOrb } from '@/components/BreathingOrb';
-import { MinimalTimer } from '@/components/MinimalTimer';
-import { TideTimer } from '@/components/TideTimer';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { SessionAudio } from '@/lib/audio';
 import { soundMeta } from '@/lib/catalog';
@@ -453,46 +451,18 @@ export default function SessionScreen() {
           style={styles.center}
           pointerEvents="box-none"
           entering={FadeIn.duration(1100)}>
-          {settings.timerStyle === 'tide' ? (
-            <TideTimer active={phase === 'running'} progress={progress} color={cat.accent}>
-              <AppText
-                variant="display"
-                color="#FFFFFF"
-                style={styles.clock}
-                accessibilityLabel={spokenTime}>
-                {formatClock(clockSeconds)}
-              </AppText>
-            </TideTimer>
-          ) : settings.timerStyle === 'minimal' ? (
-            <MinimalTimer active={phase === 'running'}>
-              <AppText
-                variant="display"
-                color={cat.accent}
-                style={styles.clockMinimal}
-                accessibilityLabel={spokenTime}>
-                {formatClock(clockSeconds)}
-              </AppText>
-            </MinimalTimer>
-          ) : (
-            <BreathingOrb active={phase === 'running'} core={cat.accent} halo={cat.colors[0]} colors={cat.colors}>
-              <AppText
-                variant="display"
-                color="#FFFFFF"
-                style={styles.clock}
-                accessibilityLabel={spokenTime}>
-                {formatClock(clockSeconds)}
-              </AppText>
-            </BreathingOrb>
-          )}
+          <BreathingOrb active={phase === 'running'} core={cat.accent} halo={cat.colors[0]} colors={cat.colors}>
+            <AppText
+              variant="display"
+              color="#FFFFFF"
+              style={styles.clock}
+              accessibilityLabel={spokenTime}>
+              {formatClock(clockSeconds)}
+            </AppText>
+          </BreathingOrb>
 
           <AppText variant="label" muted style={styles.hint}>
-            {phase === 'running'
-              ? settings.timerStyle === 'orb'
-                ? 'Breathe with the orb'
-                : settings.timerStyle === 'tide'
-                  ? 'Let it fill'
-                  : 'Be still'
-              : 'Paused'}
+            {phase === 'running' ? 'Breathe with the orb' : 'Paused'}
           </AppText>
         </Animated.View>
 

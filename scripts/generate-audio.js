@@ -129,7 +129,15 @@ function master(channels, { targetDb = -14, thresholdDb = -18, ratio = 3, air = 
     }
   }
 
-  // 1) Linked compressor.
+  // 1) Linked compressor. Warm up the envelope on a silent first pass so its
+  //    state is loop-continuous — otherwise it starts at 0, so the loop's start
+  //    is less compressed than its end, leaving a gain step (an audible pop) at
+  //    the wrap, worst on the louder channel.
+  for (let i = 0; i < n; i++) {
+    let det = 0;
+    for (const ch of channels) det = Math.max(det, Math.abs(ch[i]));
+    env = (det > env ? atk : rel) * env + (1 - (det > env ? atk : rel)) * det;
+  }
   for (let i = 0; i < n; i++) {
     let det = 0;
     for (const ch of channels) det = Math.max(det, Math.abs(ch[i]));
@@ -1569,7 +1577,7 @@ const calm = generateMusic({
   noiseAmp: 0.06,
   seed: 11,
 });
-writeWavStereo(path.join(MUSIC_DIR, 'calm.wav'), calm.left, calm.right, { air: 0.12, lowShelf: 0.2, airFreq: 9000 });
+writeWavStereo(path.join(MUSIC_DIR, 'calm.wav'), calm.left, calm.right);
 
 const focus = generateMusic({
   carrierHz: 384, // "scientific" G (3× 128) — in the effective binaural carrier band
@@ -1583,7 +1591,7 @@ const focus = generateMusic({
   noiseAmp: 0.03,
   seed: 22,
 });
-writeWavStereo(path.join(MUSIC_DIR, 'focus.wav'), focus.left, focus.right, { air: 0.12, lowShelf: 0.2, airFreq: 9000 });
+writeWavStereo(path.join(MUSIC_DIR, 'focus.wav'), focus.left, focus.right);
 
 const deep = generateMusic({
   carrierHz: 144, // low warm drone
@@ -1595,7 +1603,7 @@ const deep = generateMusic({
   noiseAmp: 0.05,
   seed: 33,
 });
-writeWavStereo(path.join(MUSIC_DIR, 'deep.wav'), deep.left, deep.right, { air: 0.12, lowShelf: 0.2, airFreq: 9000 });
+writeWavStereo(path.join(MUSIC_DIR, 'deep.wav'), deep.left, deep.right);
 
 const dream = generateMusic({
   carrierHz: 396, // soft mid drone (octave up) — lands in the effective binaural band
@@ -1608,7 +1616,7 @@ const dream = generateMusic({
   noiseAmp: 0.06,
   seed: 44,
 });
-writeWavStereo(path.join(MUSIC_DIR, 'dream.wav'), dream.left, dream.right, { air: 0.12, lowShelf: 0.2, airFreq: 9000 });
+writeWavStereo(path.join(MUSIC_DIR, 'dream.wav'), dream.left, dream.right);
 
 const clarity = generateMusic({
   carrierHz: 240,
@@ -1622,7 +1630,7 @@ const clarity = generateMusic({
   noiseAmp: 0.04,
   seed: 55,
 });
-writeWavStereo(path.join(MUSIC_DIR, 'clarity.wav'), clarity.left, clarity.right, { air: 0.12, lowShelf: 0.2, airFreq: 9000 });
+writeWavStereo(path.join(MUSIC_DIR, 'clarity.wav'), clarity.left, clarity.right);
 
 // Beats get a headphone-focused master: more presence "air", a wider stereo
 // image, and low-shelf warmth for a fuller low end on good earphones. Each is

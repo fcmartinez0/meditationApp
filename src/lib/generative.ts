@@ -102,9 +102,11 @@ const LOOP_SECONDS = 16;
 const XFADE_SECONDS = 2;
 const RENDER_SECONDS = LOOP_SECONDS + XFADE_SECONDS;
 const IMPULSE_SECONDS = 0.7;
-// 24 kHz (Nyquist 12 kHz) still covers the air/shimmer the pads need while
-// cutting per-sample DSP ~25% vs 32 kHz; playback resamples to the device rate.
-const RENDER_SR = 24000;
+// Render at 44.1 kHz (Nyquist 22 kHz). 24 kHz was cheaper but its 12 kHz ceiling
+// made bright pads/chimes and the reverb tail sound grainy and metallic
+// ("robotic"); full rate removes that aliasing. The render is offline and
+// prefetched in the background, so the extra cost doesn't stall the session.
+const RENDER_SR = 44100;
 // The offline mix is baked at this level; the player's master scales on top.
 const MIX_GAIN = 0.5;
 
@@ -167,7 +169,7 @@ function softClip(x: number): number {
 // warmth and rounds off peaks the way a mix-bus compressor would, baked into the
 // off-thread render as one WaveShaper node. Near-linear at low levels, so it
 // only colours the sound as the mix gets loud, never obviously distorting.
-function makeSaturationCurve(amount = 1.6, n = 1024): Float32Array {
+function makeSaturationCurve(amount = 1.15, n = 1024): Float32Array {
   const curve = new Float32Array(n);
   const k = Math.tanh(amount);
   for (let i = 0; i < n; i++) {
@@ -323,8 +325,8 @@ class Composer {
     // otherwise). One node, created here — no effect on UI responsiveness.
     const air = ctx.createBiquadFilter();
     air.type = 'highshelf';
-    air.frequency.value = 6500;
-    air.gain.value = 4;
+    air.frequency.value = 7500;
+    air.gain.value = 2.5;
     // Master glue: a gentle tanh saturator on the sum for warmth and cohesion,
     // and to round off peaks (the native engine has no compressor). 2x oversample
     // keeps the added harmonics from aliasing on bright material.

@@ -140,8 +140,6 @@ export interface PieceRating {
   at: number;
 }
 
-/** The visual shown during a session. */
-export type TimerStyle = 'orb' | 'tide' | 'minimal';
 
 /** A single completed (or partially completed) meditation session. */
 export interface SessionRecord {
@@ -173,8 +171,6 @@ export interface Settings {
    * pausing other apps, which also enables reliable background/lock-screen use.
    */
   mixWithMusic: boolean;
-  /** Visual shown during a session. */
-  timerStyle: TimerStyle;
   /** Optional user-chosen background image (a local file URI), or null. */
   backgroundUri: string | null;
   /** Whether the first-run intro has been completed. */
@@ -202,7 +198,6 @@ export const DEFAULT_SETTINGS: Settings = {
   reminderMinute: 0,
   volume: 0.85,
   mixWithMusic: false,
-  timerStyle: 'orb',
   backgroundUri: null,
   onboarded: false,
   settingsVersion: 3,
