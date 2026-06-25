@@ -32,7 +32,7 @@ export function Screen({ children, scroll = false, bare = false, contentStyle, f
   const padding = bare ? undefined : styles.padded;
 
   return (
-    <View style={[styles.fill, { backgroundColor: colors.background }]}>
+    <View style={[styles.fill, styles.clip, { backgroundColor: colors.background }]}>
       {bg ? (
         <>
           <Image source={{ uri: bg }} style={StyleSheet.absoluteFill} contentFit="cover" transition={300} />
@@ -40,12 +40,15 @@ export function Screen({ children, scroll = false, bare = false, contentStyle, f
           <View style={[StyleSheet.absoluteFill, { backgroundColor: withAlpha(colors.background, 0.55) }]} />
         </>
       ) : null}
-      {/* Faint rotating geometric watermark, echoing the session orb. */}
-      {/* Ambient backdrop: a faint stardust field plus a geometric mandala, so
-          screens never read as empty. */}
+      {/* Ambient backdrop: a faint stardust field plus geometric mandalas,
+          horizontally centred (top + bottom) so it stays symmetric as you scroll. */}
       <StarField color={colors.text} count={bg ? 70 : 130} />
-      <GeometricFlair color={colors.accent} size={520} opacity={bg ? 0.18 : 0.32} style={styles.flair} />
-      <GeometricFlair color={colors.accent} size={300} opacity={bg ? 0.12 : 0.2} style={styles.flairAlt} />
+      <View style={styles.flairTop} pointerEvents="none">
+        <GeometricFlair color={colors.accent} size={520} opacity={bg ? 0.18 : 0.3} />
+      </View>
+      <View style={styles.flairBottom} pointerEvents="none">
+        <GeometricFlair color={colors.accent} size={360} opacity={bg ? 0.12 : 0.2} />
+      </View>
       <SafeAreaView style={styles.fill} edges={['top', 'left', 'right']}>
         {scroll ? (
           <ScrollView
@@ -65,9 +68,10 @@ export function Screen({ children, scroll = false, bare = false, contentStyle, f
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  // Two mandalas bleeding off opposite corners so the backdrop feels balanced.
-  flair: { position: 'absolute', top: -180, right: -180 },
-  flairAlt: { position: 'absolute', bottom: -110, left: -120 },
+  clip: { overflow: 'hidden' },
+  // Centred mandalas bleeding off the top and bottom — symmetric left-to-right.
+  flairTop: { position: 'absolute', top: -240, left: 0, right: 0, alignItems: 'center' },
+  flairBottom: { position: 'absolute', bottom: -200, left: 0, right: 0, alignItems: 'center' },
   padded: { paddingHorizontal: spacing.xl },
   scrollContent: { paddingBottom: spacing.xxxl, gap: spacing.lg },
 });

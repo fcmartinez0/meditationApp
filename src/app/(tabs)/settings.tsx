@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import Constants from 'expo-constants';
 import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
@@ -195,7 +196,7 @@ export default function SettingsScreen() {
   return (
     <Screen scroll>
       <View style={styles.header}>
-        <AppText variant="label" muted>
+        <AppText variant="label" color={colors.accent}>
           PREFERENCES
         </AppText>
         <AppText variant="title">Settings</AppText>
@@ -339,7 +340,7 @@ export default function SettingsScreen() {
       </Card>
 
       <AppText variant="caption" muted center style={styles.footer}>
-        Stillness · v1.0
+        Stillness · v{Constants.expoConfig?.version ?? '1.0.0'}
       </AppText>
     </Screen>
   );

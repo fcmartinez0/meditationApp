@@ -256,10 +256,11 @@ function generateMusic({ carrierHz, beatHz, partials, noiseAmp, seed }) {
   const left = new Float32Array(total);
   const right = new Float32Array(total);
 
-  // Shared warm noise bed (centered, so it adds no beat of its own).
+  // Decorrelated warm noise beds per ear for a wider, airier space (noise has no
+  // tonal beat of its own, so the binaural beat stays pure).
   const rng = makeRng(seed);
-  let bed = brownNoise(total, rng);
-  bed = lowPass(bed, 400);
+  const bedL = lowPass(brownNoise(total, rng), 400);
+  const bedR = lowPass(brownNoise(total, rng), 400);
 
   for (let i = 0; i < total; i++) {
     const t = i / SAMPLE_RATE;
@@ -267,15 +268,23 @@ function generateMusic({ carrierHz, beatHz, partials, noiseAmp, seed }) {
     const swell = 0.72 + 0.28 * Math.sin(2 * Math.PI * 0.08 * t);
     let l = 0;
     let r = 0;
-    for (const p of partials) {
+    partials.forEach((p, k) => {
+      // Each harmonic drifts in level on its own slow LFO, so the timbre evolves
+      // over the loop instead of sitting as a static drone.
+      const drift = 1 + 0.22 * Math.sin(2 * Math.PI * (0.013 + k * 0.006) * t + k);
+      const a = p.amp * drift;
       const fl = carrierHz * p.ratio;
       const fr = fl + beatHz; // constant offset -> same perceived beat per partial
-      l += p.amp * Math.sin(2 * Math.PI * fl * t);
-      r += p.amp * Math.sin(2 * Math.PI * fr * t);
-    }
-    const air = bed[i] * noiseAmp;
-    left[i] = l * swell + air;
-    right[i] = r * swell + air;
+      l += a * Math.sin(2 * Math.PI * fl * t);
+      r += a * Math.sin(2 * Math.PI * fr * t);
+    });
+    // A soft, centred shimmer (an octave+fifth up) that swells in and out very
+    // slowly — adds evolving air. Centred, so it introduces no beat of its own.
+    const shimmer = 0.1 * Math.max(0, Math.sin(2 * Math.PI * 0.035 * t)) * Math.sin(2 * Math.PI * carrierHz * 3 * t);
+    l += shimmer;
+    r += shimmer;
+    left[i] = l * swell + bedL[i] * noiseAmp;
+    right[i] = r * swell + bedR[i] * noiseAmp;
   }
 
   return {
@@ -284,8 +293,15 @@ function generateMusic({ carrierHz, beatHz, partials, noiseAmp, seed }) {
   };
 }
 
+// Per-variant beat knobs. Only the beat generators use midiToFreq / makeKit, so
+// setting these before generating a beat shifts its key (pads/keys/bass/melody —
+// drums use raw Hz and stay put) and reseeds its groove, producing musically
+// distinct variants without touching each generator. Reset to 0 afterward.
+let BEAT_TRANSPOSE = 0;
+let BEAT_SEED_OFFSET = 0;
+
 function midiToFreq(m) {
-  return 440 * Math.pow(2, (m - 69) / 12);
+  return 440 * Math.pow(2, (m - 69 + BEAT_TRANSPOSE) / 12);
 }
 
 /**
@@ -296,7 +312,7 @@ function midiToFreq(m) {
  */
 function makeKit(N, seed) {
   const SR = SAMPLE_RATE;
-  const rng = makeRng(seed);
+  const rng = makeRng((seed + BEAT_SEED_OFFSET) >>> 0);
   const L = new Float32Array(N);
   const R = new Float32Array(N);
   const add = (idx, l, r) => {
@@ -1634,26 +1650,34 @@ writeWavStereo(path.join(MUSIC_DIR, 'clarity.wav'), clarity.left, clarity.right)
 
 // Beats get a headphone-focused master: more presence "air", a wider stereo
 // image, and low-shelf warmth for a fuller low end on good earphones. Each is
-// tuned to its genre (deeper sub on house/techno/dnb, more air on the bright
-// retro/lush ones). The loudness pass + limiter keep levels safe.
-const lofi = generateLoFi();
-writeWavStereo(path.join(BEATS_DIR, 'lofi.wav'), lofi.left, lofi.right, { air: 0.34, widen: 1.2, lowShelf: 0.34, airFreq: 9000 });
-const liquid = generateLiquid();
-writeWavStereo(path.join(BEATS_DIR, 'liquid.wav'), liquid.left, liquid.right, { air: 0.45, widen: 1.4, lowShelf: 0.42, airFreq: 8000 });
-const chillstep = generateChillstep();
-writeWavStereo(path.join(BEATS_DIR, 'chillstep.wav'), chillstep.left, chillstep.right, { air: 0.42, widen: 1.35, lowShelf: 0.42, airFreq: 8500 });
-const downtempo = generateDowntempo();
-writeWavStereo(path.join(BEATS_DIR, 'downtempo.wav'), downtempo.left, downtempo.right, { air: 0.4, widen: 1.3, lowShelf: 0.32, airFreq: 8500 });
-const deephouse = generateDeepHouse();
-writeWavStereo(path.join(BEATS_DIR, 'deephouse.wav'), deephouse.left, deephouse.right, { air: 0.36, widen: 1.32, lowShelf: 0.46, airFreq: 9000 });
-const melodic = generateMelodic();
-writeWavStereo(path.join(BEATS_DIR, 'melodic.wav'), melodic.left, melodic.right, { air: 0.46, widen: 1.4, lowShelf: 0.36, airFreq: 8000 });
-const techno = generateTechno();
-writeWavStereo(path.join(BEATS_DIR, 'techno.wav'), techno.left, techno.right, { air: 0.4, widen: 1.35, lowShelf: 0.46, airFreq: 8500 });
-const triphop = generateTripHop();
-writeWavStereo(path.join(BEATS_DIR, 'triphop.wav'), triphop.left, triphop.right, { air: 0.42, widen: 1.5, lowShelf: 0.4, airFreq: 8500 });
-const synthwave = generateSynthwave();
-writeWavStereo(path.join(BEATS_DIR, 'synthwave.wav'), synthwave.left, synthwave.right, { air: 0.5, widen: 1.7, lowShelf: 0.34, airFreq: 7500 });
+// tuned to its genre. Two variants per genre are rendered in different keys with
+// reseeded grooves (see BEAT_TRANSPOSE / BEAT_SEED_OFFSET), so the app can pick a
+// different one each session for variety. The loudness pass + limiter keep levels safe.
+const BEATS = [
+  { name: 'lofi', gen: generateLoFi, opts: { air: 0.34, widen: 1.2, lowShelf: 0.34, airFreq: 9000 } },
+  { name: 'liquid', gen: generateLiquid, opts: { air: 0.45, widen: 1.4, lowShelf: 0.42, airFreq: 8000 } },
+  { name: 'chillstep', gen: generateChillstep, opts: { air: 0.42, widen: 1.35, lowShelf: 0.42, airFreq: 8500 } },
+  { name: 'downtempo', gen: generateDowntempo, opts: { air: 0.4, widen: 1.3, lowShelf: 0.32, airFreq: 8500 } },
+  { name: 'deephouse', gen: generateDeepHouse, opts: { air: 0.36, widen: 1.32, lowShelf: 0.46, airFreq: 9000 } },
+  { name: 'melodic', gen: generateMelodic, opts: { air: 0.46, widen: 1.4, lowShelf: 0.36, airFreq: 8000 } },
+  { name: 'techno', gen: generateTechno, opts: { air: 0.4, widen: 1.35, lowShelf: 0.46, airFreq: 8500 } },
+  { name: 'triphop', gen: generateTripHop, opts: { air: 0.42, widen: 1.5, lowShelf: 0.4, airFreq: 8500 } },
+  { name: 'synthwave', gen: generateSynthwave, opts: { air: 0.5, widen: 1.7, lowShelf: 0.34, airFreq: 7500 } },
+];
+const BEAT_VARIANTS = [
+  { transpose: 0, seed: 0 },
+  { transpose: 5, seed: 50000 }, // variant 2: up a fourth, reseeded groove
+];
+for (let v = 0; v < BEAT_VARIANTS.length; v++) {
+  BEAT_TRANSPOSE = BEAT_VARIANTS[v].transpose;
+  BEAT_SEED_OFFSET = BEAT_VARIANTS[v].seed;
+  for (const b of BEATS) {
+    const track = b.gen();
+    writeWavStereo(path.join(BEATS_DIR, `${b.name}-${v + 1}.wav`), track.left, track.right, b.opts);
+  }
+}
+BEAT_TRANSPOSE = 0;
+BEAT_SEED_OFFSET = 0;
 
 console.log('Done.');
 }

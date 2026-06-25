@@ -31,7 +31,9 @@ function resolveArtwork(): Promise<string | undefined> {
   return artworkPromise;
 }
 
-const AMBIENT_SOURCES: Record<FileSound, number> = {
+// One source per sound, except the beats — each has two variants (different key
+// + groove) and the session picks one at random for variety.
+const AMBIENT_SOURCES: Record<FileSound, number | number[]> = {
   rain: require('@/assets/audio/ambient/rain.wav'),
   ocean: require('@/assets/audio/ambient/ocean.wav'),
   forest: require('@/assets/audio/ambient/forest.wav'),
@@ -47,16 +49,25 @@ const AMBIENT_SOURCES: Record<FileSound, number> = {
   deep: require('@/assets/audio/music/deep.wav'),
   dream: require('@/assets/audio/music/dream.wav'),
   clarity: require('@/assets/audio/music/clarity.wav'),
-  lofi: require('@/assets/audio/beats/lofi.wav'),
-  liquid: require('@/assets/audio/beats/liquid.wav'),
-  chillstep: require('@/assets/audio/beats/chillstep.wav'),
-  downtempo: require('@/assets/audio/beats/downtempo.wav'),
-  deephouse: require('@/assets/audio/beats/deephouse.wav'),
-  melodic: require('@/assets/audio/beats/melodic.wav'),
-  techno: require('@/assets/audio/beats/techno.wav'),
-  triphop: require('@/assets/audio/beats/triphop.wav'),
-  synthwave: require('@/assets/audio/beats/synthwave.wav'),
+  lofi: [require('@/assets/audio/beats/lofi-1.wav'), require('@/assets/audio/beats/lofi-2.wav')],
+  liquid: [require('@/assets/audio/beats/liquid-1.wav'), require('@/assets/audio/beats/liquid-2.wav')],
+  chillstep: [require('@/assets/audio/beats/chillstep-1.wav'), require('@/assets/audio/beats/chillstep-2.wav')],
+  downtempo: [require('@/assets/audio/beats/downtempo-1.wav'), require('@/assets/audio/beats/downtempo-2.wav')],
+  deephouse: [require('@/assets/audio/beats/deephouse-1.wav'), require('@/assets/audio/beats/deephouse-2.wav')],
+  melodic: [require('@/assets/audio/beats/melodic-1.wav'), require('@/assets/audio/beats/melodic-2.wav')],
+  techno: [require('@/assets/audio/beats/techno-1.wav'), require('@/assets/audio/beats/techno-2.wav')],
+  triphop: [require('@/assets/audio/beats/triphop-1.wav'), require('@/assets/audio/beats/triphop-2.wav')],
+  synthwave: [require('@/assets/audio/beats/synthwave-1.wav'), require('@/assets/audio/beats/synthwave-2.wav')],
 };
+
+/** All variant sources for a sound (a single-element list for most). */
+function sourcesFor(ambient: FileSound): number[] {
+  const src = AMBIENT_SOURCES[ambient];
+  return Array.isArray(src) ? src : [src];
+}
+
+// How often a multi-variant beat evolves to its other variant mid-session.
+const EVOLVE_MS = 200000; // ~3.3 minutes
 
 // Track the last-applied mix mode so we re-apply only when it actually changes.
 let appliedMix: boolean | null = null;
@@ -88,6 +99,13 @@ export class SessionAudio {
   private statusSub: ReturnType<AudioPlayer['addListener']> | null = null;
   private onPlaying?: (playing: boolean) => void;
   private lastPlaying: boolean | null = null;
+  // Beat variants: the loaded sources, the current one, and the mid-session
+  // "evolve" timer that crossfades to the other variant for within-session variety.
+  private sources: number[] = [];
+  private variantIdx = 0;
+  private playing = false;
+  private evolveTimer: ReturnType<typeof setInterval> | null = null;
+  private evolving = false;
   // Only forward transport changes once we've actually started playing, so the
   // player's initial "not playing" status can't trip a spurious pause at startup.
   private emitStatus = false;
@@ -119,12 +137,16 @@ export class SessionAudio {
     this.artwork = await resolveArtwork();
     await ensureAudioMode(mixWithMusic);
     if (ambient !== 'none' && !isGenerative(ambient)) {
-      this.ambient = createAudioPlayer(AMBIENT_SOURCES[ambient]);
+      this.sources = sourcesFor(ambient);
+      this.variantIdx = Math.floor(Math.random() * this.sources.length);
+      this.ambient = createAudioPlayer(this.sources[this.variantIdx]);
       this.ambient.loop = true;
       // Start silent so startAmbient() can fade in and avoid a click.
       this.ambient.volume = 0;
-      // Mirror external (lock-screen) play/pause back to the session UI.
+      // Mirror external (lock-screen) play/pause back to the session UI. Ignore
+      // the transient pause/play that a mid-session variant swap produces.
       this.statusSub = this.ambient.addListener('playbackStatusUpdate', (status) => {
+        if (this.evolving) return;
         const playing = !!status.playing;
         if (this.lastPlaying === playing) return;
         this.lastPlaying = playing;
@@ -167,10 +189,56 @@ export class SessionAudio {
         await new Promise((r) => setTimeout(r, 25));
       }
     })();
+    // Beats with more than one variant evolve mid-session: every few minutes the
+    // track crossfades (via a source swap) to its other variant — a gentle key
+    // change so a long session doesn't loop the same groove forever.
+    this.playing = true;
+    if (this.sources.length > 1 && !this.evolveTimer) {
+      this.evolveTimer = setInterval(() => void this.evolve(), EVOLVE_MS);
+    }
+  }
+
+  /** Crossfade the single player to the next variant (fade out, swap, fade in). */
+  private async evolve() {
+    const player = this.ambient;
+    if (!player || this.evolving || !this.playing || this.sources.length < 2) return;
+    this.evolving = true;
+    try {
+      const next = (this.variantIdx + 1) % this.sources.length;
+      await this.fadeTo(0, 1500);
+      if (!this.playing) return; // paused mid-fade — leave it for resume
+      player.replace(this.sources[next]);
+      player.loop = true;
+      player.volume = 0;
+      player.play();
+      this.variantIdx = next;
+      await this.fadeTo(this.targetVol, 1800);
+    } catch {
+      // Best effort — never let an evolve break playback.
+    } finally {
+      this.evolving = false;
+    }
+  }
+
+  /** Ramp the player volume to a target over `ms`. */
+  private async fadeTo(target: number, ms: number) {
+    const player = this.ambient;
+    if (!player) return;
+    const steps = 12;
+    const start = player.volume ?? 0;
+    for (let i = 1; i <= steps; i++) {
+      try {
+        player.volume = start + (target - start) * (i / steps);
+      } catch {
+        break;
+      }
+      await new Promise((r) => setTimeout(r, ms / steps));
+    }
   }
 
   /** Pause the loop (keeps position), e.g. when the session is paused. */
   pauseAmbient() {
+    this.playing = false;
     try {
       this.ambient?.pause();
     } catch {
@@ -180,6 +248,7 @@ export class SessionAudio {
 
   /** Resume after pauseAmbient(). */
   resumeAmbient() {
+    this.playing = true;
     try {
       this.ambient?.play();
     } catch {
@@ -189,6 +258,11 @@ export class SessionAudio {
 
   /** Fade ambient out over a few hundred ms, then pause. */
   async stopAmbient() {
+    this.playing = false;
+    if (this.evolveTimer) {
+      clearInterval(this.evolveTimer);
+      this.evolveTimer = null;
+    }
     const player = this.ambient;
     if (!player) return;
     try {
@@ -207,6 +281,11 @@ export class SessionAudio {
   /** Release native resources. Call when leaving the session. */
   release() {
     this.onPlaying = undefined;
+    this.playing = false;
+    if (this.evolveTimer) {
+      clearInterval(this.evolveTimer);
+      this.evolveTimer = null;
+    }
     try {
       this.statusSub?.remove();
     } catch {}

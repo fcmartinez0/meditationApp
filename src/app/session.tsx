@@ -10,6 +10,8 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { BreathingOrb } from '@/components/BreathingOrb';
+import { GlassFill } from '@/components/GlassFill';
+import { StarField } from '@/components/StarField';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { SessionAudio } from '@/lib/audio';
 import { soundMeta } from '@/lib/catalog';
@@ -331,7 +333,8 @@ export default function SessionScreen() {
 
   if (phase === 'finished') {
     return (
-      <View style={[styles.fill, { backgroundColor: colors.background }]}>
+      <View style={[styles.fill, styles.clip, { backgroundColor: colors.background }]}>
+        <StarField color={colors.text} count={90} />
         <SafeAreaView style={styles.completed}>
           <Ionicons
             name={useEngine ? 'musical-notes' : 'checkmark-circle'}
@@ -401,7 +404,8 @@ export default function SessionScreen() {
   // Preparing: a calm screen while the piece renders — no countdown yet.
   if (phase === 'preparing') {
     return (
-      <View style={[styles.fill, { backgroundColor: colors.background }]}>
+      <View style={[styles.fill, styles.clip, { backgroundColor: colors.background }]}>
+        <StarField color={colors.text} count={90} />
         <SafeAreaView style={styles.fill} edges={['left', 'right', 'bottom']}>
           <Pressable
             accessibilityRole="button"
@@ -434,7 +438,8 @@ export default function SessionScreen() {
   }
 
   return (
-    <View style={[styles.fill, { backgroundColor: colors.background }]}>
+    <View style={[styles.fill, styles.clip, { backgroundColor: colors.background }]}>
+        <StarField color={colors.text} count={90} />
       <SafeAreaView style={styles.fill} edges={['left', 'right', 'bottom']}>
         <Pressable
           accessibilityRole="button"
@@ -468,7 +473,8 @@ export default function SessionScreen() {
 
         <View style={styles.controls}>
           {audioFailed && (
-            <View style={[styles.audioWarn, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={styles.audioWarn}>
+              <GlassFill fallback={colors.surface} radius={radius.md} />
               <Ionicons name="volume-mute-outline" size={18} color={colors.warning} />
               <AppText variant="caption" muted style={styles.audioWarnText}>
                 Audio couldn’t start, but your session is still running in silence.
@@ -476,9 +482,10 @@ export default function SessionScreen() {
             </View>
           )}
           {useEngine && specLabel && (
-            <View style={[styles.nowPlaying, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={styles.nowPlaying}>
+              <GlassFill fallback={colors.surface} radius={radius.md} />
               <View style={styles.nowPlayingText}>
-                <AppText variant="caption" muted>
+                <AppText variant="caption" color={cat.accent}>
                   {composing ? 'COMPOSING' : 'NOW PLAYING'}
                 </AppText>
                 <AppText variant="body" numberOfLines={1}>
@@ -523,6 +530,7 @@ export default function SessionScreen() {
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
+  clip: { overflow: 'hidden' },
   close: {
     position: 'absolute',
     right: spacing.sm,
@@ -555,7 +563,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
     borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
+    overflow: 'hidden',
   },
   audioWarn: {
     flexDirection: 'row',
@@ -564,7 +572,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.lg,
     borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
+    overflow: 'hidden',
   },
   audioWarnText: { flex: 1, lineHeight: 16 },
   nowPlayingText: { flex: 1, gap: 2 },
