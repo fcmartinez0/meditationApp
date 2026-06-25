@@ -15,168 +15,130 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { withAlpha } from '@/theme/categories';
 
 const SIZE = 280;
-const CORE = SIZE * 0.64;
-// A calm ~4.2s inhale / ~4.2s exhale breathing rhythm.
+const CORE = SIZE * 0.46;
+const GEOM = SIZE * 0.92;
+const SPOKES = 12;
 const BREATH_MS = 4200;
 
 interface BreathingOrbProps {
-  /** When false the orb settles to a resting size (paused). */
   active?: boolean;
-  /** Hold a calm, still glow with no pulsing (e.g. on the home screen). */
   still?: boolean;
-  /** Core / halo colors (default to the theme accent). */
   core?: string;
   halo?: string;
-  /** A two-stop gradient for a richer core (falls back to [core, halo]). */
   colors?: readonly [string, string];
   children?: React.ReactNode;
 }
 
 /**
- * A living "aurora" orb that paces the breath: a gradient core with slowly
- * orbiting internal light blobs and a drifting sheen, a soft breathing halo,
- * concentric breath-ripples, and a few twinkling sparks. Calm, never busy.
+ * A crisp geometric "bloom" that paces the breath: two counter-rotating polygon
+ * rings, a wheel of radial spokes, sharp concentric rings, and a gradient core —
+ * all revolving slowly in the brand colours. Breathes when active, drifts when
+ * still, and holds steady for Reduce Motion.
  */
 export function BreathingOrb({ active = false, still, core, halo, colors: gradient, children }: BreathingOrbProps) {
   const theme = useThemeColors();
   const coreColor = core ?? theme.accentSoft;
   const haloColor = halo ?? theme.auroraEnd;
   const grad = gradient ?? ([coreColor, haloColor] as const);
+  // A small multi-hue palette so the geometry reads as colourful, not mono.
+  const palette = ['#FFFFFF', grad[0], grad[1], haloColor];
   const reduced = useReducedMotion();
 
   const breath = useSharedValue(0.5);
-  const ripple = useSharedValue(0);
-  const spin = useSharedValue(0); // sheen + spark ring
-  const orbit = useSharedValue(0); // internal aurora blobs
-  const twinkle = useSharedValue(0.5);
+  const spinA = useSharedValue(0); // polygon CW
+  const spinB = useSharedValue(0); // polygon CCW
+  const spinS = useSharedValue(0); // spokes
 
   useEffect(() => {
-    const loop = (sv: typeof spin, ms: number) =>
+    const loop = (sv: typeof spinA, ms: number) =>
       (sv.value = withRepeat(withTiming(1, { duration: ms, easing: Easing.linear }), -1, false));
 
-    if (still || reduced) {
+    if (reduced) {
       cancelAnimation(breath);
-      cancelAnimation(ripple);
+      cancelAnimation(spinA);
+      cancelAnimation(spinB);
+      cancelAnimation(spinS);
       breath.value = 0.5;
-      ripple.value = 0;
-      if (reduced) {
-        cancelAnimation(spin);
-        cancelAnimation(orbit);
-        cancelAnimation(twinkle);
-        spin.value = 0;
-        orbit.value = 0;
-        twinkle.value = 0.6;
-      } else {
-        // A still orb still drifts gently — alive, just not breathing.
-        loop(spin, 52000);
-        loop(orbit, 26000);
-        twinkle.value = withRepeat(withTiming(1, { duration: 3200, easing: Easing.inOut(Easing.ease) }), -1, true);
-      }
+      spinA.value = 0;
+      spinB.value = 0;
+      spinS.value = 0;
       return;
     }
-    if (active) {
-      cancelAnimation(breath);
+
+    // Geometry always revolves (slower when still/paused, livelier when active).
+    loop(spinA, active ? 30000 : 44000);
+    loop(spinB, active ? 38000 : 52000);
+    loop(spinS, active ? 60000 : 80000);
+
+    cancelAnimation(breath);
+    if (still) {
+      breath.value = 0.5;
+    } else if (active) {
       breath.value = 0;
       breath.value = withRepeat(withTiming(1, { duration: BREATH_MS, easing: Easing.inOut(Easing.ease) }), -1, true);
-      ripple.value = 0;
-      ripple.value = withRepeat(withTiming(1, { duration: BREATH_MS * 2, easing: Easing.out(Easing.ease) }), -1, false);
-      loop(spin, 44000);
-      loop(orbit, 20000);
-      twinkle.value = withRepeat(withTiming(1, { duration: 2600, easing: Easing.inOut(Easing.ease) }), -1, true);
     } else {
-      cancelAnimation(breath);
-      cancelAnimation(ripple);
-      breath.value = withTiming(0.18, { duration: 800 });
-      ripple.value = withTiming(0, { duration: 800 });
-      loop(spin, 52000);
-      loop(orbit, 26000);
+      breath.value = withTiming(0.2, { duration: 800 });
     }
     return () => {
       cancelAnimation(breath);
-      cancelAnimation(ripple);
-      cancelAnimation(spin);
-      cancelAnimation(orbit);
-      cancelAnimation(twinkle);
+      cancelAnimation(spinA);
+      cancelAnimation(spinB);
+      cancelAnimation(spinS);
     };
-  }, [active, still, reduced, breath, ripple, spin, orbit, twinkle]);
+  }, [active, still, reduced, breath, spinA, spinB, spinS]);
 
   const haloStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: 0.96 + breath.value * 0.18 }],
-    opacity: 0.16 + breath.value * 0.16,
+    transform: [{ scale: 0.96 + breath.value * 0.16 }],
+    opacity: 0.12 + breath.value * 0.12,
   }));
+  const spinAStyle = useAnimatedStyle(() => ({ transform: [{ rotate: `${spinA.value * 360}deg` }] }));
+  const spinBStyle = useAnimatedStyle(() => ({ transform: [{ rotate: `${-spinB.value * 360}deg` }] }));
+  const spokesStyle = useAnimatedStyle(() => ({ transform: [{ rotate: `${spinS.value * 360}deg` }] }));
+  const ringStyle = useAnimatedStyle(() => ({ transform: [{ scale: 0.94 + breath.value * 0.08 }] }));
   const coreStyle = useAnimatedStyle(() => ({ transform: [{ scale: 0.9 + breath.value * 0.1 }] }));
-  const sheenStyle = useAnimatedStyle(() => ({ transform: [{ rotate: `${spin.value * 360}deg` }] }));
-  const orbitStyle = useAnimatedStyle(() => ({ transform: [{ rotate: `${orbit.value * 360}deg` }] }));
-  const orbitRevStyle = useAnimatedStyle(() => ({ transform: [{ rotate: `${-orbit.value * 360}deg` }] }));
-  const sparkRingStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${spin.value * 360}deg` }],
-    opacity: 0.35 + twinkle.value * 0.45,
-  }));
-
-  const ring1 = useAnimatedStyle(() => ({
-    transform: [{ scale: 0.78 + ripple.value * 0.46 }],
-    opacity: (1 - ripple.value) * 0.3,
-  }));
-  const ring2 = useAnimatedStyle(() => {
-    const p = (ripple.value + 0.5) % 1;
-    return { transform: [{ scale: 0.78 + p * 0.46 }], opacity: (1 - p) * 0.3 };
-  });
 
   return (
     <View style={styles.container}>
-      <Animated.View style={[styles.ring, { borderColor: withAlpha(haloColor, 0.6) }, ring1]} />
-      <Animated.View style={[styles.ring, { borderColor: withAlpha(haloColor, 0.6) }, ring2]} />
       <Animated.View style={[styles.halo, { backgroundColor: haloColor }, haloStyle]} />
 
-      {/* Twinkling sparks drifting around the orb. */}
-      <Animated.View style={[styles.sparkRing, sparkRingStyle]} pointerEvents="none">
-        {[0, 90, 180, 270].map((deg, i) => (
+      {/* Radial spokes wheel. */}
+      <Animated.View style={[styles.layer, spokesStyle]} pointerEvents="none">
+        {Array.from({ length: SPOKES }).map((_, i) => (
           <View
-            key={deg}
+            key={i}
             style={[
-              styles.spark,
+              styles.spoke,
               {
-                backgroundColor: i % 2 === 0 ? '#FFFFFF' : grad[1],
-                transform: [{ rotate: `${deg}deg` }, { translateY: -SIZE * 0.48 }],
+                backgroundColor: withAlpha(palette[i % palette.length], 0.5),
+                transform: [{ rotate: `${(360 / SPOKES) * i}deg` }, { translateY: -GEOM * 0.27 }],
               },
             ]}
           />
         ))}
       </Animated.View>
 
+      {/* Two counter-rotating polygons (squares → shifting 8-point geometry). */}
+      <Animated.View style={[styles.layer, spinAStyle]} pointerEvents="none">
+        <View style={[styles.poly, { width: GEOM * 0.62, height: GEOM * 0.62, borderColor: withAlpha(grad[1], 0.85) }]} />
+      </Animated.View>
+      <Animated.View style={[styles.layer, spinBStyle]} pointerEvents="none">
+        <View style={[styles.poly, { width: GEOM * 0.46, height: GEOM * 0.46, borderColor: withAlpha(grad[0], 0.85) }]} />
+      </Animated.View>
+
+      {/* Crisp concentric rings. */}
+      <Animated.View style={[styles.ringWrap, ringStyle]} pointerEvents="none">
+        <View style={[styles.ring, { width: GEOM * 0.74, height: GEOM * 0.74, borderColor: withAlpha('#FFFFFF', 0.22) }]} />
+        <View style={[styles.ring, { width: GEOM * 0.54, height: GEOM * 0.54, borderColor: withAlpha(haloColor, 0.4) }]} />
+      </Animated.View>
+
+      {/* Gradient core. */}
       <Animated.View style={[styles.core, coreStyle]}>
         <LinearGradient
           colors={[grad[0], grad[1]]}
-          start={{ x: 0.15, y: 0.0 }}
-          end={{ x: 0.85, y: 1.0 }}
+          start={{ x: 0.15, y: 0 }}
+          end={{ x: 0.85, y: 1 }}
           style={styles.coreFill}
         />
-        {/* Internal aurora: two soft blobs orbiting opposite ways. */}
-        <Animated.View style={[styles.orbitWrap, orbitStyle]} pointerEvents="none">
-          <LinearGradient
-            colors={[withAlpha('#FFFFFF', 0.55), 'transparent']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.blob}
-          />
-        </Animated.View>
-        <Animated.View style={[styles.orbitWrap, orbitRevStyle]} pointerEvents="none">
-          <LinearGradient
-            colors={[withAlpha(grad[1], 0.6), 'transparent']}
-            start={{ x: 1, y: 0 }}
-            end={{ x: 0, y: 1 }}
-            style={[styles.blob, styles.blob2]}
-          />
-        </Animated.View>
-        {/* A soft diagonal light streak slowly rotating inside the core. */}
-        <Animated.View style={[styles.sheenWrap, sheenStyle]} pointerEvents="none">
-          <LinearGradient
-            colors={[withAlpha('#FFFFFF', 0.45), 'transparent', withAlpha(grad[1], 0.4)]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
-        </Animated.View>
       </Animated.View>
 
       <View style={styles.content}>{children}</View>
@@ -186,15 +148,13 @@ export function BreathingOrb({ active = false, still, core, halo, colors: gradie
 
 const styles = StyleSheet.create({
   container: { width: SIZE, height: SIZE, alignItems: 'center', justifyContent: 'center' },
-  ring: { position: 'absolute', width: SIZE, height: SIZE, borderRadius: SIZE / 2, borderWidth: 1 },
   halo: { position: 'absolute', width: SIZE, height: SIZE, borderRadius: SIZE / 2 },
-  sparkRing: { position: 'absolute', width: SIZE, height: SIZE, alignItems: 'center', justifyContent: 'center' },
-  spark: { position: 'absolute', width: 5, height: 5, borderRadius: 3 },
+  layer: { position: 'absolute', width: SIZE, height: SIZE, alignItems: 'center', justifyContent: 'center' },
+  spoke: { position: 'absolute', width: 2, height: GEOM * 0.34, borderRadius: 1 },
+  poly: { position: 'absolute', borderWidth: 1.5, borderRadius: 6 },
+  ringWrap: { position: 'absolute', width: SIZE, height: SIZE, alignItems: 'center', justifyContent: 'center' },
+  ring: { position: 'absolute', borderWidth: 1, borderRadius: GEOM },
   core: { position: 'absolute', width: CORE, height: CORE, borderRadius: CORE / 2, overflow: 'hidden' },
   coreFill: { width: '100%', height: '100%' },
-  orbitWrap: { position: 'absolute', width: CORE, height: CORE, alignItems: 'center', justifyContent: 'center' },
-  blob: { position: 'absolute', width: CORE * 0.7, height: CORE * 0.7, borderRadius: CORE * 0.35, transform: [{ translateX: CORE * 0.2 }] },
-  blob2: { transform: [{ translateX: -CORE * 0.22 }, { translateY: CORE * 0.15 }] },
-  sheenWrap: { position: 'absolute', width: CORE * 1.6, height: CORE * 1.6, left: -CORE * 0.3, top: -CORE * 0.3 },
   content: { alignItems: 'center', justifyContent: 'center' },
 });
