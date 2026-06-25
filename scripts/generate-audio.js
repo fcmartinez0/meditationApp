@@ -91,18 +91,28 @@ function kWeightedRms(channels) {
  * a soft limiter. Channels are gain-linked so stereo / binaural imaging (and
  * the binaural beat) is preserved.
  */
-function master(channels, { targetDb = -14, thresholdDb = -18, ratio = 3, air = 0, widen = 1 } = {}) {
+function master(channels, { targetDb = -14, thresholdDb = -18, ratio = 3, air = 0, widen = 1, lowShelf = 0, airFreq = 7000 } = {}) {
   const n = channels[0].length;
   const thr = dbToLin(thresholdDb);
   const atk = Math.exp(-1 / (0.005 * SAMPLE_RATE));
   const rel = Math.exp(-1 / (0.12 * SAMPLE_RATE));
   let env = 0;
 
-  // 0) "Air" — a gentle high-shelf lift for a more produced top end.
+  // 0) "Air" — a gentle high-shelf lift for a more produced, detailed top end
+  // (lower airFreq = more presence, not just the very top).
   if (air > 0) {
     for (const ch of channels) {
-      const hp = highPass(ch, 7000);
+      const hp = highPass(ch, airFreq);
       for (let i = 0; i < n; i++) ch[i] += air * hp[i];
+    }
+  }
+
+  // 0.25) Low-shelf warmth — a gentle lift to the low body for a fuller, richer
+  // low end on good headphones, without muddying the mids.
+  if (lowShelf > 0) {
+    for (const ch of channels) {
+      const lp = lowPass(ch, 150);
+      for (let i = 0; i < n; i++) ch[i] += lowShelf * lp[i];
     }
   }
 
@@ -1559,7 +1569,7 @@ const calm = generateMusic({
   noiseAmp: 0.06,
   seed: 11,
 });
-writeWavStereo(path.join(MUSIC_DIR, 'calm.wav'), calm.left, calm.right, { targetDb: -16 });
+writeWavStereo(path.join(MUSIC_DIR, 'calm.wav'), calm.left, calm.right, { air: 0.12, lowShelf: 0.2, airFreq: 9000 });
 
 const focus = generateMusic({
   carrierHz: 384, // "scientific" G (3× 128) — in the effective binaural carrier band
@@ -1573,7 +1583,7 @@ const focus = generateMusic({
   noiseAmp: 0.03,
   seed: 22,
 });
-writeWavStereo(path.join(MUSIC_DIR, 'focus.wav'), focus.left, focus.right, { targetDb: -16 });
+writeWavStereo(path.join(MUSIC_DIR, 'focus.wav'), focus.left, focus.right, { air: 0.12, lowShelf: 0.2, airFreq: 9000 });
 
 const deep = generateMusic({
   carrierHz: 144, // low warm drone
@@ -1585,7 +1595,7 @@ const deep = generateMusic({
   noiseAmp: 0.05,
   seed: 33,
 });
-writeWavStereo(path.join(MUSIC_DIR, 'deep.wav'), deep.left, deep.right, { targetDb: -16 });
+writeWavStereo(path.join(MUSIC_DIR, 'deep.wav'), deep.left, deep.right, { air: 0.12, lowShelf: 0.2, airFreq: 9000 });
 
 const dream = generateMusic({
   carrierHz: 396, // soft mid drone (octave up) — lands in the effective binaural band
@@ -1598,7 +1608,7 @@ const dream = generateMusic({
   noiseAmp: 0.06,
   seed: 44,
 });
-writeWavStereo(path.join(MUSIC_DIR, 'dream.wav'), dream.left, dream.right, { targetDb: -16 });
+writeWavStereo(path.join(MUSIC_DIR, 'dream.wav'), dream.left, dream.right, { air: 0.12, lowShelf: 0.2, airFreq: 9000 });
 
 const clarity = generateMusic({
   carrierHz: 240,
@@ -1612,26 +1622,30 @@ const clarity = generateMusic({
   noiseAmp: 0.04,
   seed: 55,
 });
-writeWavStereo(path.join(MUSIC_DIR, 'clarity.wav'), clarity.left, clarity.right, { targetDb: -16 });
+writeWavStereo(path.join(MUSIC_DIR, 'clarity.wav'), clarity.left, clarity.right, { air: 0.12, lowShelf: 0.2, airFreq: 9000 });
 
+// Beats get a headphone-focused master: more presence "air", a wider stereo
+// image, and low-shelf warmth for a fuller low end on good earphones. Each is
+// tuned to its genre (deeper sub on house/techno/dnb, more air on the bright
+// retro/lush ones). The loudness pass + limiter keep levels safe.
 const lofi = generateLoFi();
-writeWavStereo(path.join(BEATS_DIR, 'lofi.wav'), lofi.left, lofi.right, { targetDb: -16, air: 0.3 });
+writeWavStereo(path.join(BEATS_DIR, 'lofi.wav'), lofi.left, lofi.right, { air: 0.34, widen: 1.2, lowShelf: 0.34, airFreq: 9000 });
 const liquid = generateLiquid();
-writeWavStereo(path.join(BEATS_DIR, 'liquid.wav'), liquid.left, liquid.right, { targetDb: -16, air: 0.3 });
+writeWavStereo(path.join(BEATS_DIR, 'liquid.wav'), liquid.left, liquid.right, { air: 0.45, widen: 1.4, lowShelf: 0.42, airFreq: 8000 });
 const chillstep = generateChillstep();
-writeWavStereo(path.join(BEATS_DIR, 'chillstep.wav'), chillstep.left, chillstep.right, { targetDb: -16, air: 0.3 });
+writeWavStereo(path.join(BEATS_DIR, 'chillstep.wav'), chillstep.left, chillstep.right, { air: 0.42, widen: 1.35, lowShelf: 0.42, airFreq: 8500 });
 const downtempo = generateDowntempo();
-writeWavStereo(path.join(BEATS_DIR, 'downtempo.wav'), downtempo.left, downtempo.right, { targetDb: -16, air: 0.3 });
+writeWavStereo(path.join(BEATS_DIR, 'downtempo.wav'), downtempo.left, downtempo.right, { air: 0.4, widen: 1.3, lowShelf: 0.32, airFreq: 8500 });
 const deephouse = generateDeepHouse();
-writeWavStereo(path.join(BEATS_DIR, 'deephouse.wav'), deephouse.left, deephouse.right, { targetDb: -16, air: 0.3 });
+writeWavStereo(path.join(BEATS_DIR, 'deephouse.wav'), deephouse.left, deephouse.right, { air: 0.36, widen: 1.32, lowShelf: 0.46, airFreq: 9000 });
 const melodic = generateMelodic();
-writeWavStereo(path.join(BEATS_DIR, 'melodic.wav'), melodic.left, melodic.right, { targetDb: -16, air: 0.3 });
+writeWavStereo(path.join(BEATS_DIR, 'melodic.wav'), melodic.left, melodic.right, { air: 0.46, widen: 1.4, lowShelf: 0.36, airFreq: 8000 });
 const techno = generateTechno();
-writeWavStereo(path.join(BEATS_DIR, 'techno.wav'), techno.left, techno.right, { targetDb: -16, air: 0.3 });
+writeWavStereo(path.join(BEATS_DIR, 'techno.wav'), techno.left, techno.right, { air: 0.4, widen: 1.35, lowShelf: 0.46, airFreq: 8500 });
 const triphop = generateTripHop();
-writeWavStereo(path.join(BEATS_DIR, 'triphop.wav'), triphop.left, triphop.right, { targetDb: -16, air: 0.3, widen: 1.4 });
+writeWavStereo(path.join(BEATS_DIR, 'triphop.wav'), triphop.left, triphop.right, { air: 0.42, widen: 1.5, lowShelf: 0.4, airFreq: 8500 });
 const synthwave = generateSynthwave();
-writeWavStereo(path.join(BEATS_DIR, 'synthwave.wav'), synthwave.left, synthwave.right, { targetDb: -16, air: 0.45, widen: 1.7 });
+writeWavStereo(path.join(BEATS_DIR, 'synthwave.wav'), synthwave.left, synthwave.right, { air: 0.5, widen: 1.7, lowShelf: 0.34, airFreq: 7500 });
 
 console.log('Done.');
 }
