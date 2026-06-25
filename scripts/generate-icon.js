@@ -127,13 +127,23 @@ function polyEdges(cx, cy, R, sides, rotDeg) {
 
 const NAVY = hex('#0E1020');
 const NAVY_LIFT = hex('#191D38');
+// Iridescent glass: bright core through periwinkle and sky to teal at the rim.
 const ORB_STOPS = [
-  [0.0, hex('#EAF0FF')],
-  [0.5, hex('#8B9DF0')],
-  [1.0, hex('#5FD3C4')],
+  [0.0, hex('#F4F6FF')],
+  [0.36, hex('#A6B0F8')],
+  [0.66, hex('#7BA6E8')],
+  [1.0, hex('#5FD8C6')],
 ];
-const HALO = hex('#6F8FE0');
-const ACCENT = hex('#9AA8F5');
+// Soft coloured light pools inside the orb — an aurora trapped in glass (in
+// normalized orb coordinates, -1..1; the first is the main gloss highlight).
+const AURORA = [
+  { x: -0.34, y: -0.4, col: hex('#FFFFFF'), rad: 0.55, amp: 0.5 },
+  { x: 0.34, y: 0.34, col: hex('#5FE6D2'), rad: 0.9, amp: 0.7 },
+  { x: -0.1, y: 0.1, col: hex('#A98CFF'), rad: 0.8, amp: 0.6 },
+  { x: 0.42, y: -0.28, col: hex('#6FA0FF'), rad: 0.7, amp: 0.5 },
+];
+const HALO = hex('#7C97E8');
+const ACCENT = hex('#A6B2F8');
 const STAR = hex('#FFFFFF');
 
 /**
@@ -151,17 +161,24 @@ function render(size, opts = {}) {
   const aa = 1.5; // edge anti-alias in px
   const rng = makeRng(7);
 
-  // Geometry edges (a hexagon + a hexagram), framing the orb.
+  // Geometry: a hexagon, a hexagram (two triangles), and a fine tick bezel,
+  // framing the orb like a mandala.
   const Rg = 0.62 * size * scale;
-  const edges = geom
-    ? [
-        ...polyEdges(cx, cy, Rg, 6, 0),
-        ...polyEdges(cx, cy, Rg * 0.92, 3, 0),
-        ...polyEdges(cx, cy, Rg * 0.92, 3, 180),
-      ]
-    : [];
+  const ringR = 0.76 * size * scale;
+  const edges = [];
+  if (geom) {
+    edges.push(...polyEdges(cx, cy, Rg, 6, 0));
+    edges.push(...polyEdges(cx, cy, Rg * 0.92, 3, 0));
+    edges.push(...polyEdges(cx, cy, Rg * 0.92, 3, 180));
+    const N = 36;
+    for (let k = 0; k < N; k++) {
+      const ang = (2 * Math.PI * k) / N - Math.PI / 2;
+      const r1 = ringR - size * 0.013 * scale;
+      const r2 = ringR + size * 0.013 * scale;
+      edges.push([cx + Math.cos(ang) * r1, cy + Math.sin(ang) * r1, cx + Math.cos(ang) * r2, cy + Math.sin(ang) * r2]);
+    }
+  }
   const stroke = Math.max(1.2, size * 0.004);
-  const ringR = 0.74 * size * scale; // a faint outer ring
 
   // Stardust specks (behind the orb).
   const specks = [];
@@ -206,15 +223,14 @@ function render(size, opts = {}) {
         // Halo glow around the orb.
         addLight(HALO, smooth(R * 1.9, R, dist) * 0.32);
         if (geom && !mono) {
-          // Geometric frame.
+          // Glowing geometric mandala: crisp lines plus a soft glow around them.
           let dmin = Infinity;
           for (const e of edges) {
             const d = distSeg(px, py, e[0], e[1], e[2], e[3]);
             if (d < dmin) dmin = d;
           }
-          addLight(ACCENT, (1 - smooth(0, stroke, dmin)) * 0.55);
-          // Faint outer ring.
-          addLight(ACCENT, (1 - smooth(0, stroke * 0.8, Math.abs(dist - ringR))) * 0.3);
+          addLight(ACCENT, (1 - smooth(0, stroke, dmin)) * 0.75);
+          addLight(ACCENT, (1 - smooth(0, stroke * 5, dmin)) * 0.1);
         }
       }
 
@@ -236,13 +252,27 @@ function render(size, opts = {}) {
           const lz = 0.7;
           const diff = clamp01(dx * lx + dy * ly + nz * lz);
           const base = gradient(ORB_STOPS, rr);
-          const shade = 0.42 + 0.82 * diff;
-          let c = [base[0] * shade, base[1] * shade, base[2] * shade];
-          const spec = Math.pow(diff, 20) * 230; // tight specular highlight
-          c = [c[0] + spec, c[1] + spec, c[2] + spec];
-          const rim = Math.pow(rr, 4) * 60; // cool rim light at the edge
-          c = [c[0], c[1] + rim * 0.7, c[2] + rim];
-          oc = c;
+          const shade = 0.5 + 0.6 * diff;
+          let cr = base[0] * shade;
+          let cg = base[1] * shade;
+          let cb = base[2] * shade;
+          // Internal aurora — coloured light pools blended in (not added, so the
+          // colour stays saturated) to give the glass iridescent depth.
+          for (const A of AURORA) {
+            const dd = Math.hypot(dx - A.x, dy - A.y);
+            const w = clamp01(smooth(A.rad, 0, dd) * A.amp);
+            cr = lerp(cr, A.col[0] * shade, w);
+            cg = lerp(cg, A.col[1] * shade, w);
+            cb = lerp(cb, A.col[2] * shade, w);
+          }
+          const spec = Math.pow(diff, 30) * 210; // tight specular highlight
+          cr += spec;
+          cg += spec;
+          cb += spec;
+          const rim = Math.pow(rr, 5) * 75; // cool rim light at the edge
+          cg += rim * 0.6;
+          cb += rim;
+          oc = [cr, cg, cb];
         }
         r = lerp(r, clamp01(oc[0] / 255), orbA);
         g = lerp(g, clamp01(oc[1] / 255), orbA);
