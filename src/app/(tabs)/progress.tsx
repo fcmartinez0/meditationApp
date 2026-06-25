@@ -31,7 +31,7 @@ export default function ProgressScreen() {
   return (
     <Screen scroll>
       <View style={styles.header}>
-        <AppText variant="label" muted>
+        <AppText variant="label" color={colors.accent}>
           YOUR JOURNEY
         </AppText>
         <AppText variant="title">Progress</AppText>

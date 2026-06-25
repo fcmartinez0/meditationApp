@@ -196,7 +196,7 @@ export default function SettingsScreen() {
   return (
     <Screen scroll>
       <View style={styles.header}>
-        <AppText variant="label" muted>
+        <AppText variant="label" color={colors.accent}>
           PREFERENCES
         </AppText>
         <AppText variant="title">Settings</AppText>

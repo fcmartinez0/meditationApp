@@ -75,7 +75,7 @@ export default function MeditateScreen() {
     <Screen>
       <View style={styles.root}>
         <Animated.View style={styles.header} entering={FadeInDown.duration(600)}>
-          <AppText variant="label" muted>
+          <AppText variant="label" color={colors.accent}>
             {greeting().toUpperCase()}
           </AppText>
           <AppText variant="title">Take a breath</AppText>
