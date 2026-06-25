@@ -40,7 +40,7 @@ export function Screen({ children, scroll = false, bare = false, contentStyle, f
         </>
       ) : null}
       {/* Faint rotating geometric watermark, echoing the session orb. */}
-      <GeometricFlair color={colors.accent} size={360} opacity={bg ? 0.06 : 0.09} style={styles.flair} />
+      <GeometricFlair color={colors.accent} size={380} opacity={bg ? 0.1 : 0.18} style={styles.flair} />
       <SafeAreaView style={styles.fill} edges={['top', 'left', 'right']}>
         {scroll ? (
           <ScrollView

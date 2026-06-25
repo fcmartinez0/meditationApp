@@ -9,6 +9,7 @@ import Animated, { FadeIn, FadeInDown, FadeInUp } from 'react-native-reanimated'
 import { AppText } from '@/components/AppText';
 import { BreathingOrb } from '@/components/BreathingOrb';
 import { DurationPicker } from '@/components/DurationPicker';
+import { GlassFill } from '@/components/GlassFill';
 import { Screen } from '@/components/Screen';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { greeting, soundMeta } from '@/lib/catalog';
@@ -117,10 +118,8 @@ export default function MeditateScreen() {
               onPress={openBrowse}
               accessibilityRole="button"
               accessibilityLabel={`Sound: ${sel.label}`}
-              style={({ pressed }) => [
-                styles.chip,
-                { backgroundColor: colors.surfaceMuted, transform: [{ scale: pressed ? 0.97 : 1 }] },
-              ]}>
+              style={({ pressed }) => [styles.chip, { transform: [{ scale: pressed ? 0.97 : 1 }] }]}>
+              <GlassFill fallback={colors.surfaceMuted} radius={radius.pill} />
               <Ionicons name={sel.icon} size={18} color={colors.textSecondary} />
               <AppText variant="body" numberOfLines={1}>
                 {sel.label}
@@ -128,9 +127,8 @@ export default function MeditateScreen() {
             </Pressable>
 
             {generative ? (
-              <View
-                accessibilityLabel="Length: open-ended"
-                style={[styles.chip, { backgroundColor: colors.surfaceMuted }]}>
+              <View accessibilityLabel="Length: open-ended" style={styles.chip}>
+                <GlassFill fallback={colors.surfaceMuted} radius={radius.pill} />
                 <Ionicons name="infinite" size={18} color={colors.textSecondary} />
                 <AppText variant="body">Open-ended</AppText>
               </View>
@@ -139,10 +137,8 @@ export default function MeditateScreen() {
                 onPress={openPicker}
                 accessibilityRole="button"
                 accessibilityLabel={`Length: ${settings.durationMin} minutes`}
-                style={({ pressed }) => [
-                  styles.chip,
-                  { backgroundColor: colors.surfaceMuted, transform: [{ scale: pressed ? 0.97 : 1 }] },
-                ]}>
+                style={({ pressed }) => [styles.chip, { transform: [{ scale: pressed ? 0.97 : 1 }] }]}>
+                <GlassFill fallback={colors.surfaceMuted} radius={radius.pill} />
                 <Ionicons name="timer-outline" size={18} color={colors.textSecondary} />
                 <AppText variant="body">{settings.durationMin} min</AppText>
               </Pressable>
@@ -200,6 +196,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.md,
     borderRadius: radius.pill,
+    overflow: 'hidden',
   },
   breatheLink: {
     flexDirection: 'row',

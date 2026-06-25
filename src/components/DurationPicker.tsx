@@ -1,3 +1,4 @@
+import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import * as Haptics from 'expo-haptics';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -81,12 +82,10 @@ export function DurationPicker({
     onClose();
   };
 
-  return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.root}>
-        <Pressable style={styles.backdrop} onPress={commitAndClose} accessibilityLabel="Close" />
-        <View style={[styles.sheet, { backgroundColor: colors.surface, paddingBottom: insets.bottom + spacing.lg }]}>
-          <View style={styles.header}>
+  const glass = isLiquidGlassAvailable();
+  const sheetContent = (
+    <>
+      <View style={styles.header}>
             <AppText variant="heading">Session length · {current} min</AppText>
             <Pressable onPress={commitAndClose} hitSlop={12} accessibilityRole="button" accessibilityLabel="Done">
               <AppText variant="body" color={colors.accent}>
@@ -128,7 +127,24 @@ export function DurationPicker({
               min
             </AppText>
           </View>
-        </View>
+    </>
+  );
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.root}>
+        <Pressable style={styles.backdrop} onPress={commitAndClose} accessibilityLabel="Close" />
+        {glass ? (
+          <GlassView
+            glassEffectStyle="regular"
+            style={[styles.sheet, styles.glassSheet, { paddingBottom: insets.bottom + spacing.lg }]}>
+            {sheetContent}
+          </GlassView>
+        ) : (
+          <View style={[styles.sheet, { backgroundColor: colors.surface, paddingBottom: insets.bottom + spacing.lg }]}>
+            {sheetContent}
+          </View>
+        )}
       </View>
     </Modal>
   );
@@ -143,6 +159,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.lg,
   },
+  glassSheet: { overflow: 'hidden' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
