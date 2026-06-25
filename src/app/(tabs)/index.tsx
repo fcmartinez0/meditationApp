@@ -4,6 +4,7 @@ import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import Animated, { FadeIn, FadeInDown, FadeInUp } from 'react-native-reanimated';
 
 import { AppText } from '@/components/AppText';
 import { BreathingOrb } from '@/components/BreathingOrb';
@@ -72,7 +73,7 @@ export default function MeditateScreen() {
   return (
     <Screen>
       <View style={styles.root}>
-        <View style={styles.header}>
+        <Animated.View style={styles.header} entering={FadeInDown.duration(600)}>
           <AppText variant="label" muted>
             {greeting().toUpperCase()}
           </AppText>
@@ -82,32 +83,35 @@ export default function MeditateScreen() {
               {stats.currentStreak}-day streak
             </AppText>
           )}
-        </View>
+        </Animated.View>
 
         <View style={styles.center}>
-          <BreathingOrb still core={cat.accent} halo={cat.colors[0]} colors={cat.colors}>
-            <Ionicons name={sel.icon} size={44} color="#FFFFFF" />
-          </BreathingOrb>
+          <Animated.View entering={FadeIn.duration(1100)}>
+            <BreathingOrb still core={cat.accent} halo={cat.colors[0]} colors={cat.colors}>
+              <Ionicons name={sel.icon} size={44} color="#FFFFFF" />
+            </BreathingOrb>
+          </Animated.View>
 
-          <Pressable
-            onPress={begin}
-            accessibilityRole="button"
-            accessibilityLabel={`Begin ${sel.label} session`}
-            style={({ pressed }) => [styles.beginWrap, { transform: [{ scale: pressed ? 0.96 : 1 }] }]}>
-            <LinearGradient
-              colors={cat.colors}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.begin}>
-              <AppText variant="label" color="#FFFFFF" style={styles.beginLabel}>
-                Begin
-              </AppText>
-            </LinearGradient>
-          </Pressable>
-
+          <Animated.View entering={FadeInUp.duration(700).delay(250)}>
+            <Pressable
+              onPress={begin}
+              accessibilityRole="button"
+              accessibilityLabel={`Begin ${sel.label} session`}
+              style={({ pressed }) => [styles.beginWrap, { transform: [{ scale: pressed ? 0.96 : 1 }] }]}>
+              <LinearGradient
+                colors={cat.colors}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.begin}>
+                <AppText variant="label" color="#FFFFFF" style={styles.beginLabel}>
+                  Begin
+                </AppText>
+              </LinearGradient>
+            </Pressable>
+          </Animated.View>
         </View>
 
-        <View style={styles.controls}>
+        <Animated.View style={styles.controls} entering={FadeInUp.duration(700).delay(400)}>
           <View style={styles.chipsRow}>
             <Pressable
               onPress={openBrowse}
@@ -156,7 +160,7 @@ export default function MeditateScreen() {
               Breathing exercises
             </AppText>
           </Pressable>
-        </View>
+        </Animated.View>
       </View>
 
       <DurationPicker

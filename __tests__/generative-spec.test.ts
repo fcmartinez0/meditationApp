@@ -17,6 +17,9 @@ const SCALES = [
   'mixolydian',
   'phrygian',
   'harmonic_minor',
+  'major',
+  'lydian_dominant',
+  'hirajoshi',
 ];
 const WAVES = ['sine', 'triangle', 'warm'];
 const INSTRUMENTS = ['pad', 'choir', 'bells', 'pluck', 'keys'];

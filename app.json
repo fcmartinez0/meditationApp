@@ -64,6 +64,12 @@
         }
       ],
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Stillness to use a photo from your library as the app background."
+        }
+      ],
+      [
         "react-native-audio-api",
         {
           "iosBackgroundMode": true,
