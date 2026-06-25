@@ -120,7 +120,7 @@ export default function MeditateScreen() {
               accessibilityLabel={`Sound: ${sel.label}`}
               style={({ pressed }) => [styles.chip, { transform: [{ scale: pressed ? 0.97 : 1 }] }]}>
               <GlassFill fallback={colors.surfaceMuted} radius={radius.pill} />
-              <Ionicons name={sel.icon} size={18} color={colors.textSecondary} />
+              <Ionicons name={sel.icon} size={18} color={cat.accent} />
               <AppText variant="body" numberOfLines={1}>
                 {sel.label}
               </AppText>
@@ -129,7 +129,7 @@ export default function MeditateScreen() {
             {generative ? (
               <View accessibilityLabel="Length: open-ended" style={styles.chip}>
                 <GlassFill fallback={colors.surfaceMuted} radius={radius.pill} />
-                <Ionicons name="infinite" size={18} color={colors.textSecondary} />
+                <Ionicons name="infinite" size={18} color={cat.accent} />
                 <AppText variant="body">Open-ended</AppText>
               </View>
             ) : (
@@ -139,7 +139,7 @@ export default function MeditateScreen() {
                 accessibilityLabel={`Length: ${settings.durationMin} minutes`}
                 style={({ pressed }) => [styles.chip, { transform: [{ scale: pressed ? 0.97 : 1 }] }]}>
                 <GlassFill fallback={colors.surfaceMuted} radius={radius.pill} />
-                <Ionicons name="timer-outline" size={18} color={colors.textSecondary} />
+                <Ionicons name="timer-outline" size={18} color={cat.accent} />
                 <AppText variant="body">{settings.durationMin} min</AppText>
               </Pressable>
             )}

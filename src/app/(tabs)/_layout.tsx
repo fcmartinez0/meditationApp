@@ -21,7 +21,7 @@ export default function TabsLayout() {
         options={{
           title: 'Relax',
           tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? 'moon' : 'moon-outline'} color={color} size={size} />
+            <Ionicons name={focused ? 'sparkles' : 'sparkles-outline'} color={color} size={size} />
           ),
         }}
       />
