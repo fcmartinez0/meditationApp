@@ -63,10 +63,12 @@ export function SlidersIcon({ size = 24, color, filled = false }: IconProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24">
       {rows.map((r, i) => (
-        <Line key={i} x1={3} y1={r.y} x2={21} y2={r.y} stroke={color} strokeWidth={1.6} strokeLinecap="round" strokeOpacity={0.7} />
+        <Line key={i} x1={3} y1={r.y} x2={21} y2={r.y} stroke={color} strokeWidth={1.6} strokeLinecap="round" strokeOpacity={0.45} />
       ))}
+      {/* Solid handle dots in the icon colour — reads as a slider knob and adapts
+          to light/dark without a hardcoded fill. */}
       {rows.map((r, i) => (
-        <Circle key={`k${i}`} cx={r.cx} cy={r.y} r={2.6} fill={filled ? color : '#0E1020'} stroke={color} strokeWidth={1.8} />
+        <Circle key={`k${i}`} cx={r.cx} cy={r.y} r={filled ? 3 : 2.6} fill={color} />
       ))}
     </Svg>
   );
