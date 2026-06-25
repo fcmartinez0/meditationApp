@@ -1079,36 +1079,43 @@ function generatePurr() {
   return makeSeamless(warm, loopSamples, crossSamples);
 }
 
-/** A babbling stream: bright band-passed water with bubbling amplitude motion. */
+/** A babbling stream: a warm water rush with natural, noise-based gurgles. */
 function generateStream() {
   const loopSamples = 20 * SAMPLE_RATE;
   const crossSamples = 3 * SAMPLE_RATE;
   const total = loopSamples + crossSamples;
   const rng = makeRng(4101);
-  // Decorrelated water per ear so the brook surrounds you instead of sitting in
-  // the middle of your head.
-  let L = lowPass(highPass(whiteNoise(total, rng), 450), 5500);
-  let R = lowPass(highPass(whiteNoise(total, rng), 450), 5500);
+  // Warm water rush: a mid "rush" band plus a low body, decorrelated per ear so
+  // the brook surrounds you. Tamed top end (3.2k, was 5.5k) so it isn't hissy.
+  const rushL = lowPass(highPass(whiteNoise(total, rng), 280), 3200);
+  const rushR = lowPass(highPass(whiteNoise(total, rng), 280), 3200);
+  const bodyL = lowPass(brownNoise(total, rng), 600);
+  const bodyR = lowPass(brownNoise(total, rng), 600);
+  const L = new Float32Array(total);
+  const R = new Float32Array(total);
   for (let i = 0; i < total; i++) {
     const t = i / SAMPLE_RATE;
-    const bubbleL =
-      0.55 + 0.2 * Math.sin(2 * Math.PI * 3.1 * t) + 0.12 * Math.sin(2 * Math.PI * 7.3 * t + 1) + 0.13 * Math.sin(2 * Math.PI * 1.6 * t);
-    const bubbleR =
-      0.55 + 0.2 * Math.sin(2 * Math.PI * 2.7 * t + 0.8) + 0.12 * Math.sin(2 * Math.PI * 6.1 * t) + 0.13 * Math.sin(2 * Math.PI * 1.9 * t + 1.4);
-    L[i] *= Math.max(0.2, bubbleL);
-    R[i] *= Math.max(0.2, bubbleR);
+    // Gentle gurgle on the rush, offset per ear.
+    const gL = 0.62 + 0.18 * Math.sin(2 * Math.PI * 0.9 * t) + 0.1 * Math.sin(2 * Math.PI * 2.3 * t + 1);
+    const gR = 0.62 + 0.18 * Math.sin(2 * Math.PI * 0.8 * t + 0.7) + 0.1 * Math.sin(2 * Math.PI * 2.0 * t);
+    L[i] = rushL[i] * 0.5 * Math.max(0.3, gL) + bodyL[i] * 0.22;
+    R[i] = rushR[i] * 0.5 * Math.max(0.3, gR) + bodyR[i] * 0.22;
   }
-  // Sparse "plips" — short resonant water blips panned across the field.
+  // Gurgles: short band-limited NOISE bursts (a low "gloop" band and a higher
+  // "trickle" band) — watery, never the electronic sine pings we had before.
+  const lowBub = lowPass(highPass(whiteNoise(total, rng), 320), 760);
+  const hiBub = lowPass(highPass(whiteNoise(total, rng), 850), 1900);
   for (let k = 0; k < total; k++) {
-    if (rng() < 0.0012) {
-      const f = 900 + rng() * 2200;
-      const len = Math.floor((0.01 + rng() * 0.05) * SAMPLE_RATE);
-      const amp = 0.06 + rng() * 0.12;
+    if (rng() < 0.0004) {
+      const hi = rng() < 0.5;
+      const src = hi ? hiBub : lowBub;
+      const len = Math.floor((0.04 + rng() * 0.1) * SAMPLE_RATE);
+      const amp = (hi ? 0.1 : 0.16) * (0.6 + rng() * 0.6);
       const pan = rng() * 2 - 1;
       const [gl, gr] = panGains(pan);
       for (let j = 0; j < len && k + j < total; j++) {
-        const env = Math.exp(-j / (len * 0.35));
-        const s = Math.sin((2 * Math.PI * f * j) / SAMPLE_RATE) * amp * env;
+        const w = Math.sin((Math.PI * j) / len); // soft bell window, no clicks
+        const s = src[k + j] * w * amp;
         L[k + j] += s * gl;
         R[k + j] += s * gr;
       }
@@ -1455,9 +1462,10 @@ function generateAmbient(kind) {
     L[i] *= 0.6 + 0.4 * Math.sin(2 * Math.PI * 0.05 * t + 0.5);
     R[i] *= 0.6 + 0.4 * Math.sin(2 * Math.PI * 0.045 * t + 1.6);
   }
-  // Occasional soft, high-passed rustles drifting across the field.
+  // Occasional soft, high-passed rustles drifting across the field (sparse — a
+  // quiet wood, not constant rustling).
   for (let k = 0; k < total; k++) {
-    if (rng() < 0.00035) {
+    if (rng() < 0.00015) {
       const len = Math.floor((0.05 + rng() * 0.18) * SAMPLE_RATE);
       const amp = 0.06 + rng() * 0.1;
       const pan = rng() * 2 - 1;
