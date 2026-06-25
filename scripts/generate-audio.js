@@ -256,10 +256,11 @@ function generateMusic({ carrierHz, beatHz, partials, noiseAmp, seed }) {
   const left = new Float32Array(total);
   const right = new Float32Array(total);
 
-  // Shared warm noise bed (centered, so it adds no beat of its own).
+  // Decorrelated warm noise beds per ear for a wider, airier space (noise has no
+  // tonal beat of its own, so the binaural beat stays pure).
   const rng = makeRng(seed);
-  let bed = brownNoise(total, rng);
-  bed = lowPass(bed, 400);
+  const bedL = lowPass(brownNoise(total, rng), 400);
+  const bedR = lowPass(brownNoise(total, rng), 400);
 
   for (let i = 0; i < total; i++) {
     const t = i / SAMPLE_RATE;
@@ -267,15 +268,23 @@ function generateMusic({ carrierHz, beatHz, partials, noiseAmp, seed }) {
     const swell = 0.72 + 0.28 * Math.sin(2 * Math.PI * 0.08 * t);
     let l = 0;
     let r = 0;
-    for (const p of partials) {
+    partials.forEach((p, k) => {
+      // Each harmonic drifts in level on its own slow LFO, so the timbre evolves
+      // over the loop instead of sitting as a static drone.
+      const drift = 1 + 0.22 * Math.sin(2 * Math.PI * (0.013 + k * 0.006) * t + k);
+      const a = p.amp * drift;
       const fl = carrierHz * p.ratio;
       const fr = fl + beatHz; // constant offset -> same perceived beat per partial
-      l += p.amp * Math.sin(2 * Math.PI * fl * t);
-      r += p.amp * Math.sin(2 * Math.PI * fr * t);
-    }
-    const air = bed[i] * noiseAmp;
-    left[i] = l * swell + air;
-    right[i] = r * swell + air;
+      l += a * Math.sin(2 * Math.PI * fl * t);
+      r += a * Math.sin(2 * Math.PI * fr * t);
+    });
+    // A soft, centred shimmer (an octave+fifth up) that swells in and out very
+    // slowly — adds evolving air. Centred, so it introduces no beat of its own.
+    const shimmer = 0.1 * Math.max(0, Math.sin(2 * Math.PI * 0.035 * t)) * Math.sin(2 * Math.PI * carrierHz * 3 * t);
+    l += shimmer;
+    r += shimmer;
+    left[i] = l * swell + bedL[i] * noiseAmp;
+    right[i] = r * swell + bedR[i] * noiseAmp;
   }
 
   return {
