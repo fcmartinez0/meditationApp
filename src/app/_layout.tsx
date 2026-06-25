@@ -44,30 +44,24 @@ export default function RootLayout() {
       <GestureHandlerRootView style={{ flex: 1 }}>
         <AppDataProvider>
           <ThemeProvider value={scheme === 'dark' ? DarkTheme : DefaultTheme}>
-            <Stack screenOptions={{ headerShown: false, animation: 'fade', animationDuration: 320 }}>
+            {/* Native iOS animations: card-sheet modals (parent scales back) and a
+                smooth slide-up for the immersive screens. */}
+            <Stack screenOptions={{ headerShown: false, animation: 'default' }}>
               <Stack.Screen name="(tabs)" />
               <Stack.Screen
                 name="session"
                 options={{
                   presentation: 'fullScreenModal',
-                  // A slow, dreamy fade into the immersive session.
-                  animation: 'fade',
-                  animationDuration: 520,
+                  animation: 'slide_from_bottom',
                   gestureEnabled: false,
                 }}
               />
               <Stack.Screen
                 name="breathe"
-                options={{ presentation: 'fullScreenModal', animation: 'fade', animationDuration: 450 }}
+                options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }}
               />
-              <Stack.Screen
-                name="browse"
-                options={{ presentation: 'modal', animation: 'slide_from_bottom', animationDuration: 380 }}
-              />
-              <Stack.Screen
-                name="legal"
-                options={{ presentation: 'modal', animation: 'slide_from_bottom', animationDuration: 380 }}
-              />
+              <Stack.Screen name="browse" options={{ presentation: 'modal' }} />
+              <Stack.Screen name="legal" options={{ presentation: 'modal' }} />
             </Stack>
             <OnboardingGate />
             <LaunchPrefetch />

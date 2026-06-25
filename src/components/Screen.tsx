@@ -43,7 +43,7 @@ export function Screen({ children, scroll = false, bare = false, contentStyle, f
       {/* Faint rotating geometric watermark, echoing the session orb. */}
       {/* Ambient backdrop: a faint stardust field plus a geometric mandala, so
           screens never read as empty. */}
-      <StarField color={colors.text} count={bg ? 36 : 72} />
+      <StarField color={colors.text} count={bg ? 70 : 130} />
       <GeometricFlair color={colors.accent} size={520} opacity={bg ? 0.18 : 0.32} style={styles.flair} />
       <GeometricFlair color={colors.accent} size={300} opacity={bg ? 0.12 : 0.2} style={styles.flairAlt} />
       <SafeAreaView style={styles.fill} edges={['top', 'left', 'right']}>

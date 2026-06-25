@@ -19,12 +19,15 @@ function makeRng(seed: number): () => number {
  * so screens don't read as empty. Deterministic (seeded), so it never reflows.
  * Decorative; sits behind content.
  */
-export function StarField({ color, count = 70, seed = 99 }: { color: string; count?: number; seed?: number }) {
+export function StarField({ color, count = 120, seed = 99 }: { color: string; count?: number; seed?: number }) {
   const stars = useMemo(() => {
     const r = makeRng(seed);
     return Array.from({ length: count }, () => {
-      const size = 1 + Math.round(r() * 2);
-      return { left: r() * 100, top: r() * 100, size, op: 0.1 + r() * 0.45 };
+      // Mostly small specks with the occasional brighter, larger star.
+      const big = r() < 0.18;
+      const size = big ? 2.5 + r() * 2 : 1 + r() * 1.5;
+      const op = big ? 0.5 + r() * 0.45 : 0.18 + r() * 0.4;
+      return { left: r() * 100, top: r() * 100, size, op };
     });
   }, [count, seed]);
 
