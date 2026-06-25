@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { ScrollView, StyleSheet, View, type ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { GeometricFlair } from '@/components/GeometricFlair';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useAppData } from '@/store/AppData';
 import { spacing } from '@/theme';
@@ -38,6 +39,8 @@ export function Screen({ children, scroll = false, bare = false, contentStyle, f
           <View style={[StyleSheet.absoluteFill, { backgroundColor: withAlpha(colors.background, 0.55) }]} />
         </>
       ) : null}
+      {/* Faint rotating geometric watermark, echoing the session orb. */}
+      <GeometricFlair color={colors.accent} size={360} opacity={bg ? 0.06 : 0.09} style={styles.flair} />
       <SafeAreaView style={styles.fill} edges={['top', 'left', 'right']}>
         {scroll ? (
           <ScrollView
@@ -57,6 +60,8 @@ export function Screen({ children, scroll = false, bare = false, contentStyle, f
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
+  // Bleed the motif off the top-right corner so it reads as ambient, not central.
+  flair: { position: 'absolute', top: -150, right: -130 },
   padded: { paddingHorizontal: spacing.xl },
   scrollContent: { paddingBottom: spacing.xxxl, gap: spacing.lg },
 });
