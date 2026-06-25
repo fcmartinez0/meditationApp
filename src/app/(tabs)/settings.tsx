@@ -1,7 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as FileSystem from 'expo-file-system/legacy';
 import * as Haptics from 'expo-haptics';
-import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, Platform, Pressable, StyleSheet, Switch, View } from 'react-native';
@@ -139,14 +137,19 @@ export default function SettingsScreen() {
 
   const pickBackground = async () => {
     tap();
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
-      Alert.alert('Photo access needed', 'Allow photo access to choose a background image.');
-      return;
-    }
-    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images', quality: 0.9 });
-    if (res.canceled || !res.assets?.length) return;
     try {
+      // Loaded lazily so simply opening Settings never evaluates the native
+      // image-picker module (a missing/unlinked native module would otherwise
+      // crash the whole screen on import).
+      const ImagePicker = await import('expo-image-picker');
+      const FileSystem = await import('expo-file-system/legacy');
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert('Photo access needed', 'Allow photo access to choose a background image.');
+        return;
+      }
+      const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images', quality: 0.9 });
+      if (res.canceled || !res.assets?.length) return;
       // Copy into the app's document directory so it survives cache cleanup, with
       // a unique name so the image cache always picks up the new pick.
       const dest = `${FileSystem.documentDirectory}background-${Date.now()}.jpg`;
@@ -156,14 +159,19 @@ export default function SettingsScreen() {
       }
       await updateSettings({ backgroundUri: dest });
     } catch {
-      Alert.alert('Couldn’t set background', 'Something went wrong saving that image. Please try again.');
+      Alert.alert('Couldn’t set background', 'Something went wrong choosing that image. Please try again.');
     }
   };
 
   const clearBackground = async () => {
     tap();
-    if (settings.backgroundUri) {
-      await FileSystem.deleteAsync(settings.backgroundUri, { idempotent: true }).catch(() => {});
+    try {
+      if (settings.backgroundUri) {
+        const FileSystem = await import('expo-file-system/legacy');
+        await FileSystem.deleteAsync(settings.backgroundUri, { idempotent: true }).catch(() => {});
+      }
+    } catch {
+      /* ignore — clearing the setting below is what matters */
     }
     await updateSettings({ backgroundUri: null });
   };
