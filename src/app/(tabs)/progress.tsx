@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
@@ -9,6 +10,7 @@ import { WEEKDAY_LABELS } from '@/lib/date';
 import { todayWeekIndex } from '@/lib/stats';
 import { useAppData } from '@/store/AppData';
 import { radius, spacing } from '@/theme';
+import { withAlpha } from '@/theme/categories';
 
 const MAX_BAR_HEIGHT = 120;
 
@@ -20,10 +22,10 @@ export default function ProgressScreen() {
   const maxMinutes = Math.max(...stats.weekMinutes, 1);
 
   const tiles = [
-    { label: 'Current streak', value: `${stats.currentStreak}`, unit: 'days' },
-    { label: 'Longest streak', value: `${stats.longestStreak}`, unit: 'days' },
-    { label: 'Total time', value: `${stats.totalMinutes}`, unit: 'min' },
-    { label: 'Sessions', value: `${stats.totalSessions}`, unit: 'total' },
+    { icon: 'flame' as const, label: 'Current streak', value: `${stats.currentStreak}`, unit: 'days', color: colors.warning },
+    { icon: 'trophy' as const, label: 'Longest streak', value: `${stats.longestStreak}`, unit: 'days', color: colors.accent },
+    { icon: 'time' as const, label: 'Total time', value: `${stats.totalMinutes}`, unit: 'min', color: colors.success },
+    { icon: 'leaf' as const, label: 'Sessions', value: `${stats.totalSessions}`, unit: 'total', color: colors.accentSoft },
   ];
 
   return (
@@ -39,15 +41,22 @@ export default function ProgressScreen() {
         <View style={styles.grid}>
           {tiles.map((t) => (
             <View key={t.label} style={styles.tile}>
-              <View style={styles.tileValueRow}>
-                <AppText variant="title">{t.value}</AppText>
-                <AppText variant="caption" muted>
-                  {t.unit}
+              <View style={[styles.badge, { backgroundColor: withAlpha(t.color, 0.18) }]}>
+                <Ionicons name={t.icon} size={18} color={t.color} />
+              </View>
+              <View style={styles.tileText}>
+                <View style={styles.tileValueRow}>
+                  <AppText variant="title" color={t.color}>
+                    {t.value}
+                  </AppText>
+                  <AppText variant="caption" muted>
+                    {t.unit}
+                  </AppText>
+                </View>
+                <AppText variant="caption" muted numberOfLines={1}>
+                  {t.label}
                 </AppText>
               </View>
-              <AppText variant="caption" muted>
-                {t.label}
-              </AppText>
             </View>
           ))}
         </View>
@@ -68,16 +77,16 @@ export default function ProgressScreen() {
                 accessible
                 accessibilityLabel={`${WEEKDAY_LABELS[i]}${isToday ? ' (today)' : ''}, ${minutes} minute${minutes === 1 ? '' : 's'}`}>
                 <View style={styles.barArea}>
-                  <View
-                    style={[
-                      styles.bar,
-                      {
-                        height,
-                        backgroundColor: minutes > 0 ? colors.accent : colors.surfaceMuted,
-                        opacity: minutes > 0 ? 1 : 0.6,
-                      },
-                    ]}
-                  />
+                  {minutes > 0 ? (
+                    <LinearGradient
+                      colors={[colors.auroraEnd, colors.accent]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 0, y: 1 }}
+                      style={[styles.bar, { height }]}
+                    />
+                  ) : (
+                    <View style={[styles.bar, { height, backgroundColor: colors.surfaceMuted, opacity: 0.6 }]} />
+                  )}
                 </View>
                 <AppText
                   variant="caption"
@@ -106,7 +115,9 @@ export default function ProgressScreen() {
 const styles = StyleSheet.create({
   header: { gap: spacing.xs, marginTop: spacing.sm },
   grid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: spacing.xl, columnGap: spacing.md },
-  tile: { width: '47%', flexGrow: 1, gap: spacing.xs },
+  tile: { width: '47%', flexGrow: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  badge: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
+  tileText: { flex: 1, gap: 2 },
   tileValueRow: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.xs },
   chartHeader: {
     marginBottom: spacing.lg,
