@@ -27,10 +27,10 @@ import { withAlpha } from '@/theme/categories';
 function Section({ icon, color, title }: { icon: keyof typeof Ionicons.glyphMap; color: string; title: string }) {
   return (
     <View style={styles.section}>
-      <View style={[styles.sectionIcon, { backgroundColor: withAlpha(color, 0.2) }]}>
+      <View style={[styles.sectionIcon, { backgroundColor: withAlpha(color, 0.22) }]}>
         <Ionicons name={icon} size={15} color={color} />
       </View>
-      <AppText variant="label" color={color}>
+      <AppText variant="label" muted>
         {title}
       </AppText>
     </View>
