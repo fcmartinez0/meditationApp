@@ -175,6 +175,8 @@ export interface Settings {
   mixWithMusic: boolean;
   /** Visual shown during a session. */
   timerStyle: TimerStyle;
+  /** Optional user-chosen background image (a local file URI), or null. */
+  backgroundUri: string | null;
   /** Whether the first-run intro has been completed. */
   onboarded: boolean;
   /** Schema version, for one-time migrations of stored settings. */
@@ -201,6 +203,7 @@ export const DEFAULT_SETTINGS: Settings = {
   volume: 0.85,
   mixWithMusic: false,
   timerStyle: 'orb',
+  backgroundUri: null,
   onboarded: false,
   settingsVersion: 3,
 };

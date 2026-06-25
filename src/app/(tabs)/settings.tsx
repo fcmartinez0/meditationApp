@@ -1,5 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, Platform, Pressable, StyleSheet, Switch, View } from 'react-native';
@@ -135,6 +137,37 @@ export default function SettingsScreen() {
     if (settings.reminderEnabled) await reschedule(hour, minute);
   };
 
+  const pickBackground = async () => {
+    tap();
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('Photo access needed', 'Allow photo access to choose a background image.');
+      return;
+    }
+    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images', quality: 0.9 });
+    if (res.canceled || !res.assets?.length) return;
+    try {
+      // Copy into the app's document directory so it survives cache cleanup, with
+      // a unique name so the image cache always picks up the new pick.
+      const dest = `${FileSystem.documentDirectory}background-${Date.now()}.jpg`;
+      await FileSystem.copyAsync({ from: res.assets[0].uri, to: dest });
+      if (settings.backgroundUri) {
+        await FileSystem.deleteAsync(settings.backgroundUri, { idempotent: true }).catch(() => {});
+      }
+      await updateSettings({ backgroundUri: dest });
+    } catch {
+      Alert.alert('Couldn’t set background', 'Something went wrong saving that image. Please try again.');
+    }
+  };
+
+  const clearBackground = async () => {
+    tap();
+    if (settings.backgroundUri) {
+      await FileSystem.deleteAsync(settings.backgroundUri, { idempotent: true }).catch(() => {});
+    }
+    await updateSettings({ backgroundUri: null });
+  };
+
   const confirmReset = () => {
     Alert.alert('Reset all data?', 'This permanently clears your streak and session history.', [
       { text: 'Cancel', style: 'cancel' },
@@ -246,6 +279,29 @@ export default function SettingsScreen() {
       </Card>
 
       <Card style={styles.card}>
+        <Row
+          label="Background"
+          hint={settings.backgroundUri ? 'A custom photo is set' : 'Use a photo from your library'}
+        />
+        <View style={styles.bgButtons}>
+          <Pressable onPress={pickBackground} style={[styles.bgBtn, { backgroundColor: colors.surfaceMuted }]}>
+            <Ionicons name="image-outline" size={18} color={colors.accent} />
+            <AppText variant="caption" color={colors.accent}>
+              {settings.backgroundUri ? 'Change photo' : 'Choose photo'}
+            </AppText>
+          </Pressable>
+          {settings.backgroundUri ? (
+            <Pressable onPress={clearBackground} style={[styles.bgBtn, { backgroundColor: colors.surfaceMuted }]}>
+              <Ionicons name="close-outline" size={18} color={colors.textSecondary} />
+              <AppText variant="caption" muted>
+                Remove
+              </AppText>
+            </Pressable>
+          ) : null}
+        </View>
+      </Card>
+
+      <Card style={styles.card}>
         <AppText variant="caption" muted>
           What the live music has learned from your likes.
         </AppText>
@@ -297,6 +353,15 @@ const styles = StyleSheet.create({
   timeLabel: { minWidth: 96, textAlign: 'center' },
   stepBtn: { padding: spacing.xs },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  bgButtons: { flexDirection: 'row', gap: spacing.sm },
+  bgBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.pill,
+  },
   intervalChip: {
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.lg,
