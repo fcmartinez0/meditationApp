@@ -46,9 +46,7 @@ export default function ProgressScreen() {
               </View>
               <View style={styles.tileText}>
                 <View style={styles.tileValueRow}>
-                  <AppText variant="title" color={t.color}>
-                    {t.value}
-                  </AppText>
+                  <AppText variant="title">{t.value}</AppText>
                   <AppText variant="caption" muted>
                     {t.unit}
                   </AppText>

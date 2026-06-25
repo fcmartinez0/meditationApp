@@ -16,19 +16,18 @@ interface AppTextProps extends TextProps {
 
 const VARIANTS: Record<
   Variant,
-  { fontSize: number; fontWeight: TextProps['style'] extends never ? never : any; letterSpacing?: number; maxScale: number }
+  { fontSize: number; fontWeight: TextProps['style'] extends never ? never : any; lineHeight: number; letterSpacing?: number; maxScale: number }
 > = {
   // maxScale honors iOS/Android Dynamic Type for readability while capping how
   // far each variant can grow, so large accessibility text sizes don't overflow
-  // and break the layout. Big display/title text caps tighter (it's already
-  // huge, e.g. the 52–76px session clock); body/caption scale further since
-  // that's where extra legibility matters most for low-vision users.
-  display: { fontSize: fontSize.display, fontWeight: '200', letterSpacing: 1, maxScale: 1.3 },
-  title: { fontSize: fontSize.xxl, fontWeight: '700', maxScale: 1.4 },
-  heading: { fontSize: fontSize.lg, fontWeight: '600', maxScale: 1.5 },
-  body: { fontSize: fontSize.md, fontWeight: '400', maxScale: 1.8 },
-  label: { fontSize: fontSize.sm, fontWeight: '600', letterSpacing: 0.5, maxScale: 1.6 },
-  caption: { fontSize: fontSize.xs, fontWeight: '500', maxScale: 1.8 },
+  // and break the layout. lineHeight is set per variant so multi-line body and
+  // captions read comfortably rather than cramped.
+  display: { fontSize: fontSize.display, fontWeight: '200', lineHeight: 62, letterSpacing: 1, maxScale: 1.3 },
+  title: { fontSize: fontSize.xxl, fontWeight: '700', lineHeight: 40, maxScale: 1.4 },
+  heading: { fontSize: fontSize.lg, fontWeight: '600', lineHeight: 26, maxScale: 1.5 },
+  body: { fontSize: fontSize.md, fontWeight: '400', lineHeight: 23, maxScale: 1.8 },
+  label: { fontSize: fontSize.sm, fontWeight: '600', lineHeight: 18, letterSpacing: 0.6, maxScale: 1.6 },
+  caption: { fontSize: 13, fontWeight: '500', lineHeight: 18, maxScale: 1.8 },
 };
 
 export function AppText({
@@ -53,6 +52,7 @@ export function AppText({
         {
           fontSize: v.fontSize,
           fontWeight: v.fontWeight,
+          lineHeight: v.lineHeight,
           letterSpacing: v.letterSpacing,
           color: color ?? (muted ? colors.textSecondary : colors.text),
           fontFamily: fonts.rounded,

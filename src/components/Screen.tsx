@@ -44,10 +44,10 @@ export function Screen({ children, scroll = false, bare = false, contentStyle, f
           horizontally centred (top + bottom) so it stays symmetric as you scroll. */}
       <StarField color={colors.text} count={bg ? 70 : 130} />
       <View style={styles.flairTop} pointerEvents="none">
-        <GeometricFlair color={colors.accent} size={520} opacity={bg ? 0.18 : 0.3} />
+        <GeometricFlair color={colors.accent} size={520} opacity={bg ? 0.12 : 0.2} />
       </View>
       <View style={styles.flairBottom} pointerEvents="none">
-        <GeometricFlair color={colors.accent} size={360} opacity={bg ? 0.12 : 0.2} />
+        <GeometricFlair color={colors.accent} size={360} opacity={bg ? 0.08 : 0.14} />
       </View>
       <SafeAreaView style={styles.fill} edges={['top', 'left', 'right']}>
         {scroll ? (
