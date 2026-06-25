@@ -1,13 +1,14 @@
 /**
- * Generates the app's icon set procedurally (no design tools), so the brand mark
- * matches the in-app "breathing orb": a luminous indigo→teal orb with a soft halo
- * on the app's deep-navy background. Reproducible: `node scripts/generate-icon.js`.
+ * Generates the app's icon set procedurally (no design tools): a four-point
+ * "star" formed from thousands of tiny glowing dust particles — bright white at
+ * the core, fading through indigo to teal at the ray tips — on the app's deep
+ * navy. Reproducible: `node scripts/generate-icon.js`.
  *
- *   assets/images/icon.png                     – 1024² master icon (navy bg + orb)
- *   assets/images/splash-icon.png              – 512² orb on transparent (splash)
- *   assets/images/android-icon-foreground.png  – 512² orb, kept in the safe zone
- *   assets/images/android-icon-background.png   – 512² flat navy
- *   assets/images/android-icon-monochrome.png  – 432² white orb (themed icons)
+ *   assets/images/icon.png                     – 1024² master icon (navy bg, RGB)
+ *   assets/images/splash-icon.png              – 512² stardust on transparent
+ *   assets/images/android-icon-foreground.png  – 512² stardust, in the safe zone
+ *   assets/images/android-icon-background.png  – 512² flat navy
+ *   assets/images/android-icon-monochrome.png  – 432² white stardust (themed)
  *   assets/images/favicon.png                  – 48² mini icon
  */
 
@@ -17,7 +18,19 @@ const zlib = require('zlib');
 
 const OUT = path.join(__dirname, '..', 'assets', 'images');
 
-// --- tiny PNG encoder (RGBA, 8-bit) ---------------------------------------
+// --- deterministic RNG so the dust is identical every run ------------------
+function makeRng(seed) {
+  let s = seed >>> 0 || 1;
+  return () => {
+    s ^= s << 13;
+    s ^= s >>> 17;
+    s ^= s << 5;
+    s >>>= 0;
+    return s / 0xffffffff;
+  };
+}
+
+// --- tiny PNG encoder (RGBA, or RGB when opaque) ---------------------------
 const CRC_TABLE = (() => {
   const t = new Int32Array(256);
   for (let n = 0; n < 256; n++) {
@@ -45,12 +58,8 @@ function writePNG(file, width, height, rgba, opaque = false) {
   const ihdr = Buffer.alloc(13);
   ihdr.writeUInt32BE(width, 0);
   ihdr.writeUInt32BE(height, 4);
-  ihdr[8] = 8; // bit depth
-  // Opaque images (the iOS app icon) use RGB (type 2) so there's no alpha
-  // channel — the App Store rejects icons with transparency.
-  ihdr[9] = opaque ? 2 : 6;
-  // 10,11,12 = compression, filter, interlace = 0
-  // Prepend a 0 filter byte per scanline.
+  ihdr[8] = 8;
+  ihdr[9] = opaque ? 2 : 6; // RGB (no alpha) for the App Store icon, else RGBA
   const channels = opaque ? 3 : 4;
   const stride = width * channels;
   const raw = Buffer.alloc((stride + 1) * height);
@@ -77,12 +86,6 @@ const hex = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), pa
 const lerp = (a, b, t) => a + (b - a) * t;
 const mix = (c1, c2, t) => [lerp(c1[0], c2[0], t), lerp(c1[1], c2[1], t), lerp(c1[2], c2[2], t)];
 const clamp01 = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
-// Smoothstep from edge0->edge1 (returns 0..1). Used for anti-aliased falloffs.
-function smooth(edge0, edge1, x) {
-  const t = clamp01((x - edge0) / (edge1 - edge0));
-  return t * t * (3 - 2 * t);
-}
-// Multi-stop gradient lookup. stops: [[t, [r,g,b]], ...] sorted by t.
 function gradient(stops, t) {
   if (t <= stops[0][0]) return stops[0][1];
   for (let i = 1; i < stops.length; i++) {
@@ -95,107 +98,134 @@ function gradient(stops, t) {
   return stops[stops.length - 1][1];
 }
 
-// Brand palette (matches src/theme + the in-app orb).
 const NAVY = hex('#0E1020');
-const NAVY_LIFT = hex('#171B36');
-const CORE = hex('#EAF0FF'); // soft luminous centre (not pure white)
-const INDIGO = hex('#8B9DF0');
-const TEAL = hex('#6FD6C7');
-const HALO = hex('#7FA6E0');
-const RING = hex('#AEBCF6');
-
-const ORB_STOPS = [
-  [0.0, CORE],
-  [0.45, INDIGO],
-  [1.0, TEAL],
+// Core → tips: luminous white heart, quickly into indigo, out to teal tips.
+const STAR_STOPS = [
+  [0.0, hex('#FFFFFF')],
+  [0.22, hex('#AEB8F5')],
+  [0.55, hex('#7E8FF0')],
+  [1.0, hex('#5FE0CF')],
 ];
 
 /**
- * Render the orb composition.
- *  opts.bg        – background: 'navy' | 'transparent'
- *  opts.scale     – 1 = fill; <1 shrinks the orb (Android safe zone)
- *  opts.mono      – render a flat white disc instead of the gradient orb
- *  opts.rings     – draw the faint breath ring (off for tiny sizes)
+ * Render the stardust star into an RGBA buffer.
+ *  opts.bg     – 'navy' | 'transparent'
+ *  opts.scale  – 1 = fill; <1 shrinks the star (Android safe zone)
+ *  opts.mono   – white-only dust (Android themed/monochrome icon)
  */
 function render(size, opts = {}) {
-  const { bg = 'navy', scale = 1, mono = false, rings = true } = opts;
-  const half = size / 2;
-  const cx = half;
-  const cy = half;
-  const rc = 0.52 * scale; // orb radius (fraction of half)
-  const rh = 0.82 * scale; // halo outer radius
-  const ringR = 0.68 * scale;
-  const aa = 1.5 / half; // ~1.5px anti-alias band, in normalized units
-  const buf = Buffer.alloc(size * size * 4);
+  const { bg = 'navy', scale = 1, mono = false } = opts;
+  const cx = size / 2;
+  const cy = size / 2;
+  const maxR = 0.46 * size * scale;
+  const coreFrac = 0.04; // central bright heart as a fraction of the star radius
+  const sharp = 6.0; // ray sharpness (higher = thinner, pointier spikes)
+  const rng = makeRng(20260625);
 
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const dx = (x + 0.5 - cx) / half;
-      const dy = (y + 0.5 - cy) / half;
-      const d = Math.hypot(dx, dy);
-
-      let r, g, b, a;
-      if (bg === 'navy') {
-        // Subtle radial lift toward the centre for a touch of depth.
-        const lift = smooth(1.15, 0.0, d) * 0.6;
-        [r, g, b] = mix(NAVY, NAVY_LIFT, lift);
-        a = 255;
-      } else {
-        r = g = b = 0;
-        a = 0;
+  // Additive light buffers.
+  const Lr = new Float32Array(size * size);
+  const Lg = new Float32Array(size * size);
+  const Lb = new Float32Array(size * size);
+  const splat = (x, y, r, g, b) => {
+    const xi = Math.round(x);
+    const yi = Math.round(y);
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const px = xi + dx;
+        const py = yi + dy;
+        if (px < 0 || py < 0 || px >= size || py >= size) continue;
+        const w = dx === 0 && dy === 0 ? 1 : Math.abs(dx) + Math.abs(dy) === 1 ? 0.4 : 0.18;
+        const idx = py * size + px;
+        Lr[idx] += r * w;
+        Lg[idx] += g * w;
+        Lb[idx] += b * w;
       }
-
-      if (mono) {
-        const orbA = smooth(rc + aa, rc - aa, d);
-        if (orbA > 0) {
-          r = g = b = 255;
-          a = Math.max(a, Math.round(orbA * 255));
-        }
-        buf[(y * size + x) * 4 + 0] = r;
-        buf[(y * size + x) * 4 + 1] = g;
-        buf[(y * size + x) * 4 + 2] = b;
-        buf[(y * size + x) * 4 + 3] = a;
-        continue;
-      }
-
-      // Halo glow (under everything else).
-      const haloA = smooth(rh, rc * 0.85, d) * 0.4;
-      if (haloA > 0) {
-        const blended = mix([r, g, b], HALO, haloA);
-        r = blended[0];
-        g = blended[1];
-        b = blended[2];
-        if (bg !== 'navy') a = Math.max(a, Math.round(haloA * 255));
-      }
-
-      // Faint breath ring.
-      if (rings) {
-        const ringIntensity = Math.exp(-(((d - ringR) / 0.018) ** 2)) * 0.5;
-        if (ringIntensity > 0.01) {
-          const blended = mix([r, g, b], RING, ringIntensity);
-          r = blended[0];
-          g = blended[1];
-          b = blended[2];
-          if (bg !== 'navy') a = Math.max(a, Math.round(ringIntensity * 255));
-        }
-      }
-
-      // The orb itself (on top).
-      const orbA = smooth(rc + aa, rc - aa, d);
-      if (orbA > 0) {
-        const oc = gradient(ORB_STOPS, clamp01(d / rc));
-        r = lerp(r, oc[0], orbA);
-        g = lerp(g, oc[1], orbA);
-        b = lerp(b, oc[2], orbA);
-        a = Math.max(a, Math.round(orbA * 255));
-      }
-
-      const i = (y * size + x) * 4;
-      buf[i] = Math.round(clamp01(r / 255) * 255);
-      buf[i + 1] = Math.round(clamp01(g / 255) * 255);
-      buf[i + 2] = Math.round(clamp01(b / 255) * 255);
-      buf[i + 3] = a;
     }
+  };
+
+  // The four-point star edge as a function of angle (spikes on the axes).
+  const starEdge = (theta) =>
+    (coreFrac + (1 - coreFrac) * Math.pow(Math.abs(Math.cos(2 * theta)), sharp)) * maxR;
+
+  const N = Math.floor(size * size * 0.016);
+  for (let i = 0; i < N; i++) {
+    const theta = rng() * Math.PI * 2;
+    const rho = Math.pow(rng(), 2.2) * maxR; // strongly biased to centre so rays taper to points
+    const edge = starEdge(theta);
+    const x = cx + Math.cos(theta) * rho;
+    const y = cy + Math.sin(theta) * rho;
+
+    if (rho > edge) {
+      // Sparse faint sky-dust just outside the star, for atmosphere.
+      if (rng() < 0.05 && rho < maxR * 1.04) {
+        const d = 0.05 + rng() * 0.06;
+        if (mono) splat(x, y, d, d, d);
+        else splat(x, y, d * 0.7, d * 0.8, d);
+      }
+      continue;
+    }
+
+    const bright = (0.22 + 0.78 * Math.pow(1 - rho / edge, 0.6)) * (0.55 + rng() * 0.8);
+    if (mono) {
+      splat(x, y, bright, bright, bright);
+    } else {
+      const c = gradient(STAR_STOPS, rho / maxR);
+      splat(x, y, (bright * c[0]) / 255, (bright * c[1]) / 255, (bright * c[2]) / 255);
+    }
+  }
+
+  // A luminous core glow so the heart of the star reads as solid light.
+  const glowR = maxR * 0.11;
+  const r0 = Math.ceil(glowR * 3);
+  for (let dy = -r0; dy <= r0; dy++) {
+    for (let dx = -r0; dx <= r0; dx++) {
+      const px = Math.round(cx) + dx;
+      const py = Math.round(cy) + dy;
+      if (px < 0 || py < 0 || px >= size || py >= size) continue;
+      const g = Math.exp(-0.5 * ((dx * dx + dy * dy) / (glowR * glowR))) * 0.75;
+      if (g < 0.002) continue;
+      const idx = py * size + px;
+      if (mono) {
+        Lr[idx] += g;
+        Lg[idx] += g;
+        Lb[idx] += g;
+      } else {
+        const c = STAR_STOPS[0][1];
+        Lr[idx] += (g * c[0]) / 255;
+        Lg[idx] += (g * c[1]) / 255;
+        Lb[idx] += (g * c[2]) / 255;
+      }
+    }
+  }
+
+  // Compose: navy base (or transparent) + additive light with a filmic roll-off.
+  const roll = (v) => 1 - Math.exp(-1.15 * v);
+  const buf = Buffer.alloc(size * size * 4);
+  for (let i = 0; i < size * size; i++) {
+    const lr = roll(Lr[i]);
+    const lg = roll(Lg[i]);
+    const lb = roll(Lb[i]);
+    let r;
+    let g;
+    let b;
+    let a;
+    if (bg === 'navy') {
+      r = clamp01(NAVY[0] / 255 + lr);
+      g = clamp01(NAVY[1] / 255 + lg);
+      b = clamp01(NAVY[2] / 255 + lb);
+      a = 1;
+    } else {
+      a = clamp01(Math.max(lr, lg, lb));
+      // Premultiplied-ish: keep colour where there's light.
+      r = clamp01(lr);
+      g = clamp01(lg);
+      b = clamp01(lb);
+    }
+    const o = i * 4;
+    buf[o] = Math.round(r * 255);
+    buf[o + 1] = Math.round(g * 255);
+    buf[o + 2] = Math.round(b * 255);
+    buf[o + 3] = Math.round(a * 255);
   }
   return buf;
 }
@@ -211,11 +241,11 @@ function flat(size, color) {
   return buf;
 }
 
-console.log('Generating app icons...');
+console.log('Generating stardust app icons...');
 writePNG(path.join(OUT, 'icon.png'), 1024, 1024, render(1024, { bg: 'navy' }), true);
 writePNG(path.join(OUT, 'splash-icon.png'), 512, 512, render(512, { bg: 'transparent' }));
-writePNG(path.join(OUT, 'android-icon-foreground.png'), 512, 512, render(512, { bg: 'transparent', scale: 0.66 }));
+writePNG(path.join(OUT, 'android-icon-foreground.png'), 512, 512, render(512, { bg: 'transparent', scale: 0.7 }));
 writePNG(path.join(OUT, 'android-icon-background.png'), 512, 512, flat(512, NAVY));
-writePNG(path.join(OUT, 'android-icon-monochrome.png'), 432, 432, render(432, { bg: 'transparent', scale: 0.66, mono: true, rings: false }));
-writePNG(path.join(OUT, 'favicon.png'), 48, 48, render(48, { bg: 'navy', rings: false }));
+writePNG(path.join(OUT, 'android-icon-monochrome.png'), 432, 432, render(432, { bg: 'transparent', scale: 0.7, mono: true }));
+writePNG(path.join(OUT, 'favicon.png'), 48, 48, render(48, { bg: 'navy' }));
 console.log('Done.');
