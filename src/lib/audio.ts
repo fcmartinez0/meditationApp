@@ -31,7 +31,9 @@ function resolveArtwork(): Promise<string | undefined> {
   return artworkPromise;
 }
 
-const AMBIENT_SOURCES: Record<FileSound, number> = {
+// One source per sound, except the beats — each has two variants (different key
+// + groove) and the session picks one at random for variety.
+const AMBIENT_SOURCES: Record<FileSound, number | number[]> = {
   rain: require('@/assets/audio/ambient/rain.wav'),
   ocean: require('@/assets/audio/ambient/ocean.wav'),
   forest: require('@/assets/audio/ambient/forest.wav'),
@@ -47,16 +49,22 @@ const AMBIENT_SOURCES: Record<FileSound, number> = {
   deep: require('@/assets/audio/music/deep.wav'),
   dream: require('@/assets/audio/music/dream.wav'),
   clarity: require('@/assets/audio/music/clarity.wav'),
-  lofi: require('@/assets/audio/beats/lofi.wav'),
-  liquid: require('@/assets/audio/beats/liquid.wav'),
-  chillstep: require('@/assets/audio/beats/chillstep.wav'),
-  downtempo: require('@/assets/audio/beats/downtempo.wav'),
-  deephouse: require('@/assets/audio/beats/deephouse.wav'),
-  melodic: require('@/assets/audio/beats/melodic.wav'),
-  techno: require('@/assets/audio/beats/techno.wav'),
-  triphop: require('@/assets/audio/beats/triphop.wav'),
-  synthwave: require('@/assets/audio/beats/synthwave.wav'),
+  lofi: [require('@/assets/audio/beats/lofi-1.wav'), require('@/assets/audio/beats/lofi-2.wav')],
+  liquid: [require('@/assets/audio/beats/liquid-1.wav'), require('@/assets/audio/beats/liquid-2.wav')],
+  chillstep: [require('@/assets/audio/beats/chillstep-1.wav'), require('@/assets/audio/beats/chillstep-2.wav')],
+  downtempo: [require('@/assets/audio/beats/downtempo-1.wav'), require('@/assets/audio/beats/downtempo-2.wav')],
+  deephouse: [require('@/assets/audio/beats/deephouse-1.wav'), require('@/assets/audio/beats/deephouse-2.wav')],
+  melodic: [require('@/assets/audio/beats/melodic-1.wav'), require('@/assets/audio/beats/melodic-2.wav')],
+  techno: [require('@/assets/audio/beats/techno-1.wav'), require('@/assets/audio/beats/techno-2.wav')],
+  triphop: [require('@/assets/audio/beats/triphop-1.wav'), require('@/assets/audio/beats/triphop-2.wav')],
+  synthwave: [require('@/assets/audio/beats/synthwave-1.wav'), require('@/assets/audio/beats/synthwave-2.wav')],
 };
+
+/** Resolve a sound to a single playable source, choosing a random variant if it has several. */
+function pickSource(ambient: FileSound): number {
+  const src = AMBIENT_SOURCES[ambient];
+  return Array.isArray(src) ? src[Math.floor(Math.random() * src.length)] : src;
+}
 
 // Track the last-applied mix mode so we re-apply only when it actually changes.
 let appliedMix: boolean | null = null;
@@ -119,7 +127,7 @@ export class SessionAudio {
     this.artwork = await resolveArtwork();
     await ensureAudioMode(mixWithMusic);
     if (ambient !== 'none' && !isGenerative(ambient)) {
-      this.ambient = createAudioPlayer(AMBIENT_SOURCES[ambient]);
+      this.ambient = createAudioPlayer(pickSource(ambient));
       this.ambient.loop = true;
       // Start silent so startAmbient() can fade in and avoid a click.
       this.ambient.volume = 0;
