@@ -20,6 +20,21 @@ import { clearRatings, loadRatings, summarizePreference } from '@/lib/preference
 import type { PieceRating } from '@/lib/types';
 import { useAppData } from '@/store/AppData';
 import { radius, spacing } from '@/theme';
+import { withAlpha } from '@/theme/categories';
+
+/** A colourful section header: a tinted icon badge + label. */
+function Section({ icon, color, title }: { icon: keyof typeof Ionicons.glyphMap; color: string; title: string }) {
+  return (
+    <View style={styles.section}>
+      <View style={[styles.sectionIcon, { backgroundColor: withAlpha(color, 0.2) }]}>
+        <Ionicons name={icon} size={15} color={color} />
+      </View>
+      <AppText variant="label" color={color}>
+        {title}
+      </AppText>
+    </View>
+  );
+}
 
 /** A labelled row with a control on the right. */
 function Row({ children, label, hint }: { children?: React.ReactNode; label: string; hint?: string }) {
@@ -187,6 +202,7 @@ export default function SettingsScreen() {
       </View>
 
       <Card style={styles.card}>
+        <Section icon="notifications-outline" color="#F0B860" title="REMINDER" />
         <Row
           label="Daily reminder"
           hint={NOTIFICATIONS_SUPPORTED ? 'A gentle daily nudge' : 'Available in the iOS / Android app'}>
@@ -224,6 +240,7 @@ export default function SettingsScreen() {
       </Card>
 
       <Card style={styles.card}>
+        <Section icon="musical-notes-outline" color="#2DD4BF" title="SOUND" />
         <Row label="Volume">
           <View style={styles.timeAdjust}>
             <Pressable
@@ -262,10 +279,10 @@ export default function SettingsScreen() {
       </Card>
 
       <Card style={styles.card}>
-        <Row
-          label="Background"
-          hint={settings.backgroundUri ? 'A custom photo is set' : 'Use a photo from your library'}
-        />
+        <Section icon="image-outline" color="#C084FC" title="BACKGROUND" />
+        <AppText variant="caption" muted>
+          {settings.backgroundUri ? 'A custom photo is set.' : 'Use a photo from your library.'}
+        </AppText>
         <View style={styles.bgButtons}>
           <Pressable onPress={pickBackground} style={[styles.bgBtn, { backgroundColor: colors.surfaceMuted }]}>
             <Ionicons name="image-outline" size={18} color={colors.accent} />
@@ -285,6 +302,7 @@ export default function SettingsScreen() {
       </Card>
 
       <Card style={styles.card}>
+        <Section icon="sparkles-outline" color="#C084FC" title="GENERATIVE" />
         <AppText variant="caption" muted>
           What the live music has learned from your likes.
         </AppText>
@@ -301,6 +319,7 @@ export default function SettingsScreen() {
       </Card>
 
       <Card style={styles.card}>
+        <Section icon="server-outline" color="#5BD3B4" title="DATA" />
         <Pressable onPress={confirmReset} style={styles.resetRow}>
           <Ionicons name="trash-outline" size={20} color="#E5484D" />
           <AppText variant="body" color="#E5484D">
@@ -310,6 +329,7 @@ export default function SettingsScreen() {
       </Card>
 
       <Card style={styles.card}>
+        <Section icon="shield-checkmark-outline" color={colors.accent} title="ABOUT" />
         <Pressable onPress={() => router.push('/legal')} style={styles.aboutRow}>
           <AppText variant="body" style={{ flex: 1 }}>
             Privacy & disclaimer
@@ -327,6 +347,8 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   header: { gap: spacing.xs, marginTop: spacing.sm },
+  section: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  sectionIcon: { width: 28, height: 28, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   card: { gap: spacing.md },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
   rowText: { flex: 1, gap: 2 },

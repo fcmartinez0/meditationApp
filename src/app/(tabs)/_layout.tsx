@@ -1,7 +1,7 @@
-import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 
 import { GlassTabBar } from '@/components/GlassTabBar';
+import { ConstellationIcon, SlidersIcon, StarIcon } from '@/components/icons';
 import { useThemeColors } from '@/hooks/useThemeColors';
 
 export default function TabsLayout() {
@@ -20,27 +20,21 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: 'Relax',
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? 'moon' : 'moon-outline'} color={color} size={size} />
-          ),
+          tabBarIcon: ({ color, size, focused }) => <StarIcon color={color as string} size={size} filled={focused} />,
         }}
       />
       <Tabs.Screen
         name="progress"
         options={{
           title: 'Progress',
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? 'stats-chart' : 'stats-chart-outline'} color={color} size={size} />
-          ),
+          tabBarIcon: ({ color, size, focused }) => <ConstellationIcon color={color as string} size={size} filled={focused} />,
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
           title: 'Settings',
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? 'settings' : 'settings-outline'} color={color} size={size} />
-          ),
+          tabBarIcon: ({ color, size, focused }) => <SlidersIcon color={color as string} size={size} filled={focused} />,
         }}
       />
     </Tabs>

@@ -4,6 +4,7 @@ import { ScrollView, StyleSheet, View, type ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GeometricFlair } from '@/components/GeometricFlair';
+import { StarField } from '@/components/StarField';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useAppData } from '@/store/AppData';
 import { spacing } from '@/theme';
@@ -40,7 +41,11 @@ export function Screen({ children, scroll = false, bare = false, contentStyle, f
         </>
       ) : null}
       {/* Faint rotating geometric watermark, echoing the session orb. */}
-      <GeometricFlair color={colors.accent} size={380} opacity={bg ? 0.1 : 0.18} style={styles.flair} />
+      {/* Ambient backdrop: a faint stardust field plus a geometric mandala, so
+          screens never read as empty. */}
+      <StarField color={colors.text} count={bg ? 70 : 130} />
+      <GeometricFlair color={colors.accent} size={520} opacity={bg ? 0.18 : 0.32} style={styles.flair} />
+      <GeometricFlair color={colors.accent} size={300} opacity={bg ? 0.12 : 0.2} style={styles.flairAlt} />
       <SafeAreaView style={styles.fill} edges={['top', 'left', 'right']}>
         {scroll ? (
           <ScrollView
@@ -60,8 +65,9 @@ export function Screen({ children, scroll = false, bare = false, contentStyle, f
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  // Bleed the motif off the top-right corner so it reads as ambient, not central.
-  flair: { position: 'absolute', top: -150, right: -130 },
+  // Two mandalas bleeding off opposite corners so the backdrop feels balanced.
+  flair: { position: 'absolute', top: -180, right: -180 },
+  flairAlt: { position: 'absolute', bottom: -110, left: -120 },
   padded: { paddingHorizontal: spacing.xl },
   scrollContent: { paddingBottom: spacing.xxxl, gap: spacing.lg },
 });
