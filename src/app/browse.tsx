@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/AppText';
@@ -41,8 +42,11 @@ export default function BrowseScreen() {
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-          {SECTIONS.map((section) => (
-            <View key={section.title} style={styles.section}>
+          {SECTIONS.map((section, si) => (
+            <Animated.View
+              key={section.title}
+              style={styles.section}
+              entering={FadeInDown.duration(420).delay(si * 70)}>
               <AppText variant="heading">{section.title}</AppText>
               {section.caption ? (
                 <AppText variant="caption" muted>
@@ -60,7 +64,7 @@ export default function BrowseScreen() {
                   </View>
                 ))}
               </View>
-            </View>
+            </Animated.View>
           ))}
         </ScrollView>
       </SafeAreaView>
