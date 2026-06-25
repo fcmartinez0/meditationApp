@@ -48,6 +48,7 @@ export function BreathingOrb({ active = false, still, core, halo, colors: gradie
   const spinA = useSharedValue(0); // polygon CW
   const spinB = useSharedValue(0); // polygon CCW
   const spinS = useSharedValue(0); // spokes
+  const sheen = useSharedValue(0); // glassy light sweep across the core
 
   useEffect(() => {
     const loop = (sv: typeof spinA, ms: number) =>
@@ -58,10 +59,12 @@ export function BreathingOrb({ active = false, still, core, halo, colors: gradie
       cancelAnimation(spinA);
       cancelAnimation(spinB);
       cancelAnimation(spinS);
+      cancelAnimation(sheen);
       breath.value = 0.5;
       spinA.value = 0;
       spinB.value = 0;
       spinS.value = 0;
+      sheen.value = 0;
       return;
     }
 
@@ -69,6 +72,7 @@ export function BreathingOrb({ active = false, still, core, halo, colors: gradie
     loop(spinA, active ? 30000 : 44000);
     loop(spinB, active ? 38000 : 52000);
     loop(spinS, active ? 60000 : 80000);
+    loop(sheen, active ? 14000 : 22000); // glassy shine sweep
 
     cancelAnimation(breath);
     if (still) {
@@ -84,8 +88,9 @@ export function BreathingOrb({ active = false, still, core, halo, colors: gradie
       cancelAnimation(spinA);
       cancelAnimation(spinB);
       cancelAnimation(spinS);
+      cancelAnimation(sheen);
     };
-  }, [active, still, reduced, breath, spinA, spinB, spinS]);
+  }, [active, still, reduced, breath, spinA, spinB, spinS, sheen]);
 
   const haloStyle = useAnimatedStyle(() => ({
     transform: [{ scale: 0.96 + breath.value * 0.16 }],
@@ -96,6 +101,7 @@ export function BreathingOrb({ active = false, still, core, halo, colors: gradie
   const spokesStyle = useAnimatedStyle(() => ({ transform: [{ rotate: `${spinS.value * 360}deg` }] }));
   const ringStyle = useAnimatedStyle(() => ({ transform: [{ scale: 0.94 + breath.value * 0.08 }] }));
   const coreStyle = useAnimatedStyle(() => ({ transform: [{ scale: 0.9 + breath.value * 0.1 }] }));
+  const sheenStyle = useAnimatedStyle(() => ({ transform: [{ rotate: `${sheen.value * 360}deg` }] }));
 
   return (
     <View style={styles.container}>
@@ -131,13 +137,29 @@ export function BreathingOrb({ active = false, still, core, halo, colors: gradie
         <View style={[styles.ring, { width: GEOM * 0.54, height: GEOM * 0.54, borderColor: withAlpha(haloColor, 0.4) }]} />
       </Animated.View>
 
-      {/* Gradient core. */}
+      {/* Glassy gradient core: gradient fill, a rotating light sweep, and a glossy
+          top highlight so it reads as shiny glass over the geometry. */}
       <Animated.View style={[styles.core, coreStyle]}>
         <LinearGradient
           colors={[grad[0], grad[1]]}
           start={{ x: 0.15, y: 0 }}
           end={{ x: 0.85, y: 1 }}
           style={styles.coreFill}
+        />
+        <Animated.View style={[styles.sheenWrap, sheenStyle]} pointerEvents="none">
+          <LinearGradient
+            colors={[withAlpha('#FFFFFF', 0.55), 'transparent', withAlpha(grad[1], 0.35)]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.coreFill}
+          />
+        </Animated.View>
+        <LinearGradient
+          colors={[withAlpha('#FFFFFF', 0.5), 'transparent']}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 0.7 }}
+          style={styles.gloss}
+          pointerEvents="none"
         />
       </Animated.View>
 
@@ -156,5 +178,8 @@ const styles = StyleSheet.create({
   ring: { position: 'absolute', borderWidth: 1, borderRadius: GEOM },
   core: { position: 'absolute', width: CORE, height: CORE, borderRadius: CORE / 2, overflow: 'hidden' },
   coreFill: { width: '100%', height: '100%' },
+  // Oversized so the rotating light sweep always covers the circle's corners.
+  sheenWrap: { position: 'absolute', width: CORE * 1.7, height: CORE * 1.7, left: -CORE * 0.35, top: -CORE * 0.35 },
+  gloss: { position: 'absolute', left: 0, right: 0, top: 0, height: CORE * 0.6 },
   content: { alignItems: 'center', justifyContent: 'center' },
 });

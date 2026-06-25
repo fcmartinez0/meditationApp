@@ -3,6 +3,7 @@
  * a looping ambient bed.
  */
 
+import { Asset } from 'expo-asset';
 import {
   createAudioPlayer,
   setAudioModeAsync,
@@ -11,6 +12,24 @@ import {
 
 import type { AmbientSound, FileSound } from './types';
 import { isGenerative } from './types';
+
+// The lock-screen / Control Center artwork (the app's stardust mark), resolved
+// once to a local URI for the now-playing media controls.
+let artworkPromise: Promise<string | undefined> | null = null;
+function resolveArtwork(): Promise<string | undefined> {
+  if (!artworkPromise) {
+    artworkPromise = (async () => {
+      try {
+        const asset = Asset.fromModule(require('@/assets/images/now-playing.png'));
+        await asset.downloadAsync();
+        return asset.localUri ?? asset.uri ?? undefined;
+      } catch {
+        return undefined;
+      }
+    })();
+  }
+  return artworkPromise;
+}
 
 const AMBIENT_SOURCES: Record<FileSound, number> = {
   rain: require('@/assets/audio/ambient/rain.wav'),
@@ -65,6 +84,7 @@ export class SessionAudio {
   private targetVol = 0.6;
   private mixWithMusic = false;
   private lockTitle: string | null = null;
+  private artwork: string | undefined;
   private statusSub: ReturnType<AudioPlayer['addListener']> | null = null;
   private onPlaying?: (playing: boolean) => void;
   private lastPlaying: boolean | null = null;
@@ -96,6 +116,7 @@ export class SessionAudio {
   async prepare(ambient: AmbientSound, mixWithMusic = false, lockScreenTitle?: string) {
     this.mixWithMusic = mixWithMusic;
     this.lockTitle = lockScreenTitle ?? null;
+    this.artwork = await resolveArtwork();
     await ensureAudioMode(mixWithMusic);
     if (ambient !== 'none' && !isGenerative(ambient)) {
       this.ambient = createAudioPlayer(AMBIENT_SOURCES[ambient]);
@@ -127,7 +148,7 @@ export class SessionAudio {
       try {
         player.setActiveForLockScreen(
           true,
-          { title: this.lockTitle ?? 'Stillness', artist: 'Stillness' },
+          { title: this.lockTitle ?? 'Stillness', artist: 'Stillness', artworkUrl: this.artwork },
           { isLiveStream: true, showSeekForward: false, showSeekBackward: false },
         );
       } catch {

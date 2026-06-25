@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useKeepAwake } from 'expo-keep-awake';
 import { useRouter } from 'expo-router';
@@ -14,9 +15,11 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
+import { GlassFill } from '@/components/GlassFill';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { formatClock } from '@/lib/date';
 import { radius, spacing } from '@/theme';
+import { withAlpha } from '@/theme/categories';
 
 interface Phase {
   label: string;
@@ -96,7 +99,8 @@ export default function BreatheScreen() {
               <Pressable
                 key={key}
                 onPress={() => setPatternKey(key)}
-                style={[styles.row, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                style={({ pressed }) => [styles.row, { borderColor: colors.border, opacity: pressed ? 0.7 : 1 }]}>
+                <GlassFill fallback={colors.surface} radius={radius.md} />
                 <View style={{ flex: 1 }}>
                   <AppText variant="body">{p.label}</AppText>
                   <AppText variant="caption" muted>
@@ -170,7 +174,22 @@ function BreathingRunner({ pattern, onEnd }: { pattern: { label: string; phases:
     <View style={styles.runner}>
       <View style={styles.orbArea}>
         <Animated.View style={[styles.halo, { backgroundColor: colors.auroraEnd }, haloStyle]} />
-        <Animated.View style={[styles.circle, { backgroundColor: colors.accent }, circleStyle]} />
+        <Animated.View style={[styles.ring, { borderColor: withAlpha(colors.accentSoft, 0.6) }, circleStyle]} />
+        <Animated.View style={[styles.circle, circleStyle]}>
+          <LinearGradient
+            colors={[colors.accentSoft, colors.auroraEnd]}
+            start={{ x: 0.15, y: 0 }}
+            end={{ x: 0.85, y: 1 }}
+            style={styles.circleFill}
+          />
+          <LinearGradient
+            colors={[withAlpha('#FFFFFF', 0.5), 'transparent']}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 0.7 }}
+            style={styles.gloss}
+            pointerEvents="none"
+          />
+        </Animated.View>
         <View style={styles.orbCenter}>
           <AppText variant="heading" color="#FFFFFF">
             {label}
@@ -219,11 +238,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     borderRadius: radius.md,
     borderWidth: StyleSheet.hairlineWidth,
+    overflow: 'hidden',
   },
   runner: { flex: 1, justifyContent: 'space-between', paddingBottom: spacing.xl },
   orbArea: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   halo: { position: 'absolute', width: SIZE, height: SIZE, borderRadius: SIZE / 2 },
-  circle: { position: 'absolute', width: SIZE, height: SIZE, borderRadius: SIZE / 2, opacity: 0.9 },
+  ring: { position: 'absolute', width: SIZE, height: SIZE, borderRadius: SIZE / 2, borderWidth: 1.5 },
+  circle: { position: 'absolute', width: SIZE, height: SIZE, borderRadius: SIZE / 2, overflow: 'hidden', opacity: 0.95 },
+  circleFill: { width: '100%', height: '100%' },
+  gloss: { position: 'absolute', left: 0, right: 0, top: 0, height: SIZE * 0.55 },
   orbCenter: { alignItems: 'center', gap: spacing.xs },
   count: { fontWeight: '200' },
   runnerFooter: { paddingHorizontal: spacing.xl, gap: spacing.md },
