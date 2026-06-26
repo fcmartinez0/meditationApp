@@ -10,6 +10,7 @@ import { AppText } from '@/components/AppText';
 import { Backdrop } from '@/components/Backdrop';
 import { GlassFill } from '@/components/GlassFill';
 import { SoundCard } from '@/components/SoundCard';
+import type { SoundItem } from '@/components/SoundRow';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { SECTIONS } from '@/lib/catalog';
 import type { AmbientSound } from '@/lib/types';
@@ -44,6 +45,17 @@ export default function BrowseScreen() {
   const filters = useMemo(() => [ALL, ...SECTIONS.map((s) => s.title)], []);
   const shown = filter === ALL ? SECTIONS : SECTIONS.filter((s) => s.title === filter);
 
+  // Flat lookup so a recent key resolves to its full card (label, icon, hint).
+  const itemByKey = useMemo(() => {
+    const map: Record<string, SoundItem> = {};
+    for (const s of SECTIONS) for (const it of s.items) map[it.key] = it;
+    return map;
+  }, []);
+  const recents = useMemo(
+    () => settings.recents.map((k) => itemByKey[k]).filter(Boolean).slice(0, 6),
+    [settings.recents, itemByKey],
+  );
+
   // Pick a sound and return to the calm home, ready to begin.
   const choose = (key: AmbientSound) => {
     Haptics.selectionAsync().catch(() => {});
@@ -72,6 +84,30 @@ export default function BrowseScreen() {
             <Ionicons name="close" size={26} color={colors.textSecondary} />
           </Pressable>
         </View>
+
+        {/* Recently used — pinned at the top so it's one tap away regardless of
+            the active category filter. */}
+        {recents.length > 0 && (
+          <Animated.View entering={FadeIn.duration(360)}>
+            <AppText variant="label" muted style={styles.recentLabel}>
+              RECENT
+            </AppText>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.recentRow}>
+              {recents.map((item) => (
+                <View key={item.key} style={styles.recentCell}>
+                  <SoundCard
+                    item={item}
+                    selected={settings.ambient === item.key}
+                    onPress={() => choose(item.key)}
+                  />
+                </View>
+              ))}
+            </ScrollView>
+          </Animated.View>
+        )}
 
         {/* Sticky category filter — stays put while the list scrolls. */}
         <View>
@@ -160,6 +196,9 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.sm,
   },
   close: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  recentLabel: { paddingHorizontal: spacing.xl, marginTop: spacing.xs, marginBottom: spacing.sm },
+  recentRow: { paddingHorizontal: spacing.xl, gap: spacing.md },
+  recentCell: { width: 128 },
   chips: { paddingHorizontal: spacing.xl, paddingVertical: spacing.sm, gap: spacing.sm },
   chip: {
     minHeight: 40,
