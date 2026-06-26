@@ -32,7 +32,13 @@ const AMBIENT_SOURCES: Record<FileSound, number | number[]> = {
   deep: require('@/assets/audio/music/deep.wav'),
   dream: require('@/assets/audio/music/dream.wav'),
   clarity: require('@/assets/audio/music/clarity.wav'),
-  lofi: [require('@/assets/audio/beats/lofi-1.wav'), require('@/assets/audio/beats/lofi-2.wav')],
+  // Lo-Fi folds in a real chill track (Sunward Ascent) alongside its two
+  // generated variants; the session picks one per play (matches native rotation).
+  lofi: [
+    require('@/assets/audio/beats/lofi-1.wav'),
+    require('@/assets/audio/beats/lofi-2.wav'),
+    require('@/assets/audio/tracks/sunward-ascent.mp3'),
+  ],
   liquid: [require('@/assets/audio/beats/liquid-1.wav'), require('@/assets/audio/beats/liquid-2.wav')],
   chillstep: [require('@/assets/audio/beats/chillstep-1.wav'), require('@/assets/audio/beats/chillstep-2.wav')],
   downtempo: [require('@/assets/audio/beats/downtempo-1.wav'), require('@/assets/audio/beats/downtempo-2.wav')],
@@ -41,7 +47,6 @@ const AMBIENT_SOURCES: Record<FileSound, number | number[]> = {
   techno: [require('@/assets/audio/beats/techno-1.wav'), require('@/assets/audio/beats/techno-2.wav')],
   triphop: [require('@/assets/audio/beats/triphop-1.wav'), require('@/assets/audio/beats/triphop-2.wav')],
   synthwave: [require('@/assets/audio/beats/synthwave-1.wav'), require('@/assets/audio/beats/synthwave-2.wav')],
-  sunward: require('@/assets/audio/tracks/sunward-ascent.mp3'),
 };
 
 /** Resolve a sound to a single source, choosing a random variant if it has several. */

@@ -42,7 +42,6 @@ export const SECTIONS: Section[] = [
     title: 'Beats',
     caption: 'Instrumental grooves to focus or unwind. They’re in stereo, so headphones help.',
     items: [
-      { key: 'sunward', label: 'Sunward Ascent', icon: 'sparkles-outline', hint: 'chill · full track' },
       { key: 'melodic', label: 'Melodic House', icon: 'sunny-outline', hint: '123 BPM · warm & euphoric' },
       { key: 'deephouse', label: 'Deep House', icon: 'moon-outline', hint: '122 BPM · dark & sultry' },
       { key: 'techno', label: 'Ambient Techno', icon: 'pulse-outline', hint: '122 BPM · hypnotic & rolling' },

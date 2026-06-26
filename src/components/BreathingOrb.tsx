@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   Easing,
   cancelAnimation,
+  type SharedValue,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -27,6 +28,12 @@ interface BreathingOrbProps {
   core?: string;
   halo?: string;
   colors?: readonly [string, string];
+  /**
+   * External 0..1 breath driver. When provided (e.g. a paced breathing
+   * exercise), the orb expands/contracts with this value instead of running its
+   * own breathing LFO — so the same orb can pace any rhythm.
+   */
+  breath?: SharedValue<number>;
   children?: React.ReactNode;
 }
 
@@ -36,7 +43,7 @@ interface BreathingOrbProps {
  * all revolving slowly in the brand colours. Breathes when active, drifts when
  * still, and holds steady for Reduce Motion.
  */
-export function BreathingOrb({ active = false, still, core, halo, colors: gradient, children }: BreathingOrbProps) {
+export function BreathingOrb({ active = false, still, core, halo, colors: gradient, breath: breathProp, children }: BreathingOrbProps) {
   const theme = useThemeColors();
   const coreColor = core ?? theme.accentSoft;
   const haloColor = halo ?? theme.auroraEnd;
@@ -45,7 +52,9 @@ export function BreathingOrb({ active = false, still, core, halo, colors: gradie
   const palette = ['#FFFFFF', grad[0], grad[1], haloColor];
   const reduced = useReducedMotion();
 
-  const breath = useSharedValue(0.5);
+  // Internal breath LFO, used unless the caller drives the breath externally.
+  const internalBreath = useSharedValue(0.5);
+  const breath = breathProp ?? internalBreath;
   const spinA = useSharedValue(0); // polygon CW
   const spinB = useSharedValue(0); // polygon CCW
   const spinS = useSharedValue(0); // spokes
@@ -56,12 +65,12 @@ export function BreathingOrb({ active = false, still, core, halo, colors: gradie
       (sv.value = withRepeat(withTiming(1, { duration: ms, easing: Easing.linear }), -1, false));
 
     if (reduced) {
-      cancelAnimation(breath);
+      cancelAnimation(internalBreath);
       cancelAnimation(spinA);
       cancelAnimation(spinB);
       cancelAnimation(spinS);
       cancelAnimation(sheen);
-      breath.value = 0.5;
+      if (!breathProp) internalBreath.value = 0.5;
       spinA.value = 0;
       spinB.value = 0;
       spinS.value = 0;
@@ -75,23 +84,30 @@ export function BreathingOrb({ active = false, still, core, halo, colors: gradie
     loop(spinS, active ? 60000 : 80000);
     loop(sheen, active ? 14000 : 22000); // glassy shine sweep
 
-    cancelAnimation(breath);
-    if (still) {
-      breath.value = 0.5;
-    } else if (active) {
-      breath.value = 0;
-      breath.value = withRepeat(withTiming(1, { duration: BREATH_MS, easing: Easing.inOut(Easing.ease) }), -1, true);
-    } else {
-      breath.value = withTiming(0.2, { duration: 800 });
+    // Drive the breathing LFO only when the caller isn't supplying its own.
+    if (!breathProp) {
+      cancelAnimation(internalBreath);
+      if (still) {
+        internalBreath.value = 0.5;
+      } else if (active) {
+        internalBreath.value = 0;
+        internalBreath.value = withRepeat(
+          withTiming(1, { duration: BREATH_MS, easing: Easing.inOut(Easing.ease) }),
+          -1,
+          true,
+        );
+      } else {
+        internalBreath.value = withTiming(0.2, { duration: 800 });
+      }
     }
     return () => {
-      cancelAnimation(breath);
+      cancelAnimation(internalBreath);
       cancelAnimation(spinA);
       cancelAnimation(spinB);
       cancelAnimation(spinS);
       cancelAnimation(sheen);
     };
-  }, [active, still, reduced, breath, spinA, spinB, spinS, sheen]);
+  }, [active, still, reduced, breathProp, internalBreath, spinA, spinB, spinS, sheen]);
 
   const haloStyle = useAnimatedStyle(() => ({
     transform: [{ scale: 0.96 + breath.value * 0.16 }],
@@ -130,17 +146,48 @@ export function BreathingOrb({ active = false, still, core, halo, colors: gradie
         <Polygon sides={6} radius={GEOM * 0.44} color={withAlpha(grad[1], 0.9)} strokeWidth={2} />
       </Animated.View>
 
-      {/* Two counter-rotating triangles — a shifting hexagram. */}
+      {/* A bloom of fine diamond petals, slowly counter-rotating for depth. */}
       <Animated.View style={[styles.layer, spinBStyle]} pointerEvents="none">
-        <Polygon sides={3} radius={GEOM * 0.38} color={withAlpha('#FFFFFF', 0.6)} strokeWidth={2} />
+        {Array.from({ length: 12 }).map((_, i) => (
+          <View
+            key={`petal${i}`}
+            style={[
+              styles.petal,
+              {
+                backgroundColor: withAlpha(palette[i % palette.length], i % 2 === 0 ? 0.5 : 0.22),
+                transform: [{ rotate: `${30 * i}deg` }, { translateY: -GEOM * 0.43 }, { rotate: '45deg' }],
+              },
+            ]}
+          />
+        ))}
+      </Animated.View>
+
+      {/* A jewelled hexagram: two triangles locked as one rotating star (richer
+          than a pair of bare counter-rotating triangles) with gem points. */}
+      <Animated.View style={[styles.layer, spinAStyle]} pointerEvents="none">
+        <Polygon sides={3} radius={GEOM * 0.36} color={withAlpha(grad[0], 0.85)} strokeWidth={2} />
       </Animated.View>
       <Animated.View style={[styles.layer, spinAStyle]} pointerEvents="none">
-        <Polygon sides={3} radius={GEOM * 0.38} color={withAlpha(grad[0], 0.8)} strokeWidth={2} rotate={180} />
+        <Polygon sides={3} radius={GEOM * 0.36} color={withAlpha('#FFFFFF', 0.6)} strokeWidth={2} rotate={180} />
+      </Animated.View>
+      <Animated.View style={[styles.layer, spinAStyle]} pointerEvents="none">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <View
+            key={`jewel${i}`}
+            style={[
+              styles.jewel,
+              {
+                backgroundColor: withAlpha(i % 2 === 0 ? '#FFFFFF' : grad[1], 0.92),
+                transform: [{ rotate: `${60 * i}deg` }, { translateY: -GEOM * 0.36 }],
+              },
+            ]}
+          />
+        ))}
       </Animated.View>
 
       {/* Nested inner hexagon for depth. */}
       <Animated.View style={[styles.layer, spinBStyle]} pointerEvents="none">
-        <Polygon sides={6} radius={GEOM * 0.29} color={withAlpha('#FFFFFF', 0.4)} strokeWidth={1.5} rotate={30} />
+        <Polygon sides={6} radius={GEOM * 0.27} color={withAlpha('#FFFFFF', 0.4)} strokeWidth={1.5} rotate={30} />
       </Animated.View>
 
       {/* Crisp concentric rings. */}
@@ -185,6 +232,8 @@ const styles = StyleSheet.create({
   halo: { position: 'absolute', width: SIZE, height: SIZE, borderRadius: SIZE / 2 },
   layer: { position: 'absolute', width: SIZE, height: SIZE, alignItems: 'center', justifyContent: 'center' },
   tick: { position: 'absolute', width: 2, borderRadius: 1 },
+  petal: { position: 'absolute', width: 7, height: 7, borderRadius: 1.5 },
+  jewel: { position: 'absolute', width: 5, height: 5, borderRadius: 2.5 },
   ringWrap: { position: 'absolute', width: SIZE, height: SIZE, alignItems: 'center', justifyContent: 'center' },
   ring: { position: 'absolute', borderWidth: 1, borderRadius: GEOM },
   core: { position: 'absolute', width: CORE, height: CORE, borderRadius: CORE / 2, overflow: 'hidden' },

@@ -31,8 +31,8 @@ function resolveArtwork(): Promise<string | undefined> {
   return artworkPromise;
 }
 
-// One source per sound, except the beats — each has two variants (different key
-// + groove) and the session picks one at random for variety.
+// One source per sound, except the beats — each has multiple variants and the
+// session rotates through them (crossfading) for within-session variety.
 const AMBIENT_SOURCES: Record<FileSound, number | number[]> = {
   rain: require('@/assets/audio/ambient/rain.wav'),
   ocean: require('@/assets/audio/ambient/ocean.wav'),
@@ -49,7 +49,14 @@ const AMBIENT_SOURCES: Record<FileSound, number | number[]> = {
   deep: require('@/assets/audio/music/deep.wav'),
   dream: require('@/assets/audio/music/dream.wav'),
   clarity: require('@/assets/audio/music/clarity.wav'),
-  lofi: [require('@/assets/audio/beats/lofi-1.wav'), require('@/assets/audio/beats/lofi-2.wav')],
+  // Lo-Fi mixes the two generated variants with a real chill track (Sunward
+  // Ascent, made with Gemini): the session crossfades between them so a real
+  // song surfaces and recedes amid the generated grooves.
+  lofi: [
+    require('@/assets/audio/beats/lofi-1.wav'),
+    require('@/assets/audio/beats/lofi-2.wav'),
+    require('@/assets/audio/tracks/sunward-ascent.mp3'),
+  ],
   liquid: [require('@/assets/audio/beats/liquid-1.wav'), require('@/assets/audio/beats/liquid-2.wav')],
   chillstep: [require('@/assets/audio/beats/chillstep-1.wav'), require('@/assets/audio/beats/chillstep-2.wav')],
   downtempo: [require('@/assets/audio/beats/downtempo-1.wav'), require('@/assets/audio/beats/downtempo-2.wav')],
@@ -58,29 +65,15 @@ const AMBIENT_SOURCES: Record<FileSound, number | number[]> = {
   techno: [require('@/assets/audio/beats/techno-1.wav'), require('@/assets/audio/beats/techno-2.wav')],
   triphop: [require('@/assets/audio/beats/triphop-1.wav'), require('@/assets/audio/beats/triphop-2.wav')],
   synthwave: [require('@/assets/audio/beats/synthwave-1.wav'), require('@/assets/audio/beats/synthwave-2.wav')],
-  // A full chill track (generated with Gemini); the binaural bed plays under it.
-  sunward: require('@/assets/audio/tracks/sunward-ascent.mp3'),
 };
 
-// Real (externally-produced) songs that make up the "Beats" music. A session
-// rotates through the whole pool (crossfading) to fake endless variety over long
-// sessions — even up to the 60-minute limit. Add more song keys here as they land.
-const SONG_POOL: FileSound[] = ['sunward'];
-
-/** Sources to (cross)fade through for a sound. Real songs rotate the whole pool
- *  (selected first); other sounds use their own variant list (or single source). */
+/** Sources to (cross)fade through for a sound — its variant list, or a single source. */
 function sourcesFor(ambient: FileSound): number[] {
-  if (SONG_POOL.includes(ambient)) {
-    const ordered = [ambient, ...SONG_POOL.filter((s) => s !== ambient)];
-    return ordered.map((k) => AMBIENT_SOURCES[k] as number);
-  }
   const src = AMBIENT_SOURCES[ambient];
   return Array.isArray(src) ? src : [src];
 }
 
-const isSong = (ambient: FileSound) => SONG_POOL.includes(ambient);
-
-// How often a multi-variant beat evolves to its other variant mid-session.
+// How often a multi-variant beat evolves to its next variant mid-session.
 const EVOLVE_MS = 200000; // ~3.3 minutes
 
 // Track the last-applied mix mode so we re-apply only when it actually changes.
@@ -152,8 +145,8 @@ export class SessionAudio {
     await ensureAudioMode(mixWithMusic);
     if (ambient !== 'none' && !isGenerative(ambient)) {
       this.sources = sourcesFor(ambient);
-      // Songs start on the one you picked; beat variants start on a random one.
-      this.variantIdx = isSong(ambient) ? 0 : Math.floor(Math.random() * this.sources.length);
+      // Start on a random variant so repeat sessions don't always open the same.
+      this.variantIdx = Math.floor(Math.random() * this.sources.length);
       this.ambient = createAudioPlayer(this.sources[this.variantIdx]);
       this.ambient.loop = true;
       // Start silent so startAmbient() can fade in and avoid a click.

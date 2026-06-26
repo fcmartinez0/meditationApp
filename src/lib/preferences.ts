@@ -82,7 +82,9 @@ const RANGES: Record<Section, Range> = {
     tempoMax: 72,
     pulseMax: 0,
     arpChance: 0.32,
-    bassChance: 0.7,
+    // A warm sub-bass under the pad is most of what makes a generative bed read
+    // as "music" rather than a drone, so keep one nearly always present.
+    bassChance: 0.92,
     // Mostly still; only gentle motion (no busy tribal/offbeat for rest).
     percussion: ['none', 'none', 'none', 'heartbeat', 'shaker'],
     // Calming voices; bias toward the soft pad.
@@ -101,7 +103,7 @@ const RANGES: Record<Section, Range> = {
     tempoMax: 104,
     pulseMax: 0.22,
     arpChance: 0.75,
-    bassChance: 0.85,
+    bassChance: 0.95,
     percussion: ['pulse', 'shaker', 'broken', 'heartbeat', 'offbeat', 'tribal'],
     instruments: ['pad', 'keys', 'pluck', 'bells', 'choir'],
   },

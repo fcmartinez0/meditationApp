@@ -30,7 +30,6 @@ export type AmbientSound =
   | 'techno'
   | 'triphop'
   | 'synthwave'
-  | 'sunward'
   | GenerativeSound;
 
 /** Sounds backed by a bundled .wav (everything except silence and generative). */
@@ -63,7 +62,6 @@ export const AMBIENT_KEYS: AmbientSound[] = [
   'techno',
   'triphop',
   'synthwave',
-  'sunward',
   'gen_rest',
   'gen_chill',
 ];

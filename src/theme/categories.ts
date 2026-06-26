@@ -52,7 +52,6 @@ const CATEGORY_OF: Record<AmbientSound, Category> = {
   techno: 'beats',
   triphop: 'beats',
   synthwave: 'beats',
-  sunward: 'beats',
 };
 
 export function categoryFor(sound: AmbientSound): Category {

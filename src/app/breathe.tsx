@@ -1,26 +1,20 @@
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useKeepAwake } from 'expo-keep-awake';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import Animated, {
-  Easing,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from 'react-native-reanimated';
+import { Easing, useSharedValue, withTiming } from 'react-native-reanimated';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/AppText';
 import { Backdrop } from '@/components/Backdrop';
+import { BreathingOrb } from '@/components/BreathingOrb';
 import { Button } from '@/components/Button';
 import { GlassFill } from '@/components/GlassFill';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { formatClock } from '@/lib/date';
 import { radius, spacing } from '@/theme';
-import { withAlpha } from '@/theme/categories';
 
 interface Phase {
   label: string;
@@ -119,10 +113,13 @@ export default function BreatheScreen() {
   );
 }
 
+// Phase circle scale (0.45 contracted .. 1 expanded) → orb breath (0 .. 1).
+const toBreath = (to: number) => (to - 0.45) / 0.55;
+
 function BreathingRunner({ pattern, onEnd }: { pattern: { label: string; phases: Phase[] }; onEnd: () => void }) {
   useKeepAwake();
   const colors = useThemeColors();
-  const scale = useSharedValue(0.45);
+  const breath = useSharedValue(0);
   const [label, setLabel] = useState(pattern.phases[0].label);
   const [count, setCount] = useState(pattern.phases[0].seconds);
   const [elapsed, setElapsed] = useState(0);
@@ -140,7 +137,7 @@ function BreathingRunner({ pattern, onEnd }: { pattern: { label: string; phases:
       setLabel(ph.label);
       setCount(ph.seconds);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-      scale.value = withTiming(ph.to, { duration: ph.seconds * 1000, easing: Easing.inOut(Easing.ease) });
+      breath.value = withTiming(toBreath(ph.to), { duration: ph.seconds * 1000, easing: Easing.inOut(Easing.ease) });
       let left = ph.seconds;
       clearInterval(countInterval);
       countInterval = setInterval(() => {
@@ -166,40 +163,24 @@ function BreathingRunner({ pattern, onEnd }: { pattern: { label: string; phases:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const circleStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
-  const haloStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: 0.7 + scale.value * 0.5 }],
-    opacity: 0.12 + scale.value * 0.12,
-  }));
-
   return (
     <View style={styles.runner}>
       <View style={styles.orbArea}>
-        <Animated.View style={[styles.halo, { backgroundColor: colors.auroraEnd }, haloStyle]} />
-        <Animated.View style={[styles.ring, { borderColor: withAlpha(colors.accentSoft, 0.6) }, circleStyle]} />
-        <Animated.View style={[styles.circle, circleStyle]}>
-          <LinearGradient
-            colors={[colors.accentSoft, colors.auroraEnd]}
-            start={{ x: 0.15, y: 0 }}
-            end={{ x: 0.85, y: 1 }}
-            style={styles.circleFill}
-          />
-          <LinearGradient
-            colors={[withAlpha('#FFFFFF', 0.5), 'transparent']}
-            start={{ x: 0.5, y: 0 }}
-            end={{ x: 0.5, y: 0.7 }}
-            style={styles.gloss}
-            pointerEvents="none"
-          />
-        </Animated.View>
-        <View style={styles.orbCenter}>
-          <AppText variant="heading" color="#FFFFFF">
-            {label}
-          </AppText>
-          <AppText variant="display" color="#FFFFFF" style={styles.count}>
-            {count}
-          </AppText>
-        </View>
+        <BreathingOrb
+          active
+          breath={breath}
+          core={colors.accentSoft}
+          halo={colors.auroraEnd}
+          colors={[colors.accentSoft, colors.auroraEnd]}>
+          <View style={styles.orbCenter}>
+            <AppText variant="heading" color="#FFFFFF">
+              {label}
+            </AppText>
+            <AppText variant="display" color="#FFFFFF" style={styles.count}>
+              {count}
+            </AppText>
+          </View>
+        </BreathingOrb>
       </View>
 
       <View style={styles.runnerFooter}>
@@ -211,8 +192,6 @@ function BreathingRunner({ pattern, onEnd }: { pattern: { label: string; phases:
     </View>
   );
 }
-
-const SIZE = 240;
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
@@ -245,11 +224,6 @@ const styles = StyleSheet.create({
   },
   runner: { flex: 1, justifyContent: 'space-between', paddingBottom: spacing.xl },
   orbArea: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  halo: { position: 'absolute', width: SIZE, height: SIZE, borderRadius: SIZE / 2 },
-  ring: { position: 'absolute', width: SIZE, height: SIZE, borderRadius: SIZE / 2, borderWidth: 1.5 },
-  circle: { position: 'absolute', width: SIZE, height: SIZE, borderRadius: SIZE / 2, overflow: 'hidden', opacity: 0.95 },
-  circleFill: { width: '100%', height: '100%' },
-  gloss: { position: 'absolute', left: 0, right: 0, top: 0, height: SIZE * 0.55 },
   orbCenter: { alignItems: 'center', gap: spacing.xs },
   count: { fontWeight: '200' },
   runnerFooter: { paddingHorizontal: spacing.xl, gap: spacing.md },
