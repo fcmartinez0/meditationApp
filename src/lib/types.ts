@@ -173,6 +173,8 @@ export interface Settings {
   mixWithMusic: boolean;
   /** Optional user-chosen background image (a local file URI), or null. */
   backgroundUri: string | null;
+  /** Recently used sounds, most-recent-first, for quick re-selection. */
+  recents: AmbientSound[];
   /** Whether the first-run intro has been completed. */
   onboarded: boolean;
   /** Schema version, for one-time migrations of stored settings. */
@@ -199,6 +201,7 @@ export const DEFAULT_SETTINGS: Settings = {
   volume: 0.85,
   mixWithMusic: false,
   backgroundUri: null,
+  recents: [],
   onboarded: false,
   settingsVersion: 3,
 };

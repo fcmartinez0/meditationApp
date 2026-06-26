@@ -25,16 +25,22 @@ import {
 } from '@/lib/storage';
 import {
   DEFAULT_SETTINGS,
+  type AmbientSound,
   type SessionRecord,
   type Settings,
   type Stats,
 } from '@/lib/types';
+
+// How many recently-used sounds to remember for quick re-selection.
+const RECENTS_MAX = 8;
 
 interface AppDataValue {
   ready: boolean;
   settings: Settings;
   stats: Stats;
   updateSettings: (patch: Partial<Settings>) => Promise<void>;
+  /** Record a sound as just-used, moving it to the front of recents. */
+  addRecent: (key: AmbientSound) => void;
   recordSession: (record: SessionRecord) => Promise<void>;
   resetData: () => Promise<void>;
 }
@@ -76,6 +82,13 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     setSettings((prev) => ({ ...prev, ...patch }));
   }, []);
 
+  const addRecent = useCallback((key: AmbientSound) => {
+    setSettings((prev) => {
+      const recents = [key, ...prev.recents.filter((k) => k !== key)].slice(0, RECENTS_MAX);
+      return { ...prev, recents };
+    });
+  }, []);
+
   // Persist settings whenever they change (after the initial load). Doing this
   // in an effect — rather than fire-and-forget inside the setter — lets us
   // actually catch a write failure and tell the user, instead of silently
@@ -114,8 +127,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo<AppDataValue>(
-    () => ({ ready, settings, stats, updateSettings, recordSession, resetData }),
-    [ready, settings, stats, updateSettings, recordSession, resetData],
+    () => ({ ready, settings, stats, updateSettings, addRecent, recordSession, resetData }),
+    [ready, settings, stats, updateSettings, addRecent, recordSession, resetData],
   );
 
   return <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>;

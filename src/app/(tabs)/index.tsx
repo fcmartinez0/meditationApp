@@ -28,7 +28,7 @@ import { radius, spacing } from '@/theme';
 export default function HomeScreen() {
   const colors = useThemeColors();
   const router = useRouter();
-  const { settings, stats, updateSettings } = useAppData();
+  const { settings, stats, updateSettings, addRecent } = useAppData();
 
   // The whole screen's accent follows the chosen sound's category.
   const cat = categoryStyle(settings.ambient);
@@ -55,6 +55,7 @@ export default function HomeScreen() {
 
   const begin = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    addRecent(settings.ambient);
     router.push({
       pathname: '/session',
       params: { duration: String(settings.durationMin), ambient: settings.ambient },

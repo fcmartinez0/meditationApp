@@ -47,6 +47,10 @@ export async function loadSettings(): Promise<Settings> {
     }
     // Drop a sound that no longer exists (e.g. a renamed/removed track).
     if (!AMBIENT_KEYS.includes(merged.ambient)) merged.ambient = 'none';
+    // Sanitize recents: keep only still-valid keys, deduped and bounded.
+    merged.recents = Array.from(
+      new Set((Array.isArray(merged.recents) ? merged.recents : []).filter((k) => AMBIENT_KEYS.includes(k))),
+    ).slice(0, 12);
     return merged;
   } catch {
     return { ...DEFAULT_SETTINGS };
