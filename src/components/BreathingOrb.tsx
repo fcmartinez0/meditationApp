@@ -146,43 +146,45 @@ export function BreathingOrb({ active = false, still, core, halo, colors: gradie
         <Polygon sides={6} radius={GEOM * 0.44} color={withAlpha(grad[1], 0.9)} strokeWidth={2} />
       </Animated.View>
 
-      {/* A bloom of fine diamond petals, slowly counter-rotating for depth. */}
-      <Animated.View style={[styles.layer, spinBStyle]} pointerEvents="none">
-        {Array.from({ length: 12 }).map((_, i) => (
-          <View
-            key={`petal${i}`}
-            style={[
-              styles.petal,
-              {
-                backgroundColor: withAlpha(palette[i % palette.length], i % 2 === 0 ? 0.5 : 0.22),
-                transform: [{ rotate: `${30 * i}deg` }, { translateY: -GEOM * 0.43 }, { rotate: '45deg' }],
-              },
-            ]}
-          />
-        ))}
-      </Animated.View>
-
-      {/* A jewelled hexagram: two triangles locked as one rotating star (richer
-          than a pair of bare counter-rotating triangles) with gem points. */}
+      {/* A 12-point starburst: radiant needles from the core (alternating long
+          and short for sparkle), each capped with a gem at its tip. Reads as
+          celestial radiance — no overlapping-triangle hexagram. */}
       <Animated.View style={[styles.layer, spinAStyle]} pointerEvents="none">
-        <Polygon sides={3} radius={GEOM * 0.36} color={withAlpha(grad[0], 0.85)} strokeWidth={2} />
-      </Animated.View>
-      <Animated.View style={[styles.layer, spinAStyle]} pointerEvents="none">
-        <Polygon sides={3} radius={GEOM * 0.36} color={withAlpha('#FFFFFF', 0.6)} strokeWidth={2} rotate={180} />
+        {Array.from({ length: 12 }).map((_, i) => {
+          const long = i % 2 === 0;
+          const len = GEOM * (long ? 0.42 : 0.3);
+          return (
+            <View
+              key={`ray${i}`}
+              style={[
+                styles.ray,
+                {
+                  height: len,
+                  backgroundColor: withAlpha(palette[i % palette.length], long ? 0.7 : 0.4),
+                  transform: [{ rotate: `${30 * i}deg` }, { translateY: -len / 2 }],
+                },
+              ]}
+            />
+          );
+        })}
       </Animated.View>
       <Animated.View style={[styles.layer, spinAStyle]} pointerEvents="none">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <View
-            key={`jewel${i}`}
-            style={[
-              styles.jewel,
-              {
-                backgroundColor: withAlpha(i % 2 === 0 ? '#FFFFFF' : grad[1], 0.92),
-                transform: [{ rotate: `${60 * i}deg` }, { translateY: -GEOM * 0.36 }],
-              },
-            ]}
-          />
-        ))}
+        {Array.from({ length: 12 }).map((_, i) => {
+          const long = i % 2 === 0;
+          const r = GEOM * (long ? 0.42 : 0.3);
+          return (
+            <View
+              key={`tip${i}`}
+              style={[
+                styles.jewel,
+                {
+                  backgroundColor: withAlpha(long ? '#FFFFFF' : grad[1], 0.92),
+                  transform: [{ rotate: `${30 * i}deg` }, { translateY: -r }],
+                },
+              ]}
+            />
+          );
+        })}
       </Animated.View>
 
       {/* Nested inner hexagon for depth. */}
@@ -232,7 +234,7 @@ const styles = StyleSheet.create({
   halo: { position: 'absolute', width: SIZE, height: SIZE, borderRadius: SIZE / 2 },
   layer: { position: 'absolute', width: SIZE, height: SIZE, alignItems: 'center', justifyContent: 'center' },
   tick: { position: 'absolute', width: 2, borderRadius: 1 },
-  petal: { position: 'absolute', width: 7, height: 7, borderRadius: 1.5 },
+  ray: { position: 'absolute', width: 2.5, borderRadius: 1.5 },
   jewel: { position: 'absolute', width: 5, height: 5, borderRadius: 2.5 },
   ringWrap: { position: 'absolute', width: SIZE, height: SIZE, alignItems: 'center', justifyContent: 'center' },
   ring: { position: 'absolute', borderWidth: 1, borderRadius: GEOM },
