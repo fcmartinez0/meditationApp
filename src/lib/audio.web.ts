@@ -41,6 +41,7 @@ const AMBIENT_SOURCES: Record<FileSound, number | number[]> = {
   techno: [require('@/assets/audio/beats/techno-1.wav'), require('@/assets/audio/beats/techno-2.wav')],
   triphop: [require('@/assets/audio/beats/triphop-1.wav'), require('@/assets/audio/beats/triphop-2.wav')],
   synthwave: [require('@/assets/audio/beats/synthwave-1.wav'), require('@/assets/audio/beats/synthwave-2.wav')],
+  sunward: require('@/assets/audio/tracks/sunward-ascent.mp3'),
 };
 
 /** Resolve a sound to a single source, choosing a random variant if it has several. */
