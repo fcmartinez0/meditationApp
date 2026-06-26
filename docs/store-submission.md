@@ -14,7 +14,7 @@ Stillness
 
 ### Subtitle (iOS, 30 char max)
 ```
-Meditate, breathe, focus, rest
+Focus, sleep, breathe, rest
 ```
 
 ### Promotional text (iOS, 170 char — editable without review)
@@ -25,17 +25,17 @@ endless generative music, and keep your daily streak. No ads, no tracking.
 
 ### Short description (Google Play, 80 char max)
 ```
-Meditation timer, guided breathing & a deep sound library. No ads, no tracking.
+Focus, sleep & breathing sounds with a deep audio library. No ads, no tracking.
 ```
 
 ### Full description
 ```
-Stillness is a calm, beautifully simple space to meditate, breathe, focus, and
-rest — wherever you are.
+Stillness is a calm, beautifully simple space to focus, breathe, rest, and drift
+off to sleep — wherever you are.
 
-MEDITATION TIMER
-Pick a length, choose a sound, and follow a calming visual — a breathing orb, a
-gently filling tide, or a minimal clock.
+SESSION TIMER
+Pick a length, choose a sound, and follow a calming visual: a breathing orb with
+a glassy core inside slowly revolving geometry that paces your breath.
 
 GUIDED BREATHING
 Box, 4-7-8, Calm, and Coherent rhythms with an animated pace guide and gentle
@@ -67,7 +67,7 @@ frequency tracks are a wellness aid, not a medical treatment.
 
 ### Keywords (iOS, 100 char max, comma-separated, no spaces)
 ```
-meditation,breathe,sleep,calm,focus,relax,mindfulness,binaural,white noise,timer,rest,anxiety
+focus,sleep,breathe,calm,relax,binaural,white noise,timer,rest,ambient,sounds,study
 ```
 
 ### Category
@@ -124,7 +124,7 @@ The app is local-first with **no data collection**, so:
 ### Listing assets to produce (outside the code)
 - [ ] **Screenshots** — iPhone 6.9" & 6.5" (required); iPad 13" if you keep `supportsTablet`.
       Android phone + 7"/10" tablet. Capture: Home, a session (orb), breathing, sound browse, progress.
-- [ ] **App preview video** (optional but recommended for meditation apps).
+- [ ] **App preview video** (optional but recommended for wellness apps).
 - [ ] Feature graphic (1024×500) for Google Play.
 - [ ] Host the **privacy policy** and a **support page** at public URLs.
 
@@ -135,7 +135,7 @@ The app is local-first with **no data collection**, so:
 
 ### Review notes (paste into App Store Connect "Notes for Reviewer")
 ```
-Stillness plays continuous background audio so meditation/sleep sessions keep
+Stillness plays continuous background audio so focus/rest/sleep sessions keep
 running with the screen locked — this is why UIBackgroundModes includes "audio".
 All audio is synthesized on-device; the app does not record audio and requests
 no microphone access. There is no account, server, tracking, or analytics; all

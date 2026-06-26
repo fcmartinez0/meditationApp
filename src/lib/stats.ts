@@ -61,7 +61,7 @@ export function computeStats(sessions: SessionRecord[]): Stats {
     totalSessions: sessions.length,
     totalMinutes: Math.round(totalSeconds / 60),
     weekMinutes: weekMinutes.map((m) => Math.round(m)),
-    meditatedToday: sessions.some((s) => s.day === dayKey()),
+    activeToday: sessions.some((s) => s.day === dayKey()),
   };
 }
 

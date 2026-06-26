@@ -1,5 +1,5 @@
 /**
- * Live, never-repeating meditation music, synthesized in the Web Audio API.
+ * Live, never-repeating ambient music, synthesized in the Web Audio API.
  *
  * Layers, all driven by the spec's seed so a given spec evolves the same way:
  *  - a pad of oscillator voices that glide to a new chord every chordChangeSec
@@ -29,7 +29,7 @@ const SCALES: Record<string, number[]> = {
   harmonic_minor: [0, 2, 3, 5, 7, 8, 11],
   major: [0, 2, 4, 5, 7, 9, 11], // bright, open
   lydian_dominant: [0, 2, 4, 6, 7, 9, 10], // dreamy, floating
-  hirajoshi: [0, 2, 3, 7, 8], // Japanese pentatonic — spacious, meditative
+  hirajoshi: [0, 2, 3, 7, 8], // Japanese pentatonic — spacious, calm
 };
 
 // Four-note chord voicings as scale-degree offsets from the chord root.

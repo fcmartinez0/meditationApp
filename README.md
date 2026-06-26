@@ -8,7 +8,8 @@ TypeScript); one codebase runs on iOS, Android, and the web.
 
 - **Session timer** — pick a length, choose a sound, and settle in with a
   breathing "aurora" orb: a glassy gradient core inside slowly revolving
-  geometry (a hexagram, hexagons, and a fine tick ring) that paces your breath.
+  geometry (a 12-point starburst, hexagons, and a fine tick ring) that paces
+  your breath.
 - **Guided breathing** — Box, 4-7-8, Calm, and Coherent rhythms with an animated
   pace guide and gentle haptics.
 - **A deep sound library**
@@ -51,7 +52,7 @@ switching between any two is volume-neutral.
 
 Binaural beats whose carriers sit in the band where the effect is perceived
 best, with beat frequencies grounded in entrainment research: theta (~4.6 / 6 Hz)
-for relaxation and meditation, beta (~18 Hz) for focus and working memory.
+for relaxation and deep rest, beta (~18 Hz) for focus and working memory.
 
 ## Privacy
 

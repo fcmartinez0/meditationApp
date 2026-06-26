@@ -1,4 +1,4 @@
-/** Shared domain types for the meditation app. */
+/** Shared domain types for the focus / sleep / rest app. */
 
 /** Live, procedurally-generated sounds (no audio file backs these). */
 export type GenerativeSound = 'gen_rest' | 'gen_chill';
@@ -141,13 +141,13 @@ export interface PieceRating {
 }
 
 
-/** A single completed (or partially completed) meditation session. */
+/** A single completed (or partially completed) session. */
 export interface SessionRecord {
   /** Unix epoch ms when the session ended. */
   endedAt: number;
   /** Local calendar day key, e.g. "2026-06-02". */
   day: string;
-  /** Seconds the user actually meditated. */
+  /** Seconds the user actually spent in the session. */
   durationSec: number;
   /** Whether the planned duration was reached (vs. ended early). */
   completed: boolean;
@@ -184,10 +184,10 @@ export interface Stats {
   longestStreak: number;
   totalSessions: number;
   totalMinutes: number;
-  /** Minutes meditated per weekday for the current week (Mon..Sun). */
+  /** Minutes per weekday for the current week (Mon..Sun). */
   weekMinutes: number[];
-  /** True if the user has already meditated today. */
-  meditatedToday: boolean;
+  /** True if the user has already had a session today. */
+  activeToday: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {

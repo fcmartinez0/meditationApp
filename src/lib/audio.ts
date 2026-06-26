@@ -1,5 +1,5 @@
 /**
- * Thin imperative wrapper around expo-audio for the meditation session:
+ * Thin imperative wrapper around expo-audio for the session:
  * a looping ambient bed.
  */
 
@@ -85,7 +85,7 @@ async function ensureAudioMode(mixWithMusic: boolean) {
     await setAudioModeAsync({
       playsInSilentMode: true,
       // Keep playing when the screen locks mid-session (matches the app's
-      // background-audio capability), so meditation isn't cut off.
+      // background-audio capability), so a session isn't cut off.
       shouldPlayInBackground: true,
       // Default: take over the session (pause other apps). Opt-in mixing lets
       // users lay Stillness over their own music.

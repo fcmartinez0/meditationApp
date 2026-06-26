@@ -34,7 +34,7 @@ export const SECTIONS: Section[] = [
       { key: 'calm', label: 'Calm', icon: 'heart-outline', hint: '7.83 Hz · grounding (432 Hz tuned)' },
       { key: 'clarity', label: 'Clarity', icon: 'flash-outline', hint: '10 Hz · relaxed, clear presence' },
       { key: 'focus', label: 'Focus', icon: 'bulb-outline', hint: '18 Hz · beta, alert concentration' },
-      { key: 'dream', label: 'Dream', icon: 'cloud-outline', hint: '6 Hz · dreamy & meditative' },
+      { key: 'dream', label: 'Dream', icon: 'cloud-outline', hint: '6 Hz · dreamy & restful' },
       { key: 'deep', label: 'Deep', icon: 'bed-outline', hint: '3 Hz · deep rest & sleep' },
     ],
   },
