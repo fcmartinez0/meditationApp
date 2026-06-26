@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/AppText';
+import { Backdrop } from '@/components/Backdrop';
 import { Button } from '@/components/Button';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useAppData } from '@/store/AppData';
@@ -57,7 +58,8 @@ export function Onboarding() {
 
   return (
     <View style={styles.overlay}>
-      <View style={[styles.fill, { backgroundColor: colors.background }]}>
+      <View style={[styles.fill, styles.clip, { backgroundColor: colors.background }]}>
+        <Backdrop count={90} />
         <SafeAreaView style={styles.fill}>
           <Pressable onPress={complete} hitSlop={12} style={styles.skip}>
             <AppText variant="label" muted>
@@ -111,6 +113,7 @@ export function Onboarding() {
 const styles = StyleSheet.create({
   overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 100 },
   fill: { flex: 1 },
+  clip: { overflow: 'hidden' },
   skip: { position: 'absolute', top: spacing.sm, right: spacing.xl, zIndex: 10, padding: spacing.sm },
   slide: {
     flex: 1,

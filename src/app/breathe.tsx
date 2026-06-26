@@ -14,6 +14,7 @@ import Animated, {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/AppText';
+import { Backdrop } from '@/components/Backdrop';
 import { Button } from '@/components/Button';
 import { GlassFill } from '@/components/GlassFill';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -72,7 +73,8 @@ export default function BreatheScreen() {
   const [patternKey, setPatternKey] = useState<string | null>(null);
 
   return (
-    <View style={[styles.fill, { backgroundColor: colors.background }]}>
+    <View style={[styles.fill, styles.clip, { backgroundColor: colors.background }]}>
+      <Backdrop count={90} />
       <SafeAreaView style={styles.fill} edges={['left', 'right', 'bottom']}>
         <View style={[styles.header, { paddingTop: Math.max(insets.top, 44) + spacing.xs }]}>
           <Pressable
@@ -214,6 +216,7 @@ const SIZE = 240;
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
+  clip: { overflow: 'hidden' },
   header: {
     flexDirection: 'row',
     justifyContent: 'flex-end',

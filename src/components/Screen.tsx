@@ -3,8 +3,7 @@ import type { ReactNode } from 'react';
 import { ScrollView, StyleSheet, View, type ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { GeometricFlair } from '@/components/GeometricFlair';
-import { StarField } from '@/components/StarField';
+import { Backdrop } from '@/components/Backdrop';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useAppData } from '@/store/AppData';
 import { spacing } from '@/theme';
@@ -40,15 +39,7 @@ export function Screen({ children, scroll = false, bare = false, contentStyle, f
           <View style={[StyleSheet.absoluteFill, { backgroundColor: withAlpha(colors.background, 0.55) }]} />
         </>
       ) : null}
-      {/* Ambient backdrop: a faint stardust field plus geometric mandalas,
-          horizontally centred (top + bottom) so it stays symmetric as you scroll. */}
-      <StarField color={colors.text} count={bg ? 70 : 130} />
-      <View style={styles.flairTop} pointerEvents="none">
-        <GeometricFlair color={colors.accent} size={520} opacity={bg ? 0.12 : 0.2} />
-      </View>
-      <View style={styles.flairBottom} pointerEvents="none">
-        <GeometricFlair color={colors.accent} size={360} opacity={bg ? 0.08 : 0.14} />
-      </View>
+      <Backdrop count={bg ? 70 : 120} dim={!!bg} />
       <SafeAreaView style={styles.fill} edges={['top', 'left', 'right']}>
         {scroll ? (
           <ScrollView
@@ -69,9 +60,6 @@ export function Screen({ children, scroll = false, bare = false, contentStyle, f
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   clip: { overflow: 'hidden' },
-  // Centred mandalas bleeding off the top and bottom — symmetric left-to-right.
-  flairTop: { position: 'absolute', top: -240, left: 0, right: 0, alignItems: 'center' },
-  flairBottom: { position: 'absolute', bottom: -200, left: 0, right: 0, alignItems: 'center' },
   padded: { paddingHorizontal: spacing.xl },
   scrollContent: { paddingBottom: spacing.xxxl, gap: spacing.lg },
 });
