@@ -62,11 +62,23 @@ const AMBIENT_SOURCES: Record<FileSound, number | number[]> = {
   sunward: require('@/assets/audio/tracks/sunward-ascent.mp3'),
 };
 
-/** All variant sources for a sound (a single-element list for most). */
+// Real (externally-produced) songs that make up the "Beats" music. A session
+// rotates through the whole pool (crossfading) to fake endless variety over long
+// sessions — even up to the 60-minute limit. Add more song keys here as they land.
+const SONG_POOL: FileSound[] = ['sunward'];
+
+/** Sources to (cross)fade through for a sound. Real songs rotate the whole pool
+ *  (selected first); other sounds use their own variant list (or single source). */
 function sourcesFor(ambient: FileSound): number[] {
+  if (SONG_POOL.includes(ambient)) {
+    const ordered = [ambient, ...SONG_POOL.filter((s) => s !== ambient)];
+    return ordered.map((k) => AMBIENT_SOURCES[k] as number);
+  }
   const src = AMBIENT_SOURCES[ambient];
   return Array.isArray(src) ? src : [src];
 }
+
+const isSong = (ambient: FileSound) => SONG_POOL.includes(ambient);
 
 // How often a multi-variant beat evolves to its other variant mid-session.
 const EVOLVE_MS = 200000; // ~3.3 minutes
@@ -140,7 +152,8 @@ export class SessionAudio {
     await ensureAudioMode(mixWithMusic);
     if (ambient !== 'none' && !isGenerative(ambient)) {
       this.sources = sourcesFor(ambient);
-      this.variantIdx = Math.floor(Math.random() * this.sources.length);
+      // Songs start on the one you picked; beat variants start on a random one.
+      this.variantIdx = isSong(ambient) ? 0 : Math.floor(Math.random() * this.sources.length);
       this.ambient = createAudioPlayer(this.sources[this.variantIdx]);
       this.ambient.loop = true;
       // Start silent so startAmbient() can fade in and avoid a click.
