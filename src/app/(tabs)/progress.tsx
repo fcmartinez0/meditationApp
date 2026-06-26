@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StyleSheet, View } from 'react-native';
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 
 import { AppText } from '@/components/AppText';
 import { Card } from '@/components/Card';
@@ -30,13 +31,14 @@ export default function ProgressScreen() {
 
   return (
     <Screen scroll>
-      <View style={styles.header}>
+      <Animated.View style={styles.header} entering={FadeInDown.duration(500)}>
         <AppText variant="label" color={colors.accent}>
           YOUR JOURNEY
         </AppText>
         <AppText variant="title">Progress</AppText>
-      </View>
+      </Animated.View>
 
+      <Animated.View entering={FadeInUp.duration(600).delay(120)}>
       <Card>
         <View style={styles.grid}>
           {tiles.map((t) => (
@@ -59,7 +61,9 @@ export default function ProgressScreen() {
           ))}
         </View>
       </Card>
+      </Animated.View>
 
+      <Animated.View entering={FadeInUp.duration(600).delay(240)}>
       <Card>
         <View style={styles.chartHeader}>
           <AppText variant="heading">This week</AppText>
@@ -97,14 +101,17 @@ export default function ProgressScreen() {
           })}
         </View>
       </Card>
+      </Animated.View>
 
       {stats.totalSessions === 0 && (
+        <Animated.View entering={FadeInUp.duration(600).delay(360)}>
         <Card style={styles.empty}>
           <Ionicons name="sparkles-outline" size={28} color={colors.accent} />
           <AppText variant="body" muted center>
             Your stats will appear here after your first session. Head to the Relax tab to begin.
           </AppText>
         </Card>
+        </Animated.View>
       )}
     </Screen>
   );

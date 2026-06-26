@@ -4,6 +4,7 @@ import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, Platform, Pressable, StyleSheet, Switch, View } from 'react-native';
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 
 import { AppText } from '@/components/AppText';
 import { Card } from '@/components/Card';
@@ -195,13 +196,14 @@ export default function SettingsScreen() {
 
   return (
     <Screen scroll>
-      <View style={styles.header}>
+      <Animated.View style={styles.header} entering={FadeInDown.duration(500)}>
         <AppText variant="label" color={colors.accent}>
           PREFERENCES
         </AppText>
         <AppText variant="title">Settings</AppText>
-      </View>
+      </Animated.View>
 
+      <Animated.View style={styles.cards} entering={FadeInUp.duration(600).delay(120)}>
       <Card style={styles.card}>
         <Section icon="notifications-outline" color="#F0B860" title="REMINDER" />
         <Row
@@ -342,12 +344,14 @@ export default function SettingsScreen() {
       <AppText variant="caption" muted center style={styles.footer}>
         Stillness · v{Constants.expoConfig?.version ?? '1.0.0'}
       </AppText>
+      </Animated.View>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   header: { gap: spacing.xs, marginTop: spacing.sm },
+  cards: { gap: spacing.lg },
   section: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   sectionIcon: { width: 28, height: 28, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   card: { gap: spacing.md },
