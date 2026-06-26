@@ -916,7 +916,10 @@ class Composer {
 // Target loudness (RMS) and a hard peak ceiling. RMS targeting gives consistent
 // *perceived* level (a lone loud transient won't drag the whole piece down the
 // way peak-only normalization does), and the ceiling guarantees no clipping.
-const TARGET_RMS = 0.15;
+// Nudged up to ~match the fullness of the reference chill track (Sunward Ascent
+// measured ≈0.19 RMS) so generated pieces feel as present, while staying under
+// the peak ceiling.
+const TARGET_RMS = 0.17;
 const PEAK_CEILING = 0.95;
 
 async function foldLoop(
