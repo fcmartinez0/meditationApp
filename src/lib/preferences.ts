@@ -42,6 +42,40 @@ const SCALES = [
   'hirajoshi',
 ] as const;
 
+type GenScale = (typeof SCALES)[number];
+
+// Scale pools weighted by what reads as "real, emotional music" in each section.
+// These lean on an analysis of the reference chill track (Sunward Ascent), which
+// is squarely D natural-minor (aeolian) with strong i / bIII / iv / v / bVI / bVII
+// colour — so the minor family is repeated here to bias the engine toward that
+// feel, with a few brighter/pentatonic scales kept in for variety. (Run
+// `node scripts/analyze-track.mjs <file>` on any new reference track to refresh
+// these learnings.)
+const SCALE_POOL: Record<Section, GenScale[]> = {
+  rest: [
+    'aeolian',
+    'aeolian',
+    'dorian',
+    'minor_pentatonic',
+    'hirajoshi',
+    'harmonic_minor',
+    'lydian',
+    'major_pentatonic',
+  ],
+  chill: [
+    'aeolian',
+    'aeolian',
+    'dorian',
+    'dorian',
+    'minor_pentatonic',
+    'harmonic_minor',
+    'lydian_dominant',
+    'mixolydian',
+  ],
+};
+
+const scalesFor = (section: Section): GenScale[] => SCALE_POOL[section];
+
 // Pad timbres only — bell/glass are covered by the 'bells' instrument, so
 // keeping them out of the pad wave pool avoids odd "glass pad" rolls.
 const WAVES: GenWave[] = ['sine', 'triangle', 'warm'];
@@ -82,7 +116,9 @@ const RANGES: Record<Section, Range> = {
     tempoMax: 72,
     pulseMax: 0,
     arpChance: 0.32,
-    bassChance: 0.7,
+    // A warm sub-bass under the pad is most of what makes a generative bed read
+    // as "music" rather than a drone, so keep one nearly always present.
+    bassChance: 0.92,
     // Mostly still; only gentle motion (no busy tribal/offbeat for rest).
     percussion: ['none', 'none', 'none', 'heartbeat', 'shaker'],
     // Calming voices; bias toward the soft pad.
@@ -91,17 +127,21 @@ const RANGES: Record<Section, Range> = {
   chill: {
     rootMin: 48,
     rootMax: 58,
-    brightMin: 0.4,
+    // The reference chill track sits moderately bright (~3.5 kHz spectral
+    // centroid), so keep Flow from ever getting muddy — lift the floor a touch.
+    brightMin: 0.45,
     brightMax: 0.85,
     chordMin: 6,
     chordMax: 12,
     binaurals: [9, 10, 11],
     chimeMax: 0.2,
+    // Reference track grooves ~123 BPM with a chill half-time feel; widen the top
+    // so Flow can reach that flowing energy without becoming house.
     tempoMin: 80,
-    tempoMax: 104,
+    tempoMax: 110,
     pulseMax: 0.22,
     arpChance: 0.75,
-    bassChance: 0.85,
+    bassChance: 0.95,
     percussion: ['pulse', 'shaker', 'broken', 'heartbeat', 'offbeat', 'tribal'],
     instruments: ['pad', 'keys', 'pluck', 'bells', 'choir'],
   },
@@ -156,7 +196,7 @@ function randomSpec(section: Section): PieceSpec {
   return {
     seed: Math.floor(Math.random() * 1e9),
     section,
-    scale: pick(SCALES),
+    scale: pick(scalesFor(section)),
     root: Math.round(randIn(r.rootMin, r.rootMax)),
     brightness: randIn(r.brightMin, r.brightMax),
     chordChangeSec: randIn(r.chordMin, r.chordMax),
@@ -246,7 +286,7 @@ export function nextSpec(section: Section, ratings: PieceRating[]): PieceSpec {
   return {
     seed: Math.floor(Math.random() * 1e9),
     section,
-    scale: bestBy((s) => s.scale, pick(SCALES)),
+    scale: bestBy((s) => s.scale, pick(scalesFor(section))),
     root: Math.round(clamp(mean((s) => s.root) + jitter(1.5), r.rootMin, r.rootMax)),
     brightness: clamp(mean((s) => s.brightness) + jitter(0.1), r.brightMin, r.brightMax),
     chordChangeSec: clamp(mean((s) => s.chordChangeSec) + jitter(2), r.chordMin, r.chordMax),

@@ -31,8 +31,8 @@ function resolveArtwork(): Promise<string | undefined> {
   return artworkPromise;
 }
 
-// One source per sound, except the beats — each has two variants (different key
-// + groove) and the session picks one at random for variety.
+// One source per sound, except the beats — each has multiple variants and the
+// session rotates through them (crossfading) for within-session variety.
 const AMBIENT_SOURCES: Record<FileSound, number | number[]> = {
   rain: require('@/assets/audio/ambient/rain.wav'),
   ocean: require('@/assets/audio/ambient/ocean.wav'),
@@ -49,7 +49,14 @@ const AMBIENT_SOURCES: Record<FileSound, number | number[]> = {
   deep: require('@/assets/audio/music/deep.wav'),
   dream: require('@/assets/audio/music/dream.wav'),
   clarity: require('@/assets/audio/music/clarity.wav'),
-  lofi: [require('@/assets/audio/beats/lofi-1.wav'), require('@/assets/audio/beats/lofi-2.wav')],
+  // Lo-Fi mixes the two generated variants with a real chill track (Sunward
+  // Ascent, made with Gemini): the session crossfades between them so a real
+  // song surfaces and recedes amid the generated grooves.
+  lofi: [
+    require('@/assets/audio/beats/lofi-1.wav'),
+    require('@/assets/audio/beats/lofi-2.wav'),
+    require('@/assets/audio/tracks/sunward-ascent.mp3'),
+  ],
   liquid: [require('@/assets/audio/beats/liquid-1.wav'), require('@/assets/audio/beats/liquid-2.wav')],
   chillstep: [require('@/assets/audio/beats/chillstep-1.wav'), require('@/assets/audio/beats/chillstep-2.wav')],
   downtempo: [require('@/assets/audio/beats/downtempo-1.wav'), require('@/assets/audio/beats/downtempo-2.wav')],
@@ -60,13 +67,13 @@ const AMBIENT_SOURCES: Record<FileSound, number | number[]> = {
   synthwave: [require('@/assets/audio/beats/synthwave-1.wav'), require('@/assets/audio/beats/synthwave-2.wav')],
 };
 
-/** All variant sources for a sound (a single-element list for most). */
+/** Sources to (cross)fade through for a sound — its variant list, or a single source. */
 function sourcesFor(ambient: FileSound): number[] {
   const src = AMBIENT_SOURCES[ambient];
   return Array.isArray(src) ? src : [src];
 }
 
-// How often a multi-variant beat evolves to its other variant mid-session.
+// How often a multi-variant beat evolves to its next variant mid-session.
 const EVOLVE_MS = 200000; // ~3.3 minutes
 
 // Track the last-applied mix mode so we re-apply only when it actually changes.
@@ -138,6 +145,7 @@ export class SessionAudio {
     await ensureAudioMode(mixWithMusic);
     if (ambient !== 'none' && !isGenerative(ambient)) {
       this.sources = sourcesFor(ambient);
+      // Start on a random variant so repeat sessions don't always open the same.
       this.variantIdx = Math.floor(Math.random() * this.sources.length);
       this.ambient = createAudioPlayer(this.sources[this.variantIdx]);
       this.ambient.loop = true;

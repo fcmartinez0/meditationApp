@@ -263,7 +263,7 @@ class Composer {
   private reverbSend: GainNode | null = null;
   private delaySend: GainNode | null = null;
   private voices: Voice[] = [];
-  private bass: { osc: OscillatorNode; gain: GainNode } | null = null;
+  private bass: { osc: OscillatorNode; body: OscillatorNode; gain: GainNode } | null = null;
   private noise: AudioBuffer | null = null;
   private rng: () => number;
   private chordTones: number[] = [];
@@ -472,7 +472,11 @@ class Composer {
       }
     }
 
-    // Sub-bass at a constant level (no per-loop fade); frequency tracks chords.
+    // Bass at a constant level (no per-loop fade); frequency tracks chords. A
+    // pure sine sub alone barely registers on phone speakers / earbuds and reads
+    // as a featureless rumble, so we pair it with a quiet triangle "body" an
+    // octave up, lowpassed to stay warm — together they sound like a played bass
+    // note (the single biggest lever on "this is music, not a drone").
     if (spec.bass) {
       const osc = ctx.createOscillator();
       osc.type = 'sine';
@@ -481,7 +485,20 @@ class Composer {
       gain.gain.value = 0.16;
       osc.connect(gain).connect(pulse);
       osc.start();
-      this.bass = { osc, gain };
+
+      const body = ctx.createOscillator();
+      body.type = 'triangle';
+      body.frequency.value = midiToFreq(spec.root);
+      const bodyLp = ctx.createBiquadFilter();
+      bodyLp.type = 'lowpass';
+      bodyLp.frequency.value = 320;
+      bodyLp.Q.value = 0.5;
+      const bodyGain = ctx.createGain();
+      bodyGain.gain.value = 0.05;
+      body.connect(bodyLp).connect(bodyGain).connect(pulse);
+      body.start();
+
+      this.bass = { osc, body, gain };
     }
 
     // Clean binaural beat (researched frequencies) for entrainment: two pure
@@ -623,8 +640,14 @@ class Composer {
     }
     if (this.bass) {
       const bf = midiToFreq(spec.root + chord[0] - 12);
-      if (initial) this.bass.osc.frequency.setValueAtTime(bf, when);
-      else this.bass.osc.frequency.setTargetAtTime(bf, when, glide / 3);
+      const bodyF = bf * 2; // body sits an octave above the sub
+      if (initial) {
+        this.bass.osc.frequency.setValueAtTime(bf, when);
+        this.bass.body.frequency.setValueAtTime(bodyF, when);
+      } else {
+        this.bass.osc.frequency.setTargetAtTime(bf, when, glide / 3);
+        this.bass.body.frequency.setTargetAtTime(bodyF, when, glide / 3);
+      }
     }
   }
 
@@ -893,7 +916,10 @@ class Composer {
 // Target loudness (RMS) and a hard peak ceiling. RMS targeting gives consistent
 // *perceived* level (a lone loud transient won't drag the whole piece down the
 // way peak-only normalization does), and the ceiling guarantees no clipping.
-const TARGET_RMS = 0.15;
+// Nudged up to ~match the fullness of the reference chill track (Sunward Ascent
+// measured ≈0.19 RMS) so generated pieces feel as present, while staying under
+// the peak ceiling.
+const TARGET_RMS = 0.17;
 const PEAK_CEILING = 0.95;
 
 async function foldLoop(

@@ -9,9 +9,9 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
+import { Backdrop } from '@/components/Backdrop';
 import { BreathingOrb } from '@/components/BreathingOrb';
 import { GlassFill } from '@/components/GlassFill';
-import { StarField } from '@/components/StarField';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { SessionAudio } from '@/lib/audio';
 import { soundMeta } from '@/lib/catalog';
@@ -334,7 +334,7 @@ export default function SessionScreen() {
   if (phase === 'finished') {
     return (
       <View style={[styles.fill, styles.clip, { backgroundColor: colors.background }]}>
-        <StarField color={colors.text} count={90} />
+        <Backdrop mandala={false} count={90} />
         <SafeAreaView style={styles.completed}>
           <Ionicons
             name={useEngine ? 'musical-notes' : 'checkmark-circle'}
@@ -405,7 +405,7 @@ export default function SessionScreen() {
   if (phase === 'preparing') {
     return (
       <View style={[styles.fill, styles.clip, { backgroundColor: colors.background }]}>
-        <StarField color={colors.text} count={90} />
+        <Backdrop mandala={false} count={90} />
         <SafeAreaView style={styles.fill} edges={['left', 'right', 'bottom']}>
           <Pressable
             accessibilityRole="button"
@@ -439,7 +439,7 @@ export default function SessionScreen() {
 
   return (
     <View style={[styles.fill, styles.clip, { backgroundColor: colors.background }]}>
-        <StarField color={colors.text} count={90} />
+        <Backdrop mandala={false} count={90} />
       <SafeAreaView style={styles.fill} edges={['left', 'right', 'bottom']}>
         <Pressable
           accessibilityRole="button"

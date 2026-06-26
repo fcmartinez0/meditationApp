@@ -6,6 +6,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/AppText';
+import { Backdrop } from '@/components/Backdrop';
 import { SoundCard } from '@/components/SoundCard';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { SECTIONS } from '@/lib/catalog';
@@ -27,7 +28,8 @@ export default function BrowseScreen() {
   };
 
   return (
-    <View style={[styles.fill, { backgroundColor: colors.background }]}>
+    <View style={[styles.fill, styles.clip, { backgroundColor: colors.background }]}>
+      <Backdrop count={90} />
       <SafeAreaView style={styles.fill} edges={['top', 'left', 'right']}>
         <View style={styles.header}>
           <AppText variant="title">Sounds</AppText>
@@ -74,6 +76,7 @@ export default function BrowseScreen() {
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
+  clip: { overflow: 'hidden' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
