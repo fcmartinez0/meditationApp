@@ -1,5 +1,5 @@
 /**
- * App-wide state: user settings and meditation history, persisted to
+ * App-wide state: user settings and session history, persisted to
  * AsyncStorage and exposed with derived stats. Wrap the app once at the root.
  */
 
@@ -47,7 +47,7 @@ const EMPTY_STATS: Stats = {
   totalSessions: 0,
   totalMinutes: 0,
   weekMinutes: [0, 0, 0, 0, 0, 0, 0],
-  meditatedToday: false,
+  activeToday: false,
 };
 
 export function AppDataProvider({ children }: { children: ReactNode }) {

@@ -25,7 +25,7 @@ import { radius, spacing } from '@/theme';
  * sound library lives one tap away behind "Browse", so opening the app feels
  * like arriving somewhere quiet — not facing a wall of choices.
  */
-export default function MeditateScreen() {
+export default function HomeScreen() {
   const colors = useThemeColors();
   const router = useRouter();
   const { settings, stats, updateSettings } = useAppData();

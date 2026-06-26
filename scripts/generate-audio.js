@@ -15,7 +15,7 @@
  * brainwave-entrainment associations:
  * Beat frequencies follow the entrainment study referenced in the README
  * (PMC8636003, "Personalized Theta and Beta Binaural Beats"): theta ~4.6/6 Hz
- * for relaxation & meditation, beta ~18 Hz for focus & working memory. Carriers
+ * for relaxation & deep rest, beta ~18 Hz for focus & working memory. Carriers
  * sit in the ~300–500 Hz band where binaural beats are perceived best (the study
  * used a 500 Hz carrier).
  *   assets/audio/music/calm.wav   – 432 Hz drone, 7.83 Hz beat (Schumann / theta-alpha, grounding calm)

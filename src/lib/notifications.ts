@@ -3,7 +3,7 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
-const REMINDER_ID = 'daily-meditation-reminder';
+const REMINDER_ID = 'daily-reminder';
 const ANDROID_CHANNEL = 'reminders';
 // Web can't schedule a repeating local notification, so reminders are native-only.
 export const NOTIFICATIONS_SUPPORTED = Platform.OS !== 'web';

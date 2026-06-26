@@ -19,20 +19,20 @@ describe('computeStats', () => {
     expect(s.longestStreak).toBe(0);
     expect(s.totalSessions).toBe(0);
     expect(s.totalMinutes).toBe(0);
-    expect(s.meditatedToday).toBe(false);
+    expect(s.activeToday).toBe(false);
   });
 
   it('counts a current streak ending today', () => {
     const s = computeStats([session(daysAgo(0)), session(daysAgo(1)), session(daysAgo(2))]);
     expect(s.currentStreak).toBe(3);
     expect(s.longestStreak).toBe(3);
-    expect(s.meditatedToday).toBe(true);
+    expect(s.activeToday).toBe(true);
   });
 
   it('keeps the streak alive if today is empty but yesterday is not', () => {
     const s = computeStats([session(daysAgo(1)), session(daysAgo(2))]);
     expect(s.currentStreak).toBe(2);
-    expect(s.meditatedToday).toBe(false);
+    expect(s.activeToday).toBe(false);
   });
 
   it('breaks the current streak after a gap but remembers the longest', () => {

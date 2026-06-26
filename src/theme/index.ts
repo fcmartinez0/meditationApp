@@ -1,5 +1,5 @@
 /**
- * Calming design tokens for the meditation app.
+ * Calming design tokens for the focus / sleep / rest app.
  *
  * A single source of truth for colors (light + dark), spacing, radii,
  * typography and the gradients used across screens.

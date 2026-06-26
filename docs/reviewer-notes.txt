@@ -11,7 +11,7 @@ immediately available — no demo credentials are needed.
 
 BACKGROUND AUDIO
 The app plays continuous background audio so a session keeps running with the
-screen locked (for sleep and meditation). This is why UIBackgroundModes
+screen locked (for focus, rest, and sleep). This is why UIBackgroundModes
 includes "audio".
 
 NO MICROPHONE / NO RECORDING
