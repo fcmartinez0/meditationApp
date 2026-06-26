@@ -1,30 +1,60 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
+import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/AppText';
 import { Backdrop } from '@/components/Backdrop';
+import { GlassFill } from '@/components/GlassFill';
 import { SoundCard } from '@/components/SoundCard';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { SECTIONS } from '@/lib/catalog';
 import type { AmbientSound } from '@/lib/types';
 import { useAppData } from '@/store/AppData';
-import { spacing } from '@/theme';
+import { radius, spacing } from '@/theme';
+import { CATEGORY_STYLES, type Category } from '@/theme/categories';
 
-/** The full sound library — a vertical grid, opened from the home. */
+const ALL = 'All';
+
+// Each library section maps to a category colour for its filter chip.
+const SECTION_CAT: Record<string, Category> = {
+  Generative: 'generative',
+  Frequencies: 'frequency',
+  Beats: 'beats',
+  Ambient: 'ambient',
+};
+
+/** The full sound library — opened from the home. A sticky category filter lets
+ *  you jump straight to a group instead of scrolling the whole list. */
 export default function BrowseScreen() {
   const colors = useThemeColors();
   const router = useRouter();
   const { settings, updateSettings } = useAppData();
+
+  // Open on the group that holds the current sound, so you land where you are.
+  const initial = useMemo(() => {
+    const found = SECTIONS.find((s) => s.items.some((it) => it.key === settings.ambient));
+    return found?.title ?? ALL;
+  }, [settings.ambient]);
+  const [filter, setFilter] = useState<string>(initial);
+
+  const filters = useMemo(() => [ALL, ...SECTIONS.map((s) => s.title)], []);
+  const shown = filter === ALL ? SECTIONS : SECTIONS.filter((s) => s.title === filter);
 
   // Pick a sound and return to the calm home, ready to begin.
   const choose = (key: AmbientSound) => {
     Haptics.selectionAsync().catch(() => {});
     updateSettings({ ambient: key });
     router.back();
+  };
+
+  const tapFilter = (f: string) => {
+    if (f === filter) return;
+    Haptics.selectionAsync().catch(() => {});
+    setFilter(f);
   };
 
   return (
@@ -43,27 +73,71 @@ export default function BrowseScreen() {
           </Pressable>
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-          {SECTIONS.map((section, si) => (
+        {/* Sticky category filter — stays put while the list scrolls. */}
+        <View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.chips}>
+            {filters.map((f) => {
+              const active = f === filter;
+              const accent = f === ALL ? colors.accent : CATEGORY_STYLES[SECTION_CAT[f]].accent;
+              return (
+                <Pressable
+                  key={f}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active }}
+                  accessibilityLabel={`Show ${f}`}
+                  onPress={() => tapFilter(f)}
+                  style={({ pressed }) => [
+                    styles.chip,
+                    {
+                      backgroundColor: active ? accent : 'transparent',
+                      borderColor: active ? accent : colors.border,
+                      transform: [{ scale: pressed ? 0.96 : 1 }],
+                    },
+                  ]}>
+                  {!active && <GlassFill fallback={colors.surfaceMuted} radius={radius.pill} />}
+                  <AppText
+                    variant="label"
+                    color={active ? '#FFFFFF' : colors.textSecondary}
+                    style={styles.chipLabel}>
+                    {f}
+                  </AppText>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+
+        {/* Re-keyed by filter so the grid fades in fresh on each switch. */}
+        <ScrollView
+          key={filter}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.content}>
+          {shown.map((section, si) => (
             <Animated.View
               key={section.title}
               style={styles.section}
-              entering={FadeInDown.duration(420).delay(si * 70)}>
-              <AppText variant="heading">{section.title}</AppText>
+              entering={FadeInDown.duration(380).delay(si * 60)}>
+              {filter === ALL && <AppText variant="heading">{section.title}</AppText>}
               {section.caption ? (
                 <AppText variant="caption" muted>
                   {section.caption}
                 </AppText>
               ) : null}
               <View style={styles.grid}>
-                {section.items.map((item) => (
-                  <View key={item.key} style={styles.cell}>
+                {section.items.map((item, ii) => (
+                  <Animated.View
+                    key={item.key}
+                    style={styles.cell}
+                    entering={FadeIn.duration(300).delay(si * 60 + ii * 25)}>
                     <SoundCard
                       item={item}
                       selected={settings.ambient === item.key}
                       onPress={() => choose(item.key)}
                     />
-                  </View>
+                  </Animated.View>
                 ))}
               </View>
             </Animated.View>
@@ -86,7 +160,18 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.sm,
   },
   close: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  content: { paddingHorizontal: spacing.xl, paddingBottom: spacing.xxxl, gap: spacing.xl },
+  chips: { paddingHorizontal: spacing.xl, paddingVertical: spacing.sm, gap: spacing.sm },
+  chip: {
+    minHeight: 40,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  chipLabel: { letterSpacing: 0.3 },
+  content: { paddingHorizontal: spacing.xl, paddingTop: spacing.xs, paddingBottom: spacing.xxxl, gap: spacing.xl },
   section: { gap: spacing.sm },
   // Two-column vertical grid — no horizontal scrolling.
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: spacing.md },
