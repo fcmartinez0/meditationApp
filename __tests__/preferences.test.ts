@@ -60,10 +60,14 @@ describe('nextSpec', () => {
   });
 
   it('keeps chill pieces in range and lets them pulse', () => {
-    const s = nextSpec('chill', []);
-    expect(s.section).toBe('chill');
-    expect(s.tempo).toBeGreaterThanOrEqual(80);
-    expect(s.tempo).toBeLessThanOrEqual(104);
+    // Sample many times so the range invariant is actually exercised (a single
+    // random draw could pass by luck even if the bounds were wrong).
+    for (let i = 0; i < 200; i++) {
+      const s = nextSpec('chill', []);
+      expect(s.section).toBe('chill');
+      expect(s.tempo).toBeGreaterThanOrEqual(80);
+      expect(s.tempo).toBeLessThanOrEqual(110);
+    }
   });
 
   it('converges toward liked traits while keeping binaural in the researched band', () => {
