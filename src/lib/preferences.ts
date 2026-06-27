@@ -56,21 +56,21 @@ const SCALE_POOL: Record<Section, GenScale[]> = {
   rest: [
     'minor_pentatonic',
     'minor_pentatonic',
-    'aeolian',
-    'dorian',
+    'minor_pentatonic',
+    'hirajoshi',
     'hirajoshi',
     'major_pentatonic',
     'aeolian',
-    'mixolydian',
+    'dorian',
   ],
   chill: [
     'minor_pentatonic',
     'minor_pentatonic',
+    'minor_pentatonic',
+    'major_pentatonic',
+    'dorian',
+    'mixolydian',
     'aeolian',
-    'dorian',
-    'dorian',
-    'mixolydian',
-    'mixolydian',
     'major_pentatonic',
   ],
 };
@@ -105,7 +105,7 @@ const RANGES: Record<Section, Range> = {
     rootMin: 45,
     rootMax: 55,
     brightMin: 0.15,
-    brightMax: 0.55,
+    brightMax: 0.5,
     // Reference tracks move harmonically a bit more often than the old static
     // drone (analysis: a chord change every ~2 s). Shorten the holds so even
     // Rest has gentle movement, while staying calm.
@@ -115,7 +115,9 @@ const RANGES: Record<Section, Range> = {
     // 6 Hz beat shown to promote meditative states, plus a 3 Hz delta option for
     // deep rest / sleep. (PMC8636003: theta 4.60 Hz ±0.70; 6 Hz meditation.)
     binaurals: [3, 4.6, 6, 6],
-    chimeMax: 0.25,
+    // Reference tracks are smooth and tonal (low spectral flatness), so keep the
+    // sparkly chimes sparse.
+    chimeMax: 0.18,
     tempoMin: 48,
     tempoMax: 72,
     pulseMax: 0,
@@ -134,13 +136,13 @@ const RANGES: Record<Section, Range> = {
     // Across all reference tracks the average is warmer than a single bright one
     // suggested (mean centroid ~3.1 kHz -> brightness ~0.37), so warm the floor
     // and tame the ceiling so Flow sits in that cosy band rather than glassy.
-    brightMin: 0.4,
-    brightMax: 0.8,
+    brightMin: 0.36,
+    brightMax: 0.74,
     // Reference harmonic rhythm is fairly active (~2 s); shorten the holds.
     chordMin: 5,
     chordMax: 10,
     binaurals: [9, 10, 11],
-    chimeMax: 0.2,
+    chimeMax: 0.15,
     // Reference track grooves ~123 BPM with a chill half-time feel; widen the top
     // so Flow can reach that flowing energy without becoming house.
     tempoMin: 80,
@@ -148,8 +150,11 @@ const RANGES: Record<Section, Range> = {
     pulseMax: 0.22,
     arpChance: 0.75,
     bassChance: 0.95,
-    percussion: ['pulse', 'shaker', 'broken', 'heartbeat', 'offbeat', 'tribal'],
-    instruments: ['pad', 'keys', 'pluck', 'bells', 'choir'],
+    // Gentle grooves (reference ~3.5 onsets/sec): bias toward softer patterns and
+    // allow a no-percussion option; dropped the busy 'tribal'.
+    percussion: ['none', 'pulse', 'shaker', 'broken', 'heartbeat', 'offbeat'],
+    // Warm, tonal timbres — favour pads/keys/choir over bright bells.
+    instruments: ['pad', 'pad', 'keys', 'choir', 'pluck'],
   },
 };
 
