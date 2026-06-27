@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
@@ -8,7 +9,8 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { categoryStyle, withAlpha } from '@/theme/categories';
 import { radius, spacing } from '@/theme';
 
-/** A grid card: a flat tinted tile with title + hint. Fills its cell. */
+/** A grid card: a category-tinted gradient tile with a glossy sheen, title and
+ *  hint. Selected gets a fuller gradient, an accent ring and a now-playing meter. */
 export function SoundCard({
   item,
   selected,
@@ -32,14 +34,31 @@ export function SoundCard({
         style={[
           styles.art,
           {
-            backgroundColor: withAlpha(cat.accent, selected ? 0.2 : 0.1),
-            borderColor: selected ? cat.accent : 'transparent',
+            borderColor: selected ? cat.accent : withAlpha(cat.accent, 0.18),
+            borderWidth: selected ? 2 : 1,
           },
         ]}>
-        <Ionicons name={item.icon} size={30} color={cat.accent} />
+        <LinearGradient
+          colors={[
+            withAlpha(cat.colors[0], selected ? 0.42 : 0.18),
+            withAlpha(cat.colors[1], selected ? 0.28 : 0.08),
+          ]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+        {/* Glassy top sheen. */}
+        <LinearGradient
+          colors={[withAlpha('#FFFFFF', 0.18), 'transparent']}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 0.7 }}
+          style={styles.sheen}
+          pointerEvents="none"
+        />
+        <Ionicons name={item.icon} size={30} color={selected ? '#FFFFFF' : cat.accent} />
         {selected && (
           <View style={styles.eq}>
-            <EqualizerBars color={cat.accent} />
+            <EqualizerBars color="#FFFFFF" />
           </View>
         )}
       </View>
@@ -62,11 +81,11 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 92,
     borderRadius: radius.md,
-    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
   },
+  sheen: { position: 'absolute', left: 0, right: 0, top: 0, height: 46 },
   eq: { position: 'absolute', bottom: spacing.sm, right: spacing.sm },
   label: { marginTop: spacing.xs },
 });

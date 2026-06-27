@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/AppText';
@@ -336,14 +336,18 @@ export default function SessionScreen() {
       <View style={[styles.fill, styles.clip, { backgroundColor: colors.background }]}>
         <Backdrop mandala={false} count={90} />
         <SafeAreaView style={styles.completed}>
-          <Ionicons
-            name={useEngine ? 'musical-notes' : 'checkmark-circle'}
-            size={88}
-            color={colors.success}
-          />
-          <AppText variant="title" center>
-            {useEngine ? 'Hope you enjoyed it' : 'Session complete'}
-          </AppText>
+          <Animated.View entering={FadeInDown.duration(600)}>
+            <Ionicons
+              name={useEngine ? 'musical-notes' : 'checkmark-circle'}
+              size={88}
+              color={colors.success}
+            />
+          </Animated.View>
+          <Animated.View entering={FadeInDown.duration(600).delay(120)}>
+            <AppText variant="title" center>
+              {useEngine ? 'Hope you enjoyed it' : 'Session complete'}
+            </AppText>
+          </Animated.View>
           {!useEngine && (
             <>
               <AppText variant="body" muted center>
@@ -395,7 +399,9 @@ export default function SessionScreen() {
             </View>
           )}
 
-          <Button label="Done" onPress={() => router.back()} style={styles.doneBtn} />
+          <Animated.View style={styles.doneBtn} entering={FadeInUp.duration(600).delay(260)}>
+            <Button label="Done" onPress={() => router.back()} />
+          </Animated.View>
         </SafeAreaView>
       </View>
     );
@@ -542,7 +548,6 @@ const styles = StyleSheet.create({
   },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.xl },
   clock: { fontSize: 52, fontWeight: '200' },
-  clockMinimal: { fontSize: 76, fontWeight: '100' },
   hint: { marginTop: spacing.sm },
   tip: {
     flexDirection: 'row',
