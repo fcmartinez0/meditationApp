@@ -60,11 +60,13 @@ const AMBIENT_SOURCES: Record<FileSound, number | number[]> = {
   ],
   liquid: [require('@/assets/audio/beats/liquid-1.wav'), require('@/assets/audio/beats/liquid-2.wav')],
   chillstep: [require('@/assets/audio/beats/chillstep-1.wav'), require('@/assets/audio/beats/chillstep-2.wav')],
-  // Downtempo folds in a real melodic track (Gravel & Keys, D minor ~99 BPM).
+  // Downtempo folds in two real dreamy tracks (Gravel & Keys, D minor ~99 BPM;
+  // Seven Miles Until Dawn, G minor ~61 BPM, brighter & atmospheric).
   downtempo: [
     require('@/assets/audio/beats/downtempo-1.wav'),
     require('@/assets/audio/beats/downtempo-2.wav'),
     require('@/assets/audio/tracks/gravel-and-keys.mp3'),
+    require('@/assets/audio/tracks/seven-miles-until-dawn.mp3'),
   ],
   deephouse: [require('@/assets/audio/beats/deephouse-1.wav'), require('@/assets/audio/beats/deephouse-2.wav')],
   melodic: [require('@/assets/audio/beats/melodic-1.wav'), require('@/assets/audio/beats/melodic-2.wav')],

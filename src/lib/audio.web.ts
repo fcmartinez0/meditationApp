@@ -46,6 +46,7 @@ const AMBIENT_SOURCES: Record<FileSound, number | number[]> = {
     require('@/assets/audio/beats/downtempo-1.wav'),
     require('@/assets/audio/beats/downtempo-2.wav'),
     require('@/assets/audio/tracks/gravel-and-keys.mp3'),
+    require('@/assets/audio/tracks/seven-miles-until-dawn.mp3'),
   ],
   deephouse: [require('@/assets/audio/beats/deephouse-1.wav'), require('@/assets/audio/beats/deephouse-2.wav')],
   melodic: [require('@/assets/audio/beats/melodic-1.wav'), require('@/assets/audio/beats/melodic-2.wav')],
