@@ -34,57 +34,57 @@ function resolveArtwork(): Promise<string | undefined> {
 // One source per sound, except the beats — each has multiple variants and the
 // session rotates through them (crossfading) for within-session variety.
 const AMBIENT_SOURCES: Record<FileSound, number | number[]> = {
-  rain: require('@/assets/audio/ambient/rain.wav'),
-  ocean: require('@/assets/audio/ambient/ocean.wav'),
-  forest: require('@/assets/audio/ambient/forest.wav'),
-  stream: require('@/assets/audio/ambient/stream.wav'),
-  fire: require('@/assets/audio/ambient/fire.wav'),
-  night: require('@/assets/audio/ambient/night.wav'),
-  brown: require('@/assets/audio/ambient/brown.wav'),
-  white: require('@/assets/audio/ambient/white.wav'),
-  pink: require('@/assets/audio/ambient/pink.wav'),
-  purr: require('@/assets/audio/purr.wav'),
-  calm: require('@/assets/audio/music/calm.wav'),
-  focus: require('@/assets/audio/music/focus.wav'),
-  deep: require('@/assets/audio/music/deep.wav'),
-  dream: require('@/assets/audio/music/dream.wav'),
-  clarity: require('@/assets/audio/music/clarity.wav'),
+  rain: require('@/assets/audio/ambient/rain.mp3'),
+  ocean: require('@/assets/audio/ambient/ocean.mp3'),
+  forest: require('@/assets/audio/ambient/forest.mp3'),
+  stream: require('@/assets/audio/ambient/stream.mp3'),
+  fire: require('@/assets/audio/ambient/fire.mp3'),
+  night: require('@/assets/audio/ambient/night.mp3'),
+  brown: require('@/assets/audio/ambient/brown.mp3'),
+  white: require('@/assets/audio/ambient/white.mp3'),
+  pink: require('@/assets/audio/ambient/pink.mp3'),
+  purr: require('@/assets/audio/purr.mp3'),
+  calm: require('@/assets/audio/music/calm.mp3'),
+  focus: require('@/assets/audio/music/focus.mp3'),
+  deep: require('@/assets/audio/music/deep.mp3'),
+  dream: require('@/assets/audio/music/dream.mp3'),
+  clarity: require('@/assets/audio/music/clarity.mp3'),
   // Lo-Fi mixes the two generated variants with two real late-night tracks
   // (Sunward Ascent, brighter; Velvet Midnight, darker): the session crossfades
   // between them so a real song surfaces and recedes amid the generated grooves.
   lofi: [
-    require('@/assets/audio/beats/lofi-1.wav'),
-    require('@/assets/audio/beats/lofi-2.wav'),
+    require('@/assets/audio/beats/lofi-1.mp3'),
+    require('@/assets/audio/beats/lofi-2.mp3'),
     require('@/assets/audio/tracks/sunward-ascent.mp3'),
     require('@/assets/audio/tracks/velvet-midnight.mp3'),
   ],
-  liquid: [require('@/assets/audio/beats/liquid-1.wav'), require('@/assets/audio/beats/liquid-2.wav')],
-  chillstep: [require('@/assets/audio/beats/chillstep-1.wav'), require('@/assets/audio/beats/chillstep-2.wav')],
+  liquid: [require('@/assets/audio/beats/liquid-1.mp3'), require('@/assets/audio/beats/liquid-2.mp3')],
+  chillstep: [require('@/assets/audio/beats/chillstep-1.mp3'), require('@/assets/audio/beats/chillstep-2.mp3')],
   // Downtempo folds in two real dreamy tracks (Gravel & Keys, D minor ~99 BPM;
   // Seven Miles Until Dawn, G minor ~61 BPM, brighter & atmospheric).
   downtempo: [
-    require('@/assets/audio/beats/downtempo-1.wav'),
-    require('@/assets/audio/beats/downtempo-2.wav'),
+    require('@/assets/audio/beats/downtempo-1.mp3'),
+    require('@/assets/audio/beats/downtempo-2.mp3'),
     require('@/assets/audio/tracks/gravel-and-keys.mp3'),
     require('@/assets/audio/tracks/seven-miles-until-dawn.mp3'),
   ],
-  deephouse: [require('@/assets/audio/beats/deephouse-1.wav'), require('@/assets/audio/beats/deephouse-2.wav')],
-  melodic: [require('@/assets/audio/beats/melodic-1.wav'), require('@/assets/audio/beats/melodic-2.wav')],
+  deephouse: [require('@/assets/audio/beats/deephouse-1.mp3'), require('@/assets/audio/beats/deephouse-2.mp3')],
+  melodic: [require('@/assets/audio/beats/melodic-1.mp3'), require('@/assets/audio/beats/melodic-2.mp3')],
   // Ambient Techno folds in a real gritty track (Grinding Floor, G minor).
   techno: [
-    require('@/assets/audio/beats/techno-1.wav'),
-    require('@/assets/audio/beats/techno-2.wav'),
+    require('@/assets/audio/beats/techno-1.mp3'),
+    require('@/assets/audio/beats/techno-2.mp3'),
     require('@/assets/audio/tracks/grinding-floor.mp3'),
   ],
   // Trip-Hop folds in two real slow, warm tracks (Concrete Skin & Velvet
   // Concrete, both F major ~60 BPM, different shades of dark).
   triphop: [
-    require('@/assets/audio/beats/triphop-1.wav'),
-    require('@/assets/audio/beats/triphop-2.wav'),
+    require('@/assets/audio/beats/triphop-1.mp3'),
+    require('@/assets/audio/beats/triphop-2.mp3'),
     require('@/assets/audio/tracks/concrete-skin.mp3'),
     require('@/assets/audio/tracks/velvet-concrete.mp3'),
   ],
-  synthwave: [require('@/assets/audio/beats/synthwave-1.wav'), require('@/assets/audio/beats/synthwave-2.wav')],
+  synthwave: [require('@/assets/audio/beats/synthwave-1.mp3'), require('@/assets/audio/beats/synthwave-2.mp3')],
 };
 
 /** Sources to (cross)fade through for a sound — its variant list, or a single source. */
@@ -93,8 +93,11 @@ function sourcesFor(ambient: FileSound): number[] {
   return Array.isArray(src) ? src : [src];
 }
 
-// How often a multi-variant beat evolves to its next variant mid-session.
-const EVOLVE_MS = 200000; // ~3.3 minutes
+// Cycling between variants is driven by playback position so a transition lands
+// at a track's natural end (or a loop seam) instead of cutting it off mid-track.
+const MIN_DWELL_MS = 90000; // play a variant at least this long before moving on
+const MAX_DWELL_MS = 240000; // safety cap (e.g. if duration is never reported)
+const END_LEAD_SEC = 2.5; // start the crossfade this far before the track ends
 
 // Track the last-applied mix mode so we re-apply only when it actually changes.
 let appliedMix: boolean | null = null;
@@ -133,6 +136,8 @@ export class SessionAudio {
   private playing = false;
   private evolveTimer: ReturnType<typeof setInterval> | null = null;
   private evolving = false;
+  // When the current variant started playing — used to decide when to cycle.
+  private dwellStart = 0;
   // Only forward transport changes once we've actually started playing, so the
   // player's initial "not playing" status can't trip a spurious pause at startup.
   private emitStatus = false;
@@ -174,6 +179,8 @@ export class SessionAudio {
       // Mirror external (lock-screen) play/pause back to the session UI. Ignore
       // the transient pause/play that a mid-session variant swap produces.
       this.statusSub = this.ambient.addListener('playbackStatusUpdate', (status) => {
+        // Cycle at the track's natural end (after a minimum dwell), not mid-track.
+        this.maybeCycle(status.currentTime ?? 0, status.duration ?? 0);
         if (this.evolving) return;
         const playing = !!status.playing;
         if (this.lastPlaying === playing) return;
@@ -221,9 +228,22 @@ export class SessionAudio {
     // track crossfades (via a source swap) to its other variant — a gentle key
     // change so a long session doesn't loop the same groove forever.
     this.playing = true;
+    this.dwellStart = Date.now();
+    // Safety fallback only: if a platform never reports duration (so the
+    // position-based cycle can't fire), force a move once the max dwell elapses.
     if (this.sources.length > 1 && !this.evolveTimer) {
-      this.evolveTimer = setInterval(() => void this.evolve(), EVOLVE_MS);
+      this.evolveTimer = setInterval(() => {
+        if (this.playing && !this.evolving && Date.now() - this.dwellStart >= MAX_DWELL_MS) void this.evolve();
+      }, 15000);
     }
+  }
+
+  /** Decide, from the current playback position, whether to cycle to the next
+   *  variant — triggering only near the track's end so it isn't cut off. */
+  private maybeCycle(currentTime: number, duration: number) {
+    if (this.sources.length < 2 || !this.playing || this.evolving) return;
+    if (Date.now() - this.dwellStart < MIN_DWELL_MS) return;
+    if (duration > 0 && currentTime >= duration - END_LEAD_SEC) void this.evolve();
   }
 
   /** Crossfade the single player to the next variant (fade out, swap, fade in). */
@@ -240,6 +260,7 @@ export class SessionAudio {
       player.volume = 0;
       player.play();
       this.variantIdx = next;
+      this.dwellStart = Date.now(); // reset the dwell clock for the new variant
       await this.fadeTo(this.targetVol, 1800);
     } catch {
       // Best effort — never let an evolve break playback.

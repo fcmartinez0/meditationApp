@@ -1,10 +1,13 @@
 /**
- * Generates the app's bundled audio as 16-bit mono PCM WAV files.
+ * Generates the app's bundled audio. Everything is synthesized procedurally (no
+ * external assets), so the audio is fully reproducible. This writes uncompressed
+ * 16-bit PCM WAV intermediates; run the converter afterwards to produce the
+ * shipped, compressed .mp3 (and delete the .wav) — that is what keeps the app
+ * small (~130 MB of WAV -> ~13 MB of MP3):
  *
- * Everything is synthesized procedurally (no external assets), so the audio
- * is fully reproducible: `node scripts/generate-audio.js`.
+ *   node scripts/generate-audio.js     # writes .wav intermediates
+ *   node scripts/convert-audio.mjs     # -> .mp3, deletes the .wav
  *
- *   assets/audio/bell.wav            – singing-bowl chime (start / interval / end)
  *   assets/audio/ambient/rain.wav    – steady rainfall (looping)
  *   assets/audio/ambient/ocean.wav   – slow ocean swells (looping)
  *   assets/audio/ambient/forest.wav  – soft wind / forest hush (looping)
@@ -1559,7 +1562,6 @@ function buildAll() {
 console.log('Generating audio assets...');
 // Gentle chime: peak-normalise well below full scale so the bell sits as a soft
 // accent over the beds rather than startling (it was the loudest asset before).
-writeWav(path.join(OUT_DIR, 'bell.wav'), generateBell(), { master: false, peak: 0.5 });
 // Nature textures are now stereo for width and depth.
 const rain = generateAmbient('rain');
 writeWavStereo(path.join(AMBIENT_DIR, 'rain.wav'), rain.left, rain.right, { targetDb: -16 });

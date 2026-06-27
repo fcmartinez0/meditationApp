@@ -37,9 +37,11 @@
     "react-native-worklets": "0.8.3"
   },
   "devDependencies": {
+    "@breezystack/lamejs": "^1.2.7",
     "@types/jest": "^30.0.0",
     "@types/react": "~19.2.2",
     "jest-expo": "~56.0.4",
+    "mpg123-decoder": "^1.0.3",
     "typescript": "~6.0.3"
   },
   "scripts": {
