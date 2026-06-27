@@ -1,16 +1,17 @@
 /**
- * Generates the app's icon set procedurally (no design tools): a luminous Julia
- * fractal on a vibrant, full-bleed indigo->navy gradient — modern-iOS style
- * (edge-to-edge colour, one bold centred subject, no inner frame; iOS applies the
- * rounded-rect mask itself). 2x2 supersampled for crisp fractal edges.
- * Reproducible: `node scripts/generate-icon.js`.
+ * Generates the app's icon set procedurally (no design tools): a bold geometric
+ * emblem — a filled 12-point starburst with a luminous teal->periwinkle gradient
+ * and sheen, ringed by a thin hexagon, with a bright core — on a vibrant
+ * full-bleed indigo->navy gradient. Modern-iOS style (edge-to-edge colour, one
+ * bold centred subject, no inner frame; iOS applies the rounded mask). It mirrors
+ * the in-app breathing orb's starburst. 2x2 supersampled. `node scripts/generate-icon.js`.
  *
  *   assets/images/icon.png                     – 1024² master icon (RGB, opaque)
  *   assets/images/now-playing.png              – 1024² lock-screen artwork
- *   assets/images/splash-icon.png              – 512² fractal on transparent
- *   assets/images/android-icon-foreground.png  – 512² fractal, in the safe zone
+ *   assets/images/splash-icon.png              – 512² emblem on transparent
+ *   assets/images/android-icon-foreground.png  – 512² emblem, in the safe zone
  *   assets/images/android-icon-background.png   – 512² gradient
- *   assets/images/android-icon-monochrome.png  – 432² white fractal (themed)
+ *   assets/images/android-icon-monochrome.png  – 432² white emblem (themed)
  *   assets/images/favicon.png                  – 48² mini icon
  */
 
@@ -71,11 +72,12 @@ function writePNG(file, width, height, rgba, opaque = false) {
   console.log(`  wrote ${path.relative(process.cwd(), file)} (${(png.length / 1024).toFixed(0)} KB)`);
 }
 
-// --- colour helpers --------------------------------------------------------
+// --- colour + geometry helpers --------------------------------------------
 const hex = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
 const lerp = (a, b, t) => a + (b - a) * t;
 const mix = (c1, c2, t) => [lerp(c1[0], c2[0], t), lerp(c1[1], c2[1], t), lerp(c1[2], c2[2], t)];
 const clamp01 = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
+const smooth = (e0, e1, x) => { const t = clamp01((x - e0) / (e1 - e0)); return t * t * (3 - 2 * t); };
 function gradient(stops, t) {
   if (t <= stops[0][0]) return stops[0][1];
   for (let i = 1; i < stops.length; i++) {
@@ -87,123 +89,160 @@ function gradient(stops, t) {
   }
   return stops[stops.length - 1][1];
 }
+function distSeg(px, py, x1, y1, x2, y2) {
+  const vx = x2 - x1, vy = y2 - y1, wx = px - x1, wy = py - y1;
+  const c1 = vx * wx + vy * wy;
+  if (c1 <= 0) return Math.hypot(px - x1, py - y1);
+  const c2 = vx * vx + vy * vy;
+  if (c2 <= c1) return Math.hypot(px - x2, py - y2);
+  const b = c1 / c2;
+  return Math.hypot(px - (x1 + b * vx), py - (y1 + b * vy));
+}
+// Even-odd point-in-polygon.
+function inPoly(px, py, pts) {
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const xi = pts[i][0], yi = pts[i][1], xj = pts[j][0], yj = pts[j][1];
+    if ((yi > py) !== (yj > py) && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+function polyEdges(cx, cy, R, sides, rotDeg) {
+  const base = (rotDeg * Math.PI) / 180 - Math.PI / 2;
+  const pts = [];
+  for (let k = 0; k < sides; k++) pts.push([cx + R * Math.cos(base + (2 * Math.PI * k) / sides), cy + R * Math.sin(base + (2 * Math.PI * k) / sides)]);
+  const e = [];
+  for (let k = 0; k < sides; k++) e.push([...pts[k], ...pts[(k + 1) % sides]]);
+  return e;
+}
 
-// Vibrant diagonal background (indigo top-left -> deep navy bottom-right).
 const BG_STOPS = [
   [0.0, hex('#454AA0')],
   [0.45, hex('#23264B')],
   [1.0, hex('#0C0E1C')],
 ];
-// Luminous "ink" filling the fractal interior, swept diagonally: pale periwinkle
-// (top-left) through sky to teal (bottom-right), with a white sheen added near
-// the light source for a glassy, modern feel.
+// Luminous fill swept diagonally: pale periwinkle (top-left) -> sky -> teal.
 const INK_STOPS = [
   [0.0, hex('#D8DEFF')],
   [0.5, hex('#85CBEE')],
   [1.0, hex('#54E0CC')],
 ];
-const GLOW_NEAR = hex('#CBD4FF'); // periwinkle, near the boundary
-const GLOW_FAR = hex('#5FD9CC'); // teal, in the fade
-
-// Julia constant — the Douady rabbit: a connected, centred, three-lobed set that
-// reads as a bold, recognisable fractal even at small sizes.
-const C_RE = -0.123;
-const C_IM = 0.745;
-const MAX_ITER = 240;
-const BAILOUT = 16;
+const RING = hex('#A6B2F8'); // hexagon ring + glow accent
 
 /**
- * Render the fractal icon.
- *  opts.bg          – 'gradient' | 'transparent'
- *  opts.scale       – 1 = fill; <1 shrinks the subject (Android safe zone)
- *  opts.mono        – flat white fractal silhouette (Android themed icon)
- *  opts.flatBg      – solid colour background instead of the gradient
+ * Render the geometric emblem.
+ *  opts.bg     – 'gradient' | 'transparent'
+ *  opts.scale  – 1 = fill; <1 shrinks (Android safe zone)
+ *  opts.mono   – flat white silhouette (Android themed icon)
+ *  opts.geom   – include the hexagon ring (off for tiny sizes)
  */
 function render(size, opts = {}) {
-  const { bg = 'gradient', scale = 1, mono = false } = opts;
+  const { bg = 'gradient', scale = 1, mono = false, geom = true } = opts;
   const transparent = bg === 'transparent';
-  const SS = 2; // 2x2 supersampling
-  const half = 1.68 / scale; // half-window in the complex plane (margin from edges)
+  const cx = size / 2;
+  const cy = size / 2;
+  const SS = 2;
+  const Ro = 0.40 * size * scale; // star outer radius
+  const Ri = 0.17 * size * scale; // star inner radius (sharp 12-point)
+  const POINTS = 12;
+  const coreR = 0.085 * size * scale;
+  const hexR = 0.495 * size * scale;
+  const stroke = Math.max(1.5, size * 0.012 * scale);
+
+  // 12-point star vertices (24 points alternating outer/inner), starting at top.
+  const star = [];
+  const starEdges = [];
+  for (let i = 0; i < POINTS * 2; i++) {
+    const ang = (Math.PI * i) / POINTS - Math.PI / 2;
+    const rad = i % 2 === 0 ? Ro : Ri;
+    star.push([cx + Math.cos(ang) * rad, cy + Math.sin(ang) * rad]);
+  }
+  for (let i = 0; i < star.length; i++) starEdges.push([...star[i], ...star[(i + 1) % star.length]]);
+  const hexEdges = geom ? polyEdges(cx, cy, hexR, 6, 0) : [];
 
   const buf = Buffer.alloc(size * size * 4);
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
-      let R = 0;
-      let G = 0;
-      let B = 0;
-      let A = 0;
+      let Rr = 0;
+      let Gg = 0;
+      let Bb = 0;
+      let Aa = 0;
       for (let sy = 0; sy < SS; sy++) {
         for (let sx = 0; sx < SS; sx++) {
-          const fx = (x + (sx + 0.5) / SS) / size; // 0..1
-          const fy = (y + (sy + 0.5) / SS) / size;
-          const zx0 = (fx * 2 - 1) * half;
-          const zy0 = (fy * 2 - 1) * half;
+          const px = x + (sx + 0.5) / SS;
+          const py = y + (sy + 0.5) / SS;
+          const fx = px / size;
+          const fy = py / size;
 
-          // Iterate z = z^2 + c.
-          let zx = zx0;
-          let zy = zy0;
-          let n = 0;
-          for (; n < MAX_ITER; n++) {
-            const x2 = zx * zx;
-            const y2 = zy * zy;
-            if (x2 + y2 > BAILOUT) break;
-            zy = 2 * zx * zy + C_IM;
-            zx = x2 - y2 + C_RE;
-          }
-
-          let cr;
-          let cg;
-          let cb;
-          let ca;
-          if (n >= MAX_ITER) {
-            // Interior: luminous radial ink (bright core -> teal edge).
-            if (mono) {
-              cr = cg = cb = 255;
-              ca = 1;
-            } else {
-              const dt = clamp01((fx + fy) / 2); // diagonal sweep, tl -> br
-              const ink = gradient(INK_STOPS, dt);
-              // White sheen near the upper-left light source.
-              const hd = Math.hypot(fx - 0.33, fy - 0.3);
-              const sheen = Math.pow(clamp01(1 - hd / 0.55), 3) * 130;
-              cr = ink[0] + sheen;
-              cg = ink[1] + sheen;
-              cb = ink[2] + sheen;
-              ca = 1;
-            }
+          let r;
+          let g;
+          let b;
+          let a;
+          if (transparent) {
+            r = g = b = 0;
+            a = 0;
           } else {
-            // Exterior: smooth escape time -> a glow that's bright near the set
-            // boundary and fades into the background.
-            const logz = Math.log(zx * zx + zy * zy) / 2;
-            const nu = Math.log(logz / Math.log(2)) / Math.log(2);
-            const mu = n + 1 - nu;
-            const prox = clamp01(mu / 42); // ~1 near boundary, ~0 far away
-            const glowA = Math.pow(prox, 1.5);
-            if (mono) {
-              cr = cg = cb = 255;
-              ca = glowA * 0.0; // monochrome shows only the solid set
-            } else {
-              const bgc = transparent ? [0, 0, 0] : gradient(BG_STOPS, clamp01((fx + fy) / 2));
-              const glow = mix(GLOW_FAR, GLOW_NEAR, clamp01(mu / 24));
-              const blended = mix(bgc, glow, glowA);
-              cr = blended[0];
-              cg = blended[1];
-              cb = blended[2];
-              ca = transparent ? glowA : 1;
-            }
+            const bgc = gradient(BG_STOPS, clamp01((fx + fy) / 2));
+            r = bgc[0] / 255;
+            g = bgc[1] / 255;
+            b = bgc[2] / 255;
+            a = 1;
           }
-          R += cr;
-          G += cg;
-          B += cb;
-          A += ca;
+          const over = (col, amt) => {
+            if (amt <= 0) return;
+            r = lerp(r, col[0] / 255, amt);
+            g = lerp(g, col[1] / 255, amt);
+            b = lerp(b, col[2] / 255, amt);
+            if (transparent) a = Math.max(a, amt);
+          };
+
+          // Hexagon ring (under the star): crisp line + soft glow.
+          if (geom && !mono) {
+            let dmin = Infinity;
+            for (const e of hexEdges) { const d = distSeg(px, py, e[0], e[1], e[2], e[3]); if (d < dmin) dmin = d; }
+            over(RING, (1 - smooth(0, stroke, dmin)) * 0.8);
+            over(RING, (1 - smooth(0, stroke * 6, dmin)) * 0.12);
+          }
+
+          // Distance to the star boundary (for AA + outer glow).
+          let sd = Infinity;
+          for (const e of starEdges) { const d = distSeg(px, py, e[0], e[1], e[2], e[3]); if (d < sd) sd = d; }
+          const inside = inPoly(px, py, star);
+          const aa = 1.2;
+
+          if (mono) {
+            const cov = inside ? 1 : 1 - smooth(0, aa, sd);
+            if (cov > 0) { r = g = b = 1; a = Math.max(a, cov); }
+          } else {
+            // Outer glow around the star.
+            if (!inside) over(mix(INK_STOPS[2][1], RING, 0.4), Math.pow(1 - smooth(0, Ro * 0.5, sd), 2) * 0.28);
+            // Filled star: diagonal ink + upper-left sheen.
+            const cov = inside ? 1 : 1 - smooth(0, aa, sd);
+            if (cov > 0) {
+              const ink = gradient(INK_STOPS, clamp01((fx + fy) / 2));
+              const hd = Math.hypot(fx - 0.36, fy - 0.32);
+              const sheen = Math.pow(clamp01(1 - hd / 0.5), 3) * 0.7;
+              const col = [lerp(ink[0], 255, sheen), lerp(ink[1], 255, sheen), lerp(ink[2], 255, sheen)];
+              over(col, cov);
+            }
+            // Bright core.
+            const cd = Math.hypot(px - cx, py - cy);
+            over([255, 255, 255], (1 - smooth(coreR * 0.6, coreR, cd)) * 0.95);
+            over(INK_STOPS[1][1], (1 - smooth(coreR, coreR * 1.8, cd)) * 0.3);
+          }
+
+          Rr += clamp01(r);
+          Gg += clamp01(g);
+          Bb += clamp01(b);
+          Aa += clamp01(a);
         }
       }
-      const nSamp = SS * SS;
+      const n = SS * SS;
       const o = (y * size + x) * 4;
-      buf[o] = Math.round(clamp01(R / nSamp / 255) * 255);
-      buf[o + 1] = Math.round(clamp01(G / nSamp / 255) * 255);
-      buf[o + 2] = Math.round(clamp01(B / nSamp / 255) * 255);
-      buf[o + 3] = Math.round(clamp01(A / nSamp) * 255);
+      buf[o] = Math.round((Rr / n) * 255);
+      buf[o + 1] = Math.round((Gg / n) * 255);
+      buf[o + 2] = Math.round((Bb / n) * 255);
+      buf[o + 3] = Math.round((Aa / n) * 255);
     }
   }
   return buf;
@@ -224,12 +263,12 @@ function flatGradient(size) {
   return buf;
 }
 
-console.log('Generating fractal app icons...');
+console.log('Generating geometric app icons...');
 writePNG(path.join(OUT, 'icon.png'), 1024, 1024, render(1024, { bg: 'gradient' }), true);
 writePNG(path.join(OUT, 'now-playing.png'), 1024, 1024, render(1024, { bg: 'gradient' }), true);
 writePNG(path.join(OUT, 'splash-icon.png'), 512, 512, render(512, { bg: 'transparent' }));
-writePNG(path.join(OUT, 'android-icon-foreground.png'), 512, 512, render(512, { bg: 'transparent', scale: 0.62 }));
+writePNG(path.join(OUT, 'android-icon-foreground.png'), 512, 512, render(512, { bg: 'transparent', scale: 0.62, geom: false }));
 writePNG(path.join(OUT, 'android-icon-background.png'), 512, 512, flatGradient(512));
-writePNG(path.join(OUT, 'android-icon-monochrome.png'), 432, 432, render(432, { bg: 'transparent', scale: 0.62, mono: true }));
-writePNG(path.join(OUT, 'favicon.png'), 48, 48, render(48, { bg: 'gradient' }), true);
+writePNG(path.join(OUT, 'android-icon-monochrome.png'), 432, 432, render(432, { bg: 'transparent', scale: 0.62, mono: true, geom: false }));
+writePNG(path.join(OUT, 'favicon.png'), 48, 48, render(48, { bg: 'gradient', geom: false }), true);
 console.log('Done.');

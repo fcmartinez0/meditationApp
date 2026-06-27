@@ -325,8 +325,10 @@ class Composer {
     // otherwise). One node, created here — no effect on UI responsiveness.
     const air = ctx.createBiquadFilter();
     air.type = 'highshelf';
+    // Gentle air only — the reference tracks are warm (mean centroid ~3.1 kHz),
+    // so keep the top subtle rather than glassy.
     air.frequency.value = 7500;
-    air.gain.value = 2.5;
+    air.gain.value = 1.8;
     // Master glue: a gentle tanh saturator on the sum for warmth and cohesion,
     // and to round off peaks (the native engine has no compressor). 2x oversample
     // keeps the added harmonics from aliasing on bright material.

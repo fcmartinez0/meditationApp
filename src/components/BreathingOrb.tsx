@@ -146,23 +146,23 @@ export function BreathingOrb({ active = false, still, core, halo, colors: gradie
         <Polygon sides={6} radius={GEOM * 0.44} color={withAlpha(grad[1], 0.9)} strokeWidth={2} />
       </Animated.View>
 
-      {/* A 12-point starburst: radiant needles from the core (alternating long
-          and short for sparkle), each capped with a gem at its tip. Reads as
-          celestial radiance — no overlapping-triangle hexagram. */}
+      {/* A 12-point starburst of glowing light-beams: each ray is a gradient
+          sliver, bright at the core and fading to nothing at the tip (alternating
+          long and short for sparkle), capped with a gem. Celestial radiance —
+          no overlapping-triangle hexagram. */}
       <Animated.View style={[styles.layer, spinAStyle]} pointerEvents="none">
         {Array.from({ length: 12 }).map((_, i) => {
           const long = i % 2 === 0;
           const len = GEOM * (long ? 0.42 : 0.3);
           return (
-            <View
+            <LinearGradient
               key={`ray${i}`}
+              colors={['transparent', withAlpha(palette[i % palette.length], long ? 0.85 : 0.5)]}
+              start={{ x: 0.5, y: 0 }}
+              end={{ x: 0.5, y: 1 }}
               style={[
                 styles.ray,
-                {
-                  height: len,
-                  backgroundColor: withAlpha(palette[i % palette.length], long ? 0.7 : 0.4),
-                  transform: [{ rotate: `${30 * i}deg` }, { translateY: -len / 2 }],
-                },
+                { height: len, transform: [{ rotate: `${30 * i}deg` }, { translateY: -len / 2 }] },
               ]}
             />
           );
@@ -185,6 +185,23 @@ export function BreathingOrb({ active = false, still, core, halo, colors: gradie
             />
           );
         })}
+      </Animated.View>
+
+      {/* Orbiting luminous particles — small "stars" drifting on a ring,
+          counter-rotating for a calm, celestial layer. */}
+      <Animated.View style={[styles.layer, spinBStyle]} pointerEvents="none">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <View
+            key={`orbit${i}`}
+            style={[
+              styles.orbit,
+              {
+                backgroundColor: withAlpha(palette[(i + 1) % palette.length], 0.9),
+                transform: [{ rotate: `${60 * i + 30}deg` }, { translateY: -GEOM * 0.5 }],
+              },
+            ]}
+          />
+        ))}
       </Animated.View>
 
       {/* Nested inner hexagon for depth. */}
@@ -234,8 +251,9 @@ const styles = StyleSheet.create({
   halo: { position: 'absolute', width: SIZE, height: SIZE, borderRadius: SIZE / 2 },
   layer: { position: 'absolute', width: SIZE, height: SIZE, alignItems: 'center', justifyContent: 'center' },
   tick: { position: 'absolute', width: 2, borderRadius: 1 },
-  ray: { position: 'absolute', width: 2.5, borderRadius: 1.5 },
+  ray: { position: 'absolute', width: 4, borderRadius: 2 },
   jewel: { position: 'absolute', width: 5, height: 5, borderRadius: 2.5 },
+  orbit: { position: 'absolute', width: 6, height: 6, borderRadius: 3 },
   ringWrap: { position: 'absolute', width: SIZE, height: SIZE, alignItems: 'center', justifyContent: 'center' },
   ring: { position: 'absolute', borderWidth: 1, borderRadius: GEOM },
   core: { position: 'absolute', width: CORE, height: CORE, borderRadius: CORE / 2, overflow: 'hidden' },
