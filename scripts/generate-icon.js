@@ -1,8 +1,9 @@
 /**
  * Generates the app's icon set procedurally (no design tools): a glowing glass
  * orb — a shaded sphere (light core through indigo to teal, a specular highlight
- * and a soft halo) framed by a faint geometric ring (hexagon + hexagram), on the
- * app's deep navy with a little stardust. Matches the in-app breathing orb.
+ * and a soft halo) framed by a faint geometric ring (hexagon + 12-point
+ * starburst), on the app's deep navy with a little stardust. Matches the in-app
+ * breathing orb.
  * Reproducible: `node scripts/generate-icon.js`.
  *
  *   assets/images/icon.png                     – 1024² master icon (navy, RGB)
@@ -161,15 +162,26 @@ function render(size, opts = {}) {
   const aa = 1.5; // edge anti-alias in px
   const rng = makeRng(7);
 
-  // Geometry: a hexagon, a hexagram (two triangles), and a fine tick bezel,
+  // Geometry: a hexagon, a 12-point starburst (radial spokes, alternating long
+  // and short — celestial radiance, not a hexagram), and a fine tick bezel,
   // framing the orb like a mandala.
   const Rg = 0.62 * size * scale;
   const ringR = 0.76 * size * scale;
   const edges = [];
   if (geom) {
     edges.push(...polyEdges(cx, cy, Rg, 6, 0));
-    edges.push(...polyEdges(cx, cy, Rg * 0.92, 3, 0));
-    edges.push(...polyEdges(cx, cy, Rg * 0.92, 3, 180));
+    const burstInner = R * 1.12; // start just outside the orb
+    const SPOKES = 12;
+    for (let k = 0; k < SPOKES; k++) {
+      const ang = (2 * Math.PI * k) / SPOKES - Math.PI / 2;
+      const outer = Rg * (k % 2 === 0 ? 0.96 : 0.78); // long / short rays
+      edges.push([
+        cx + Math.cos(ang) * burstInner,
+        cy + Math.sin(ang) * burstInner,
+        cx + Math.cos(ang) * outer,
+        cy + Math.sin(ang) * outer,
+      ]);
+    }
     const N = 36;
     for (let k = 0; k < N; k++) {
       const ang = (2 * Math.PI * k) / N - Math.PI / 2;
