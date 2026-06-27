@@ -59,11 +59,26 @@ const AMBIENT_SOURCES: Record<FileSound, number | number[]> = {
   ],
   liquid: [require('@/assets/audio/beats/liquid-1.wav'), require('@/assets/audio/beats/liquid-2.wav')],
   chillstep: [require('@/assets/audio/beats/chillstep-1.wav'), require('@/assets/audio/beats/chillstep-2.wav')],
-  downtempo: [require('@/assets/audio/beats/downtempo-1.wav'), require('@/assets/audio/beats/downtempo-2.wav')],
+  // Downtempo folds in a real melodic track (Gravel & Keys, D minor ~99 BPM).
+  downtempo: [
+    require('@/assets/audio/beats/downtempo-1.wav'),
+    require('@/assets/audio/beats/downtempo-2.wav'),
+    require('@/assets/audio/tracks/gravel-and-keys.mp3'),
+  ],
   deephouse: [require('@/assets/audio/beats/deephouse-1.wav'), require('@/assets/audio/beats/deephouse-2.wav')],
   melodic: [require('@/assets/audio/beats/melodic-1.wav'), require('@/assets/audio/beats/melodic-2.wav')],
-  techno: [require('@/assets/audio/beats/techno-1.wav'), require('@/assets/audio/beats/techno-2.wav')],
-  triphop: [require('@/assets/audio/beats/triphop-1.wav'), require('@/assets/audio/beats/triphop-2.wav')],
+  // Ambient Techno folds in a real gritty track (Grinding Floor, G minor).
+  techno: [
+    require('@/assets/audio/beats/techno-1.wav'),
+    require('@/assets/audio/beats/techno-2.wav'),
+    require('@/assets/audio/tracks/grinding-floor.mp3'),
+  ],
+  // Trip-Hop folds in a real slow, warm track (Concrete Skin, F major ~60 BPM).
+  triphop: [
+    require('@/assets/audio/beats/triphop-1.wav'),
+    require('@/assets/audio/beats/triphop-2.wav'),
+    require('@/assets/audio/tracks/concrete-skin.mp3'),
+  ],
   synthwave: [require('@/assets/audio/beats/synthwave-1.wav'), require('@/assets/audio/beats/synthwave-2.wav')],
 };
 
