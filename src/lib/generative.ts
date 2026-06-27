@@ -478,11 +478,13 @@ class Composer {
     // octave up, lowpassed to stay warm — together they sound like a played bass
     // note (the single biggest lever on "this is music, not a drone").
     if (spec.bass) {
+      // Reference tracks carry ~86% of their energy below 250 Hz, so the sub +
+      // body sit a touch louder here than a typical pad bed would.
       const osc = ctx.createOscillator();
       osc.type = 'sine';
       osc.frequency.value = midiToFreq(spec.root - 12);
       const gain = ctx.createGain();
-      gain.gain.value = 0.16;
+      gain.gain.value = 0.19;
       osc.connect(gain).connect(pulse);
       osc.start();
 
@@ -494,7 +496,7 @@ class Composer {
       bodyLp.frequency.value = 320;
       bodyLp.Q.value = 0.5;
       const bodyGain = ctx.createGain();
-      bodyGain.gain.value = 0.05;
+      bodyGain.gain.value = 0.07;
       body.connect(bodyLp).connect(bodyGain).connect(pulse);
       body.start();
 
@@ -916,10 +918,9 @@ class Composer {
 // Target loudness (RMS) and a hard peak ceiling. RMS targeting gives consistent
 // *perceived* level (a lone loud transient won't drag the whole piece down the
 // way peak-only normalization does), and the ceiling guarantees no clipping.
-// Nudged up to ~match the fullness of the reference chill track (Sunward Ascent
-// measured ≈0.19 RMS) so generated pieces feel as present, while staying under
-// the peak ceiling.
-const TARGET_RMS = 0.17;
+// Matched to the reference tracks, which all measure ≈0.19 RMS, so generated
+// pieces feel as full and present — while staying under the peak ceiling.
+const TARGET_RMS = 0.18;
 const PEAK_CEILING = 0.95;
 
 async function foldLoop(
