@@ -1,17 +1,16 @@
 /**
- * Generates the app's icon set procedurally (no design tools): a glowing glass
- * orb — a shaded sphere (light core through indigo to teal, a specular highlight
- * and a soft halo) framed by a faint geometric ring (hexagon + 12-point
- * starburst), on the app's deep navy with a little stardust. Matches the in-app
- * breathing orb.
+ * Generates the app's icon set procedurally (no design tools): a luminous Julia
+ * fractal on a vibrant, full-bleed indigo->navy gradient — modern-iOS style
+ * (edge-to-edge colour, one bold centred subject, no inner frame; iOS applies the
+ * rounded-rect mask itself). 2x2 supersampled for crisp fractal edges.
  * Reproducible: `node scripts/generate-icon.js`.
  *
- *   assets/images/icon.png                     – 1024² master icon (navy, RGB)
+ *   assets/images/icon.png                     – 1024² master icon (RGB, opaque)
  *   assets/images/now-playing.png              – 1024² lock-screen artwork
- *   assets/images/splash-icon.png              – 512² orb on transparent
- *   assets/images/android-icon-foreground.png  – 512² orb, in the safe zone
- *   assets/images/android-icon-background.png   – 512² flat navy
- *   assets/images/android-icon-monochrome.png  – 432² white orb (themed)
+ *   assets/images/splash-icon.png              – 512² fractal on transparent
+ *   assets/images/android-icon-foreground.png  – 512² fractal, in the safe zone
+ *   assets/images/android-icon-background.png   – 512² gradient
+ *   assets/images/android-icon-monochrome.png  – 432² white fractal (themed)
  *   assets/images/favicon.png                  – 48² mini icon
  */
 
@@ -20,17 +19,6 @@ const path = require('path');
 const zlib = require('zlib');
 
 const OUT = path.join(__dirname, '..', 'assets', 'images');
-
-function makeRng(seed) {
-  let s = seed >>> 0 || 1;
-  return () => {
-    s ^= s << 13;
-    s ^= s >>> 17;
-    s ^= s << 5;
-    s >>>= 0;
-    return s / 0xffffffff;
-  };
-}
 
 // --- tiny PNG encoder (RGBA, or RGB when opaque) ---------------------------
 const CRC_TABLE = (() => {
@@ -83,15 +71,11 @@ function writePNG(file, width, height, rgba, opaque = false) {
   console.log(`  wrote ${path.relative(process.cwd(), file)} (${(png.length / 1024).toFixed(0)} KB)`);
 }
 
-// --- colour + geometry helpers --------------------------------------------
+// --- colour helpers --------------------------------------------------------
 const hex = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
 const lerp = (a, b, t) => a + (b - a) * t;
 const mix = (c1, c2, t) => [lerp(c1[0], c2[0], t), lerp(c1[1], c2[1], t), lerp(c1[2], c2[2], t)];
 const clamp01 = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
-function smooth(edge0, edge1, x) {
-  const t = clamp01((x - edge0) / (edge1 - edge0));
-  return t * t * (3 - 2 * t);
-}
 function gradient(stops, t) {
   if (t <= stops[0][0]) return stops[0][1];
   for (let i = 1; i < stops.length; i++) {
@@ -103,228 +87,149 @@ function gradient(stops, t) {
   }
   return stops[stops.length - 1][1];
 }
-// Shortest distance from a point to a line segment.
-function distSeg(px, py, x1, y1, x2, y2) {
-  const vx = x2 - x1;
-  const vy = y2 - y1;
-  const wx = px - x1;
-  const wy = py - y1;
-  const c1 = vx * wx + vy * wy;
-  if (c1 <= 0) return Math.hypot(px - x1, py - y1);
-  const c2 = vx * vx + vy * vy;
-  if (c2 <= c1) return Math.hypot(px - x2, py - y2);
-  const b = c1 / c2;
-  return Math.hypot(px - (x1 + b * vx), py - (y1 + b * vy));
-}
-// Edges of a regular polygon (rotDeg, starting at top).
-function polyEdges(cx, cy, R, sides, rotDeg) {
-  const base = (rotDeg * Math.PI) / 180 - Math.PI / 2;
-  const pts = [];
-  for (let k = 0; k < sides; k++) pts.push([cx + R * Math.cos(base + (2 * Math.PI * k) / sides), cy + R * Math.sin(base + (2 * Math.PI * k) / sides)]);
-  const edges = [];
-  for (let k = 0; k < sides; k++) edges.push([...pts[k], ...pts[(k + 1) % sides]]);
-  return edges;
-}
 
-const NAVY = hex('#0E1020');
-const NAVY_LIFT = hex('#191D38');
-// Iridescent glass: bright core through periwinkle and sky to teal at the rim.
-const ORB_STOPS = [
-  [0.0, hex('#F4F6FF')],
-  [0.36, hex('#A6B0F8')],
-  [0.66, hex('#7BA6E8')],
-  [1.0, hex('#5FD8C6')],
+// Vibrant diagonal background (indigo top-left -> deep navy bottom-right).
+const BG_STOPS = [
+  [0.0, hex('#454AA0')],
+  [0.45, hex('#23264B')],
+  [1.0, hex('#0C0E1C')],
 ];
-// Soft coloured light pools inside the orb — an aurora trapped in glass (in
-// normalized orb coordinates, -1..1; the first is the main gloss highlight).
-const AURORA = [
-  { x: -0.34, y: -0.4, col: hex('#FFFFFF'), rad: 0.55, amp: 0.5 },
-  { x: 0.34, y: 0.34, col: hex('#5FE6D2'), rad: 0.9, amp: 0.7 },
-  { x: -0.1, y: 0.1, col: hex('#A98CFF'), rad: 0.8, amp: 0.6 },
-  { x: 0.42, y: -0.28, col: hex('#6FA0FF'), rad: 0.7, amp: 0.5 },
+// Luminous "ink" filling the fractal interior, swept diagonally: pale periwinkle
+// (top-left) through sky to teal (bottom-right), with a white sheen added near
+// the light source for a glassy, modern feel.
+const INK_STOPS = [
+  [0.0, hex('#D8DEFF')],
+  [0.5, hex('#85CBEE')],
+  [1.0, hex('#54E0CC')],
 ];
-const HALO = hex('#7C97E8');
-const ACCENT = hex('#A6B2F8');
-const STAR = hex('#FFFFFF');
+const GLOW_NEAR = hex('#CBD4FF'); // periwinkle, near the boundary
+const GLOW_FAR = hex('#5FD9CC'); // teal, in the fade
+
+// Julia constant — the Douady rabbit: a connected, centred, three-lobed set that
+// reads as a bold, recognisable fractal even at small sizes.
+const C_RE = -0.123;
+const C_IM = 0.745;
+const MAX_ITER = 240;
+const BAILOUT = 16;
 
 /**
- * Render the orb.
- *  opts.bg     – 'navy' | 'transparent'
- *  opts.scale  – 1 = fill; <1 shrinks (Android safe zone)
- *  opts.mono   – flat white orb (Android themed icon)
- *  opts.geom   – draw the geometric frame + stardust (off for tiny sizes)
+ * Render the fractal icon.
+ *  opts.bg          – 'gradient' | 'transparent'
+ *  opts.scale       – 1 = fill; <1 shrinks the subject (Android safe zone)
+ *  opts.mono        – flat white fractal silhouette (Android themed icon)
+ *  opts.flatBg      – solid colour background instead of the gradient
  */
 function render(size, opts = {}) {
-  const { bg = 'navy', scale = 1, mono = false, geom = true } = opts;
-  const cx = size / 2;
-  const cy = size / 2;
-  const R = 0.4 * size * scale; // orb radius
-  const aa = 1.5; // edge anti-alias in px
-  const rng = makeRng(7);
-
-  // Geometry: a hexagon, a 12-point starburst (radial spokes, alternating long
-  // and short — celestial radiance, not a hexagram), and a fine tick bezel,
-  // framing the orb like a mandala.
-  const Rg = 0.62 * size * scale;
-  const ringR = 0.76 * size * scale;
-  const edges = [];
-  if (geom) {
-    edges.push(...polyEdges(cx, cy, Rg, 6, 0));
-    const burstInner = R * 1.12; // start just outside the orb
-    const SPOKES = 12;
-    for (let k = 0; k < SPOKES; k++) {
-      const ang = (2 * Math.PI * k) / SPOKES - Math.PI / 2;
-      const outer = Rg * (k % 2 === 0 ? 0.96 : 0.78); // long / short rays
-      edges.push([
-        cx + Math.cos(ang) * burstInner,
-        cy + Math.sin(ang) * burstInner,
-        cx + Math.cos(ang) * outer,
-        cy + Math.sin(ang) * outer,
-      ]);
-    }
-    const N = 36;
-    for (let k = 0; k < N; k++) {
-      const ang = (2 * Math.PI * k) / N - Math.PI / 2;
-      const r1 = ringR - size * 0.013 * scale;
-      const r2 = ringR + size * 0.013 * scale;
-      edges.push([cx + Math.cos(ang) * r1, cy + Math.sin(ang) * r1, cx + Math.cos(ang) * r2, cy + Math.sin(ang) * r2]);
-    }
-  }
-  const stroke = Math.max(1.2, size * 0.004);
-
-  // Stardust specks (behind the orb).
-  const specks = [];
-  if (geom && !mono) {
-    for (let i = 0; i < Math.floor(size * 0.06); i++) {
-      specks.push({ x: rng() * size, y: rng() * size, r: 0.6 + rng() * 1.6, a: 0.15 + rng() * 0.5 });
-    }
-  }
+  const { bg = 'gradient', scale = 1, mono = false } = opts;
+  const transparent = bg === 'transparent';
+  const SS = 2; // 2x2 supersampling
+  const half = 1.68 / scale; // half-window in the complex plane (margin from edges)
 
   const buf = Buffer.alloc(size * size * 4);
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
-      const px = x + 0.5;
-      const py = y + 0.5;
-      const dist = Math.hypot(px - cx, py - cy);
+      let R = 0;
+      let G = 0;
+      let B = 0;
+      let A = 0;
+      for (let sy = 0; sy < SS; sy++) {
+        for (let sx = 0; sx < SS; sx++) {
+          const fx = (x + (sx + 0.5) / SS) / size; // 0..1
+          const fy = (y + (sy + 0.5) / SS) / size;
+          const zx0 = (fx * 2 - 1) * half;
+          const zy0 = (fy * 2 - 1) * half;
 
-      // --- background / behind-orb light ---
-      let r;
-      let g;
-      let b;
-      let a;
-      if (bg === 'navy') {
-        const lift = smooth(0.95 * size, 0, dist) * 0.5;
-        [r, g, b] = mix(NAVY, NAVY_LIFT, lift);
-        r /= 255;
-        g /= 255;
-        b /= 255;
-        a = 1;
-      } else {
-        r = g = b = 0;
-        a = 0;
-      }
-      const addLight = (col, amt) => {
-        if (amt <= 0) return;
-        r = clamp01(r + (col[0] / 255) * amt);
-        g = clamp01(g + (col[1] / 255) * amt);
-        b = clamp01(b + (col[2] / 255) * amt);
-        if (bg !== 'navy') a = clamp01(Math.max(a, amt));
-      };
-
-      if (dist > R - aa) {
-        // Halo glow around the orb.
-        addLight(HALO, smooth(R * 1.9, R, dist) * 0.32);
-        if (geom && !mono) {
-          // Glowing geometric mandala: crisp lines plus a soft glow around them.
-          let dmin = Infinity;
-          for (const e of edges) {
-            const d = distSeg(px, py, e[0], e[1], e[2], e[3]);
-            if (d < dmin) dmin = d;
+          // Iterate z = z^2 + c.
+          let zx = zx0;
+          let zy = zy0;
+          let n = 0;
+          for (; n < MAX_ITER; n++) {
+            const x2 = zx * zx;
+            const y2 = zy * zy;
+            if (x2 + y2 > BAILOUT) break;
+            zy = 2 * zx * zy + C_IM;
+            zx = x2 - y2 + C_RE;
           }
-          addLight(ACCENT, (1 - smooth(0, stroke, dmin)) * 0.75);
-          addLight(ACCENT, (1 - smooth(0, stroke * 5, dmin)) * 0.1);
-        }
-      }
 
-      // --- the orb (a shaded sphere) on top ---
-      const dx = (px - cx) / R;
-      const dy = (py - cy) / R;
-      const r2 = dx * dx + dy * dy;
-      const orbA = smooth(R + aa, R - aa, dist);
-      if (orbA > 0 && r2 < 1.2) {
-        const rr = Math.min(1, Math.sqrt(r2));
-        let oc;
-        if (mono) {
-          oc = STAR;
-        } else {
-          const nz = Math.sqrt(Math.max(0, 1 - r2));
-          // Light from the upper-left.
-          const lx = -0.45;
-          const ly = -0.55;
-          const lz = 0.7;
-          const diff = clamp01(dx * lx + dy * ly + nz * lz);
-          const base = gradient(ORB_STOPS, rr);
-          const shade = 0.5 + 0.6 * diff;
-          let cr = base[0] * shade;
-          let cg = base[1] * shade;
-          let cb = base[2] * shade;
-          // Internal aurora — coloured light pools blended in (not added, so the
-          // colour stays saturated) to give the glass iridescent depth.
-          for (const A of AURORA) {
-            const dd = Math.hypot(dx - A.x, dy - A.y);
-            const w = clamp01(smooth(A.rad, 0, dd) * A.amp);
-            cr = lerp(cr, A.col[0] * shade, w);
-            cg = lerp(cg, A.col[1] * shade, w);
-            cb = lerp(cb, A.col[2] * shade, w);
+          let cr;
+          let cg;
+          let cb;
+          let ca;
+          if (n >= MAX_ITER) {
+            // Interior: luminous radial ink (bright core -> teal edge).
+            if (mono) {
+              cr = cg = cb = 255;
+              ca = 1;
+            } else {
+              const dt = clamp01((fx + fy) / 2); // diagonal sweep, tl -> br
+              const ink = gradient(INK_STOPS, dt);
+              // White sheen near the upper-left light source.
+              const hd = Math.hypot(fx - 0.33, fy - 0.3);
+              const sheen = Math.pow(clamp01(1 - hd / 0.55), 3) * 130;
+              cr = ink[0] + sheen;
+              cg = ink[1] + sheen;
+              cb = ink[2] + sheen;
+              ca = 1;
+            }
+          } else {
+            // Exterior: smooth escape time -> a glow that's bright near the set
+            // boundary and fades into the background.
+            const logz = Math.log(zx * zx + zy * zy) / 2;
+            const nu = Math.log(logz / Math.log(2)) / Math.log(2);
+            const mu = n + 1 - nu;
+            const prox = clamp01(mu / 42); // ~1 near boundary, ~0 far away
+            const glowA = Math.pow(prox, 1.5);
+            if (mono) {
+              cr = cg = cb = 255;
+              ca = glowA * 0.0; // monochrome shows only the solid set
+            } else {
+              const bgc = transparent ? [0, 0, 0] : gradient(BG_STOPS, clamp01((fx + fy) / 2));
+              const glow = mix(GLOW_FAR, GLOW_NEAR, clamp01(mu / 24));
+              const blended = mix(bgc, glow, glowA);
+              cr = blended[0];
+              cg = blended[1];
+              cb = blended[2];
+              ca = transparent ? glowA : 1;
+            }
           }
-          const spec = Math.pow(diff, 30) * 210; // tight specular highlight
-          cr += spec;
-          cg += spec;
-          cb += spec;
-          const rim = Math.pow(rr, 5) * 75; // cool rim light at the edge
-          cg += rim * 0.6;
-          cb += rim;
-          oc = [cr, cg, cb];
-        }
-        r = lerp(r, clamp01(oc[0] / 255), orbA);
-        g = lerp(g, clamp01(oc[1] / 255), orbA);
-        b = lerp(b, clamp01(oc[2] / 255), orbA);
-        if (bg !== 'navy') a = Math.max(a, orbA);
-      } else if (!mono) {
-        // specks only show in the empty background
-        for (const s of specks) {
-          const sd = Math.hypot(px - s.x, py - s.y);
-          if (sd < s.r) addLight(STAR, (1 - sd / s.r) * s.a);
+          R += cr;
+          G += cg;
+          B += cb;
+          A += ca;
         }
       }
-
+      const nSamp = SS * SS;
       const o = (y * size + x) * 4;
-      buf[o] = Math.round(clamp01(r) * 255);
-      buf[o + 1] = Math.round(clamp01(g) * 255);
-      buf[o + 2] = Math.round(clamp01(b) * 255);
-      buf[o + 3] = Math.round(clamp01(a) * 255);
+      buf[o] = Math.round(clamp01(R / nSamp / 255) * 255);
+      buf[o + 1] = Math.round(clamp01(G / nSamp / 255) * 255);
+      buf[o + 2] = Math.round(clamp01(B / nSamp / 255) * 255);
+      buf[o + 3] = Math.round(clamp01(A / nSamp) * 255);
     }
   }
   return buf;
 }
 
-function flat(size, color) {
+function flatGradient(size) {
   const buf = Buffer.alloc(size * size * 4);
-  for (let i = 0; i < size * size; i++) {
-    buf[i * 4] = color[0];
-    buf[i * 4 + 1] = color[1];
-    buf[i * 4 + 2] = color[2];
-    buf[i * 4 + 3] = 255;
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const c = gradient(BG_STOPS, clamp01((x / size + y / size) / 2));
+      const o = (y * size + x) * 4;
+      buf[o] = Math.round(c[0]);
+      buf[o + 1] = Math.round(c[1]);
+      buf[o + 2] = Math.round(c[2]);
+      buf[o + 3] = 255;
+    }
   }
   return buf;
 }
 
-console.log('Generating orb app icons...');
-writePNG(path.join(OUT, 'icon.png'), 1024, 1024, render(1024, { bg: 'navy' }), true);
-writePNG(path.join(OUT, 'now-playing.png'), 1024, 1024, render(1024, { bg: 'navy' }), true);
-writePNG(path.join(OUT, 'splash-icon.png'), 512, 512, render(512, { bg: 'transparent', geom: false }));
-writePNG(path.join(OUT, 'android-icon-foreground.png'), 512, 512, render(512, { bg: 'transparent', scale: 0.62, geom: false }));
-writePNG(path.join(OUT, 'android-icon-background.png'), 512, 512, flat(512, NAVY));
-writePNG(path.join(OUT, 'android-icon-monochrome.png'), 432, 432, render(432, { bg: 'transparent', scale: 0.62, mono: true, geom: false }));
-writePNG(path.join(OUT, 'favicon.png'), 48, 48, render(48, { bg: 'navy', geom: false }));
+console.log('Generating fractal app icons...');
+writePNG(path.join(OUT, 'icon.png'), 1024, 1024, render(1024, { bg: 'gradient' }), true);
+writePNG(path.join(OUT, 'now-playing.png'), 1024, 1024, render(1024, { bg: 'gradient' }), true);
+writePNG(path.join(OUT, 'splash-icon.png'), 512, 512, render(512, { bg: 'transparent' }));
+writePNG(path.join(OUT, 'android-icon-foreground.png'), 512, 512, render(512, { bg: 'transparent', scale: 0.62 }));
+writePNG(path.join(OUT, 'android-icon-background.png'), 512, 512, flatGradient(512));
+writePNG(path.join(OUT, 'android-icon-monochrome.png'), 432, 432, render(432, { bg: 'transparent', scale: 0.62, mono: true }));
+writePNG(path.join(OUT, 'favicon.png'), 48, 48, render(48, { bg: 'gradient' }), true);
 console.log('Done.');
