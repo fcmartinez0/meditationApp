@@ -38,6 +38,7 @@ const AMBIENT_SOURCES: Record<FileSound, number | number[]> = {
     require('@/assets/audio/beats/lofi-1.wav'),
     require('@/assets/audio/beats/lofi-2.wav'),
     require('@/assets/audio/tracks/sunward-ascent.mp3'),
+    require('@/assets/audio/tracks/velvet-midnight.mp3'),
   ],
   liquid: [require('@/assets/audio/beats/liquid-1.wav'), require('@/assets/audio/beats/liquid-2.wav')],
   chillstep: [require('@/assets/audio/beats/chillstep-1.wav'), require('@/assets/audio/beats/chillstep-2.wav')],

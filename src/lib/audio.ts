@@ -49,13 +49,14 @@ const AMBIENT_SOURCES: Record<FileSound, number | number[]> = {
   deep: require('@/assets/audio/music/deep.wav'),
   dream: require('@/assets/audio/music/dream.wav'),
   clarity: require('@/assets/audio/music/clarity.wav'),
-  // Lo-Fi mixes the two generated variants with a real chill track (Sunward
-  // Ascent, made with Gemini): the session crossfades between them so a real
-  // song surfaces and recedes amid the generated grooves.
+  // Lo-Fi mixes the two generated variants with two real late-night tracks
+  // (Sunward Ascent, brighter; Velvet Midnight, darker): the session crossfades
+  // between them so a real song surfaces and recedes amid the generated grooves.
   lofi: [
     require('@/assets/audio/beats/lofi-1.wav'),
     require('@/assets/audio/beats/lofi-2.wav'),
     require('@/assets/audio/tracks/sunward-ascent.mp3'),
+    require('@/assets/audio/tracks/velvet-midnight.mp3'),
   ],
   liquid: [require('@/assets/audio/beats/liquid-1.wav'), require('@/assets/audio/beats/liquid-2.wav')],
   chillstep: [require('@/assets/audio/beats/chillstep-1.wav'), require('@/assets/audio/beats/chillstep-2.wav')],
