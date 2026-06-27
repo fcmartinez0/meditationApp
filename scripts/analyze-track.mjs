@@ -21,13 +21,8 @@
  */
 
 import { readFileSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
 import { MPEGDecoder } from 'mpg123-decoder';
-
-const files = process.argv.slice(2);
-if (!files.length) {
-  console.error('usage: node scripts/analyze-track.mjs <audio-file.mp3> [more.mp3 ...]');
-  process.exit(1);
-}
 
 const NOTE = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
@@ -72,15 +67,18 @@ function fft(re, im) {
   }
 }
 
-function analyze(file) {
+export function analyzeFile(file) {
   const dec = new MPEGDecoder();
   return dec.ready.then(() => {
     const { channelData, sampleRate, samplesDecoded } = dec.decode(new Uint8Array(readFileSync(file)));
     dec.free();
-    const sr = sampleRate;
-    const N = samplesDecoded;
-    const Lc = channelData[0];
-    const Rc = channelData[1] ?? channelData[0];
+    return computeFeatures(channelData[0], channelData[1] ?? channelData[0], sampleRate, samplesDecoded, file);
+  });
+}
+
+// Compute the feature fingerprint from raw PCM (Float32 L/R). Used directly by
+// the harness on the generative render, and by analyzeFile after MP3 decode.
+export function computeFeatures(Lc, Rc, sr, N, file = '') {
     const mono = new Float32Array(N);
     let mid = 0, side = 0, sq = 0, peak = 0;
     for (let i = 0; i < N; i++) {
@@ -223,15 +221,22 @@ function analyze(file) {
       bpm, folded, onsetRate, chordChangeSec, crestDb, bestKey: best,
       top3: ranked.slice(0, 3), bands, bandTotal,
     };
-  });
 }
 
 function fmt(n, d = 2) { return Number(n).toFixed(d); }
 
-const results = [];
-for (const f of files) results.push(await analyze(f));
+// --- CLI (skipped when imported, e.g. by scripts/gen-harness.mjs) ----------
+const isMain = import.meta.url === pathToFileURL(process.argv[1] || '').href;
+if (isMain) {
+  const files = process.argv.slice(2);
+  if (!files.length) {
+    console.error('usage: node scripts/analyze-track.mjs <audio-file.mp3> [more.mp3 ...]');
+    process.exit(1);
+  }
+  const results = [];
+  for (const f of files) results.push(await analyzeFile(f));
 
-for (const r of results) {
+  for (const r of results) {
   console.log(`\n=== ${r.file.split('/').pop()} ===`);
   console.log(`  key/scale     ${NOTE[r.bestKey.root]} ${r.bestKey.scale}  (${r.top3.map((t) => `${NOTE[t.root]} ${t.scale}`).join('  |  ')})`);
   console.log(`  tempo         ${fmt(r.bpm, 1)} BPM (folded ${fmt(r.folded, 1)})`);
@@ -266,4 +271,5 @@ if (results.length > 1) {
   const brightness = Math.max(0, Math.min(1, (mean((r) => r.centroid) - 1200) / 5200));
   console.log(`\n  suggested generative brightness ~ ${fmt(brightness, 2)} (0..1)`);
   console.log(`  suggested bassChance high (low-end ${fmt(mean((r) => r.lowWeight) * 100, 0)}%); smooth pads (flatness ${fmt(mean((r) => r.flatness), 3)}, ${fmt(mean((r) => r.onsetRate), 2)} onsets/s)`);
+  }
 }

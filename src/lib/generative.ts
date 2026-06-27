@@ -1036,6 +1036,15 @@ async function renderLoop(spec: PieceSpec): Promise<LoopData | null> {
   }
 }
 
+/**
+ * Tooling only (scripts/gen-harness.mjs): render a spec offline and return the
+ * looped PCM, so the engine's output can be analysed and compared against the
+ * reference tracks. Not used by the app at runtime.
+ */
+export async function __renderSpecForHarness(spec: PieceSpec): Promise<LoopData | null> {
+  return renderLoop(spec);
+}
+
 // --- Background pre-render -------------------------------------------------
 // Rendering takes a few seconds, so we do it ahead of time (at app launch and
 // while the user is on the home) and stash the result. The session takes it for

@@ -45,3 +45,6 @@ example
 # generated native folders
 /ios
 /android
+
+# Generative harness temp renders
+.gen-harness-*
