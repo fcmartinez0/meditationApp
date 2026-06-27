@@ -74,11 +74,13 @@ const AMBIENT_SOURCES: Record<FileSound, number | number[]> = {
     require('@/assets/audio/beats/techno-2.wav'),
     require('@/assets/audio/tracks/grinding-floor.mp3'),
   ],
-  // Trip-Hop folds in a real slow, warm track (Concrete Skin, F major ~60 BPM).
+  // Trip-Hop folds in two real slow, warm tracks (Concrete Skin & Velvet
+  // Concrete, both F major ~60 BPM, different shades of dark).
   triphop: [
     require('@/assets/audio/beats/triphop-1.wav'),
     require('@/assets/audio/beats/triphop-2.wav'),
     require('@/assets/audio/tracks/concrete-skin.mp3'),
+    require('@/assets/audio/tracks/velvet-concrete.mp3'),
   ],
   synthwave: [require('@/assets/audio/beats/synthwave-1.wav'), require('@/assets/audio/beats/synthwave-2.wav')],
 };
