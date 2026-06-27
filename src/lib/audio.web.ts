@@ -58,6 +58,7 @@ const AMBIENT_SOURCES: Record<FileSound, number | number[]> = {
     require('@/assets/audio/beats/triphop-1.wav'),
     require('@/assets/audio/beats/triphop-2.wav'),
     require('@/assets/audio/tracks/concrete-skin.mp3'),
+    require('@/assets/audio/tracks/velvet-concrete.mp3'),
   ],
   synthwave: [require('@/assets/audio/beats/synthwave-1.wav'), require('@/assets/audio/beats/synthwave-2.wav')],
 };
