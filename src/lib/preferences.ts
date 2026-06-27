@@ -45,32 +45,33 @@ const SCALES = [
 type GenScale = (typeof SCALES)[number];
 
 // Scale pools weighted by what reads as "real, emotional music" in each section.
-// These lean on an analysis of the reference chill track (Sunward Ascent), which
-// is squarely D natural-minor (aeolian) with strong i / bIII / iv / v / bVI / bVII
-// colour — so the minor family is repeated here to bias the engine toward that
-// feel, with a few brighter/pentatonic scales kept in for variety. (Run
-// `node scripts/analyze-track.mjs <file>` on any new reference track to refresh
-// these learnings.)
+// Analysing the reference tracks (scripts/analyze-track.mjs over assets/audio/
+// tracks/*) showed they live in a GAPPED, MODAL palette — minor-pentatonic and
+// mixolydian/aeolian dominate, with hirajoshi colour; dense 7-note scales
+// (harmonic minor, phrygian, lydian) never appeared. Pentatonics drop the most
+// dissonant degrees, which is much of why those tracks sound smooth and "right".
+// So the pools now lean pentatonic + natural-minor/dorian/mixolydian. (Re-run the
+// analyzer on new reference tracks to refresh these.)
 const SCALE_POOL: Record<Section, GenScale[]> = {
   rest: [
-    'aeolian',
+    'minor_pentatonic',
+    'minor_pentatonic',
     'aeolian',
     'dorian',
-    'minor_pentatonic',
     'hirajoshi',
-    'harmonic_minor',
-    'lydian',
     'major_pentatonic',
+    'aeolian',
+    'mixolydian',
   ],
   chill: [
-    'aeolian',
-    'aeolian',
-    'dorian',
-    'dorian',
     'minor_pentatonic',
-    'harmonic_minor',
-    'lydian_dominant',
+    'minor_pentatonic',
+    'aeolian',
+    'dorian',
+    'dorian',
     'mixolydian',
+    'mixolydian',
+    'major_pentatonic',
   ],
 };
 
@@ -105,8 +106,11 @@ const RANGES: Record<Section, Range> = {
     rootMax: 55,
     brightMin: 0.15,
     brightMax: 0.55,
-    chordMin: 11,
-    chordMax: 22,
+    // Reference tracks move harmonically a bit more often than the old static
+    // drone (analysis: a chord change every ~2 s). Shorten the holds so even
+    // Rest has gentle movement, while staying calm.
+    chordMin: 9,
+    chordMax: 18,
     // Study-validated theta for meditation/relaxation: a ~4.6 Hz centre and the
     // 6 Hz beat shown to promote meditative states, plus a 3 Hz delta option for
     // deep rest / sleep. (PMC8636003: theta 4.60 Hz ±0.70; 6 Hz meditation.)
@@ -116,9 +120,9 @@ const RANGES: Record<Section, Range> = {
     tempoMax: 72,
     pulseMax: 0,
     arpChance: 0.32,
-    // A warm sub-bass under the pad is most of what makes a generative bed read
-    // as "music" rather than a drone, so keep one nearly always present.
-    bassChance: 0.92,
+    // The reference tracks are extremely bass-heavy (analysis: ~86% of energy
+    // below 250 Hz), so a warm low end is essential — keep a sub almost always.
+    bassChance: 0.95,
     // Mostly still; only gentle motion (no busy tribal/offbeat for rest).
     percussion: ['none', 'none', 'none', 'heartbeat', 'shaker'],
     // Calming voices; bias toward the soft pad.
@@ -127,12 +131,14 @@ const RANGES: Record<Section, Range> = {
   chill: {
     rootMin: 48,
     rootMax: 58,
-    // The reference chill track sits moderately bright (~3.5 kHz spectral
-    // centroid), so keep Flow from ever getting muddy — lift the floor a touch.
-    brightMin: 0.45,
-    brightMax: 0.85,
-    chordMin: 6,
-    chordMax: 12,
+    // Across all reference tracks the average is warmer than a single bright one
+    // suggested (mean centroid ~3.1 kHz -> brightness ~0.37), so warm the floor
+    // and tame the ceiling so Flow sits in that cosy band rather than glassy.
+    brightMin: 0.4,
+    brightMax: 0.8,
+    // Reference harmonic rhythm is fairly active (~2 s); shorten the holds.
+    chordMin: 5,
+    chordMax: 10,
     binaurals: [9, 10, 11],
     chimeMax: 0.2,
     // Reference track grooves ~123 BPM with a chill half-time feel; widen the top
