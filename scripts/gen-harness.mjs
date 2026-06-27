@@ -48,17 +48,27 @@ await build({
 });
 const { __renderSpecForHarness, nextSpec } = await import(pathToFileURL(bundle).href);
 
-// 2) Render each section N times and score the raw PCM directly.
+// The Node Web Audio backend occasionally emits a mono, near-DC, over-loud
+// render (centroid ~30 Hz, width ~0, RMS ~0.5) that doesn't reflect the engine
+// on-device. Skip those and re-render so each section gets N valid renders for a
+// stable average.
+const valid = (r) => r.width >= 0.03 && r.centroid >= 90 && r.rms < 0.42;
+
+// 2) Render each section until N valid pieces are collected; score raw PCM.
 const renderFeats = [];
+let dropped = 0;
 for (const section of ['rest', 'chill']) {
-  for (let i = 0; i < N; i++) {
+  const label = section === 'chill' ? 'flow' : 'rest';
+  let got = 0;
+  for (let attempt = 0; got < N && attempt < N * 6; attempt++) {
     const spec = nextSpec(section, []);
-    process.stderr.write(`rendering ${section} #${i + 1} (${spec.scale}, ${spec.instrument}, ${spec.tempo}bpm)...\n`);
     const loop = await __renderSpecForHarness(spec);
-    if (!loop) { process.stderr.write(`  render failed for ${section}\n`); continue; }
-    const label = section === 'chill' ? 'flow' : 'rest';
+    if (!loop) { dropped++; continue; }
     const feat = computeFeatures(loop.data[0], loop.data[1], loop.sampleRate, loop.length, `gen-${label}`);
+    if (!valid(feat)) { dropped++; continue; }
     renderFeats.push({ label: `gen-${label}`, ...feat });
+    got++;
+    process.stderr.write(`${label} ${got}/${N}: ${spec.scale} ${spec.instrument} ${spec.tempo}bpm  centroid ${feat.centroid.toFixed(0)} low ${(feat.lowWeight * 100).toFixed(0)}% flat ${feat.flatness.toFixed(2)}\n`);
   }
 }
 
@@ -87,15 +97,9 @@ function summarize(feats) {
   };
 }
 
-// Drop degenerate renders — the Node Web Audio backend occasionally emits a
-// mono, sub-only render that doesn't reflect the engine on-device.
-const valid = (r) => r.width >= 0.02 && r.centroid >= 200;
-let dropped = 0;
 const rows = [['TARGET (tracks)', summarize(trackFeats)]];
 for (const sec of [['rest', 'gen REST'], ['flow', 'gen FLOW']]) {
-  const all = renderFeats.filter((r) => r.label.startsWith(`gen-${sec[0]}`));
-  const fs = all.filter(valid);
-  dropped += all.length - fs.length;
+  const fs = renderFeats.filter((r) => r.label.startsWith(`gen-${sec[0]}`));
   if (fs.length) rows.push([`${sec[1]} (n=${fs.length})`, summarize(fs)]);
 }
 

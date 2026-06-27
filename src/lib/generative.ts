@@ -335,7 +335,15 @@ class Composer {
     const glue = ctx.createWaveShaper();
     glue.curve = makeSaturationCurve();
     glue.oversample = '2x';
-    master.connect(glue).connect(air).connect(ctx.destination);
+    // Low shelf: the reference tracks are very bass-forward (analysis: ~86% of
+    // energy below 250 Hz, vs the engine's ~30%), so lift the master lows to sit
+    // in that warm territory. This also pulls the energy-weighted brightness down
+    // toward the tracks (the engine read too bright).
+    const lowShelf = ctx.createBiquadFilter();
+    lowShelf.type = 'lowshelf';
+    lowShelf.frequency.value = 175;
+    lowShelf.gain.value = 6.5;
+    master.connect(glue).connect(lowShelf).connect(air).connect(ctx.destination);
 
     // Tempo-synced feedback delay.
     const delay = ctx.createDelay(2);
@@ -418,6 +426,27 @@ class Composer {
     noise.copyToChannel(nd, 0);
     this.noise = noise;
 
+    // A whisper of band-limited noise — tape/air texture. The reference tracks
+    // aren't pure tones (spectral flatness ~0.54); the engine's bare sine pads
+    // measured ~0.02 (sterile). A soft broadband bed fills the spectral valleys
+    // so it reads as "produced" rather than a synth drone — more for the very
+    // pure Rest pieces. Kept above the bass so it doesn't muddy the low end.
+    {
+      const bed = ctx.createBufferSource();
+      bed.buffer = noise;
+      bed.loop = true;
+      const bedHp = ctx.createBiquadFilter();
+      bedHp.type = 'highpass';
+      bedHp.frequency.value = 600;
+      const bedLp = ctx.createBiquadFilter();
+      bedLp.type = 'lowpass';
+      bedLp.frequency.value = 7000;
+      const bedGain = ctx.createGain();
+      bedGain.gain.value = spec.section === 'rest' ? 0.028 : 0.022;
+      bed.connect(bedHp).connect(bedLp).connect(bedGain).connect(master);
+      bed.start();
+    }
+
     // Slow filter movement.
     const lfo = ctx.createOscillator();
     lfo.frequency.value = 0.02 + this.rng() * 0.05;
@@ -486,7 +515,7 @@ class Composer {
       osc.type = 'sine';
       osc.frequency.value = midiToFreq(spec.root - 12);
       const gain = ctx.createGain();
-      gain.gain.value = 0.19;
+      gain.gain.value = 0.3;
       osc.connect(gain).connect(pulse);
       osc.start();
 
@@ -498,7 +527,7 @@ class Composer {
       bodyLp.frequency.value = 320;
       bodyLp.Q.value = 0.5;
       const bodyGain = ctx.createGain();
-      bodyGain.gain.value = 0.07;
+      bodyGain.gain.value = 0.1;
       body.connect(bodyLp).connect(bodyGain).connect(pulse);
       body.start();
 
