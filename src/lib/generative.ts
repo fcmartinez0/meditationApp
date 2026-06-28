@@ -688,6 +688,9 @@ class Composer {
     const rest = this.spec.section === 'rest';
     const kg = rest ? 0.16 : 0.3;
     const sg = rest ? 0.05 : 0.09;
+    // Crisp closed hi-hats give the bright transients + dynamics the engine was
+    // missing (the reference tracks have far more crest); off for still Rest.
+    const hg = rest ? 0 : 0.06;
     switch (this.spec.percussion) {
       case 'heartbeat':
         if (s === 0) this.softKick(when, kg);
@@ -697,23 +700,28 @@ class Composer {
         break;
       case 'pulse':
         if (s % 4 === 0) this.softKick(when, kg);
+        if (hg && s % 2 === 0) this.hat(when, hg * 0.7);
         break;
       case 'shaker':
         if (s === 0 || s === 8) this.softKick(when, kg * 0.8);
         if (s % 4 === 2) this.shaker(when, sg);
+        if (hg && s % 2 === 0) this.hat(when, hg * 0.6);
         break;
       case 'broken':
         if (s === 0 || s === 6 || s === 10) this.softKick(when, kg);
         if (s === 4 || s === 12 || s === 14) this.shaker(when, sg);
+        if (hg && s % 2 === 1) this.hat(when, hg);
         break;
       case 'offbeat':
         if (s === 0 || s === 8) this.softKick(when, kg * 0.85);
         if (s % 4 === 2) this.shaker(when, sg * 1.2);
         else if (s % 2 === 1) this.shaker(when, sg * 0.5);
+        if (hg && s % 2 === 1) this.hat(when, hg * 1.1); // accent the off-beats
         break;
       case 'tribal':
         if (s === 0 || s === 3 || s === 6 || s === 10 || s === 13) this.softKick(when, kg * 0.7);
         if (s === 4 || s === 12) this.shaker(when, sg);
+        if (hg && s % 2 === 0) this.hat(when, hg * 0.5);
         break;
       default:
         break;
@@ -731,19 +739,56 @@ class Composer {
   }
 
   private softKick(when: number, gain: number): void {
-    const { ctx, master } = this;
+    const { ctx, master, noise } = this;
     if (!master) return;
+    const v = this.vel(gain, 0.25); // dynamic hits, for crest
     const osc = ctx.createOscillator();
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(78, when);
+    osc.frequency.setValueAtTime(95, when);
     osc.frequency.exponentialRampToValueAtTime(42, when + 0.12);
     const g = ctx.createGain();
     g.gain.setValueAtTime(0.0001, when);
-    g.gain.exponentialRampToValueAtTime(gain, when + 0.005);
+    g.gain.exponentialRampToValueAtTime(v, when + 0.003); // snappier attack
     g.gain.exponentialRampToValueAtTime(0.0001, when + 0.28);
     osc.connect(g).connect(master);
     osc.start(when);
     osc.stop(when + 0.32);
+    // A brief click transient sharpens the attack (adds punch + crest).
+    if (noise) {
+      const click = ctx.createBufferSource();
+      click.buffer = noise;
+      click.loop = true;
+      const chp = ctx.createBiquadFilter();
+      chp.type = 'highpass';
+      chp.frequency.value = 1400;
+      const cg = ctx.createGain();
+      cg.gain.setValueAtTime(v * 0.5, when);
+      cg.gain.exponentialRampToValueAtTime(0.0001, when + 0.012);
+      click.connect(chp).connect(cg).connect(master);
+      click.start(when, this.rng() * 0.5);
+      click.stop(when + 0.02);
+    }
+  }
+
+  private hat(when: number, gain: number): void {
+    const { ctx, noise, master } = this;
+    if (!noise || !master) return;
+    const src = ctx.createBufferSource();
+    src.buffer = noise;
+    src.loop = true;
+    const hp = ctx.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = 9000;
+    const g = ctx.createGain();
+    const v = this.vel(gain, 0.4);
+    g.gain.setValueAtTime(0.0001, when);
+    g.gain.exponentialRampToValueAtTime(v, when + 0.001);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + 0.035);
+    const pan = ctx.createStereoPanner();
+    pan.pan.value = this.rng() * 0.5 - 0.25;
+    src.connect(hp).connect(g).connect(pan).connect(master);
+    src.start(when, this.rng() * 0.5);
+    src.stop(when + 0.05);
   }
 
   private shaker(when: number, gain: number): void {
@@ -996,7 +1041,9 @@ async function foldLoop(
   // silent piece, then pulled under the peak ceiling so it can't clip.
   const rms = Math.sqrt(sumSquares / Math.max(1, sampleCount));
   let gain = rms > 1e-5 ? TARGET_RMS / rms : 1;
-  gain = Math.max(0.6, Math.min(2.2, gain));
+  // Floor lowered so a loud, bass+percussion-heavy render is actually pulled
+  // down to the target loudness instead of clamping hot.
+  gain = Math.max(0.4, Math.min(2.2, gain));
   if (peak * gain > PEAK_CEILING) gain = peak > 1e-5 ? PEAK_CEILING / peak : gain;
   if (Math.abs(gain - 1) > 0.02) {
     for (const dst of out) {
