@@ -66,6 +66,9 @@ export const AMBIENT_KEYS: AmbientSound[] = [
   'gen_chill',
 ];
 
+/** How many recently-played sounds to remember (one source of truth). */
+export const RECENTS_MAX = 8;
+
 export function isGenerative(sound: AmbientSound): sound is GenerativeSound {
   return sound === 'gen_rest' || sound === 'gen_chill';
 }

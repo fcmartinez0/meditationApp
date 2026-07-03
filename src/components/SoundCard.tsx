@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
 import { EqualizerBars } from '@/components/EqualizerBars';
-import type { SoundItem } from '@/components/SoundRow';
+import type { SoundItem } from '@/lib/catalog';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { categoryStyle, withAlpha } from '@/theme/categories';
 import { radius, spacing } from '@/theme';

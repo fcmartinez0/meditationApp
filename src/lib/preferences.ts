@@ -356,7 +356,7 @@ const NOTE_NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A'
 /** A short "now playing" description of a piece, e.g. "D dorian · heartbeat". */
 export function describeSpec(spec: PieceSpec): string {
   const note = NOTE_NAMES[(((spec.root % 12) + 12) % 12)];
-  const parts = [`${note} ${spec.scale.replace('_', ' ')}`];
+  const parts = [`${note} ${spec.scale.replaceAll('_', ' ')}`];
   parts.push(spec.instrument);
   if (spec.melody) parts.push('melody');
   if (spec.percussion !== 'none') parts.push(spec.percussion);
@@ -381,6 +381,6 @@ export function summarizePreference(section: Section, ratings: PieceRating[]): s
       bestScale = scale;
     }
   }
-  const scaleName = bestScale ? bestScale.replace('_', ' ') : 'varied';
+  const scaleName = bestScale ? bestScale.replaceAll('_', ' ') : 'varied';
   return `${likes}/${here.length} liked · leaning ${scaleName}`;
 }

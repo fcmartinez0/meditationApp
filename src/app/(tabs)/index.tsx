@@ -14,7 +14,6 @@ import { Screen } from '@/components/Screen';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { greeting, soundMeta } from '@/lib/catalog';
 import { GENERATIVE_SUPPORTED, prefetchGenerative } from '@/lib/generative';
-import type { AmbientSound } from '@/lib/types';
 import { isGenerative, sectionFor } from '@/lib/types';
 import { categoryStyle } from '@/theme/categories';
 import { useAppData } from '@/store/AppData';

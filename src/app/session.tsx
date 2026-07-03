@@ -212,6 +212,7 @@ export default function SessionScreen() {
       } catch (e) {
         // Audio setup failed — let the session run silently but tell the user,
         // rather than leaving them in unexplained silence.
+        if (__DEV__) console.warn('[session] audio setup failed', e);
         if (!cancelled) setAudioFailed(true);
       }
       startCountdown();

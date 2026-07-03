@@ -25,14 +25,12 @@ import {
 } from '@/lib/storage';
 import {
   DEFAULT_SETTINGS,
+  RECENTS_MAX,
   type AmbientSound,
   type SessionRecord,
   type Settings,
   type Stats,
 } from '@/lib/types';
-
-// How many recently-used sounds to remember for quick re-selection.
-const RECENTS_MAX = 8;
 
 interface AppDataValue {
   ready: boolean;

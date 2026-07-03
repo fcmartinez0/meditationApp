@@ -14,13 +14,14 @@ import type { AmbientSound, FileSound } from './types';
 import { isGenerative } from './types';
 
 // The lock-screen / Control Center artwork (the app's stardust mark), resolved
-// once to a local URI for the now-playing media controls.
+// once to a local URI for the now-playing media controls. Reuses the app icon —
+// they were byte-identical, so a separate file was just dead weight.
 let artworkPromise: Promise<string | undefined> | null = null;
 function resolveArtwork(): Promise<string | undefined> {
   if (!artworkPromise) {
     artworkPromise = (async () => {
       try {
-        const asset = Asset.fromModule(require('@/assets/images/now-playing.png'));
+        const asset = Asset.fromModule(require('@/assets/images/icon.png'));
         await asset.downloadAsync();
         return asset.localUri ?? asset.uri ?? undefined;
       } catch {

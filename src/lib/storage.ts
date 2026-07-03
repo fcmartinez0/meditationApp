@@ -2,7 +2,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { AMBIENT_KEYS, DEFAULT_SETTINGS, type SessionRecord, type Settings } from './types';
+import { AMBIENT_KEYS, DEFAULT_SETTINGS, RECENTS_MAX, type SessionRecord, type Settings } from './types';
 
 const SESSIONS_KEY = 'mc.sessions.v1';
 const SETTINGS_KEY = 'mc.settings.v1';
@@ -62,7 +62,7 @@ export async function loadSettings(): Promise<Settings> {
     // Sanitize recents: keep only still-valid keys, deduped and bounded.
     merged.recents = Array.from(
       new Set((Array.isArray(merged.recents) ? merged.recents : []).filter((k) => AMBIENT_KEYS.includes(k))),
-    ).slice(0, 12);
+    ).slice(0, RECENTS_MAX);
     return merged;
   } catch {
     return { ...DEFAULT_SETTINGS };

@@ -1,4 +1,4 @@
-import { Text, type TextProps } from 'react-native';
+import { Text, type TextProps, type TextStyle } from 'react-native';
 
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { fontSize, fonts } from '@/theme';
@@ -16,7 +16,7 @@ interface AppTextProps extends TextProps {
 
 const VARIANTS: Record<
   Variant,
-  { fontSize: number; fontWeight: TextProps['style'] extends never ? never : any; lineHeight: number; letterSpacing?: number; maxScale: number }
+  { fontSize: number; fontWeight: TextStyle['fontWeight']; lineHeight: number; letterSpacing?: number; maxScale: number }
 > = {
   // maxScale honors iOS/Android Dynamic Type for readability while capping how
   // far each variant can grow, so large accessibility text sizes don't overflow

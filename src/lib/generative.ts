@@ -640,7 +640,7 @@ class Composer {
   }
 
   private applyChord(when: number, initial: boolean): void {
-    const { ctx, spec } = this;
+    const { spec } = this;
     const scale = SCALES[spec.scale] ?? SCALES.major_pentatonic;
     const L = scale.length;
     const deg = (x: number) => 12 * Math.floor(x / L) + scale[((x % L) + L) % L];
