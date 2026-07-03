@@ -88,6 +88,17 @@ export default function LegalScreen() {
         <P>Protect your hearing by keeping the volume at a comfortable level.</P>
       </Section>
 
+      <Section title="Sound & credits">
+        <P>
+          Stillness makes its own sound. The ambient textures, binaural frequencies and the live
+          Rest and Flow sessions are synthesized digitally — they are not field recordings.
+        </P>
+        <P>
+          Some of the instrumental music tracks were created with Google Gemini generative AI. All
+          music is bundled with the app — nothing is streamed, and the app never records you.
+        </P>
+      </Section>
+
       <AppText variant="caption" muted center style={styles.footer}>
         Stillness · v1.0
       </AppText>

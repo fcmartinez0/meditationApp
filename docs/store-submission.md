@@ -41,12 +41,13 @@ GUIDED BREATHING
 Box, 4-7-8, Calm, and Coherent rhythms with an animated pace guide and gentle
 haptics to keep you in time.
 
-A DEEP LIBRARY OF SOUND — all generated on your device, no recordings
+A DEEP LIBRARY OF SOUND — synthesized, not sampled
 • Ambient: rain, ocean, forest, stream, campfire, night crickets, and brown,
   pink & white noise.
 • Frequencies: binaural-beat tracks tuned for Calm, Clarity, Focus, Dream, and
   Deep states (headphones recommended).
-• Beats: original instrumental grooves, from warm melodic house to dusty lo-fi.
+• Beats: original instrumental grooves, from warm melodic house to dusty lo-fi —
+  some created with Google Gemini generative AI.
 • Generative: endless, never-repeating music that learns what you like as you
   rate it.
 
@@ -137,9 +138,10 @@ The app is local-first with **no data collection**, so:
 ```
 Stillness plays continuous background audio so focus/rest/sleep sessions keep
 running with the screen locked — this is why UIBackgroundModes includes "audio".
-All audio is synthesized on-device; the app does not record audio and requests
-no microphone access. There is no account, server, tracking, or analytics; all
-data stays on the device.
+The app does not record audio and requests no microphone access; all music is
+bundled with the app or generated on-device (some instrumental tracks were
+created with Google Gemini generative AI). There is no account, server, tracking,
+or analytics; all data stays on the device.
 ```
 
 ---
@@ -150,10 +152,15 @@ data stays on the device.
    artist's style." Do **not** reference any real artist/brand names in store metadata,
    screenshots, or in-app track titles — that risks IP/trademark rejection. Keep titles
    generic (e.g. "Melodic House", "Lo-Fi").
-2. **No medical claims.** Binaural/frequency wording must stay as a *wellness aid*, never a
+2. **AI-generated music (Google Gemini).** The instrumental tracks in `assets/audio/tracks/`
+   were created with Google Gemini generative AI. (a) Confirm the specific Gemini tool's terms
+   permit commercial redistribution in a paid/store app, and keep a record. (b) Keep the
+   disclosure accurate and consistent (README, in-app Privacy & Disclaimer → "Sound & credits",
+   reviewer notes, this listing). (c) Do **not** strip the tracks' C2PA content credentials.
+3. **No medical claims.** Binaural/frequency wording must stay as a *wellness aid*, never a
    treatment/cure for anxiety, insomnia, etc. The current disclaimer copy is fine — keep it.
-3. **Reminders permission.** First launch of reminders triggers the notification prompt; make
+4. **Reminders permission.** First launch of reminders triggers the notification prompt; make
    sure that flow is reachable for the reviewer (it's optional, so the app must work without it).
-4. **Generative "learns what you like".** This is on-device personalization only — make sure the
+5. **Generative "learns what you like".** This is on-device personalization only — make sure the
    data-safety forms still say "no data collected" (they should; nothing leaves the device).
 ```
