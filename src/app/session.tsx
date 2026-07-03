@@ -91,6 +91,9 @@ export default function SessionScreen() {
   const audioRef = useRef<SessionAudio | null>(null);
   const engineRef = useRef<GenerativeEngine | null>(null);
   const specRef = useRef<PieceSpec | null>(null);
+  // Bumped on every regenerate() (and on unmount) so a slow render that has been
+  // superseded knows to discard itself instead of leaving a second engine playing.
+  const regenIdRef = useRef(0);
   const endAtRef = useRef<number>(Date.now() + totalSec * 1000);
   const startAtRef = useRef<number>(Date.now());
   const recordedRef = useRef(false);
@@ -215,6 +218,7 @@ export default function SessionScreen() {
     })();
     return () => {
       cancelled = true;
+      regenIdRef.current++; // abort any in-flight regenerate so it can't outlive the screen
       engineRef.current?.stop();
       // Let the fade-out finish before tearing down, otherwise cutting the
       // audio mid-sample produces a click.
@@ -306,26 +310,37 @@ export default function SessionScreen() {
     void recordRating(specRef.current, 1);
   };
 
-  // Swap to a freshly generated piece without ending the session.
+  // Swap to a freshly generated piece without ending the session. Guarded against
+  // rapid double-taps: each call claims a generation id; a render that finishes
+  // after a newer tap (or after unmount) discards its engine instead of stacking
+  // a second loop on the shared audio context.
   const regenerate = () => {
     if (!useEngine) return;
     Haptics.selectionAsync().catch(() => {});
+    const gen = ++regenIdRef.current;
     engineRef.current?.stop();
+    engineRef.current = null;
     setLiked(false);
     void (async () => {
       const ratings = await loadRatings();
+      if (regenIdRef.current !== gen) return; // superseded while loading ratings
       const spec = nextSpec(sectionFor(ambient as GenerativeSound), ratings);
       specRef.current = spec;
       setSpecLabel(describeSpec(spec));
       setComposing(true);
       const engine = new GenerativeEngine();
-      engineRef.current = engine;
       let ok = false;
       try {
         ok = await engine.start(spec, null, settings.mixWithMusic);
       } finally {
-        setComposing(false);
+        if (regenIdRef.current === gen) setComposing(false);
       }
+      if (regenIdRef.current !== gen) {
+        // A newer regenerate (or unmount) won the race — don't leak this engine.
+        engine.stop();
+        return;
+      }
+      engineRef.current = engine;
       if (ok) engine.setVolume(settings.volume);
     })();
   };
