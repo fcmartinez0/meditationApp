@@ -131,8 +131,11 @@ export interface PieceSpec {
   melody: boolean;
 }
 
-/** Number of chord progressions the generative engine can choose from. */
-export const PROGRESSION_COUNT = 12;
+/**
+ * Number of chord progressions the generative engine can choose from. Derived
+ * from the shared table so it can never fall out of sync with the actual list.
+ */
+export { PROGRESSION_COUNT } from './generative-tables';
 
 /** A user rating of a generated piece, used to learn preferences per section. */
 export interface PieceRating {
