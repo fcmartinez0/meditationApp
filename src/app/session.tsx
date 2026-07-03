@@ -19,7 +19,7 @@ import { dayKey, formatClock } from '@/lib/date';
 import { GENERATIVE_SUPPORTED, GenerativeEngine, takeGenerative, type LoopData } from '@/lib/generative';
 import { describeSpec, loadRatings, nextSpec, recordRating } from '@/lib/preferences';
 import type { AmbientSound, FileSound, GenerativeSound, PieceSpec } from '@/lib/types';
-import { isGenerative, sectionFor } from '@/lib/types';
+import { AMBIENT_KEYS, isGenerative, sectionFor } from '@/lib/types';
 import { useAppData } from '@/store/AppData';
 import { radius, spacing } from '@/theme';
 import { categoryStyle } from '@/theme/categories';
@@ -54,7 +54,13 @@ export default function SessionScreen() {
   const params = useLocalSearchParams<{ duration?: string; ambient?: string }>();
 
   const totalSec = Math.max(1, Number(params.duration) || settings.durationMin) * 60;
-  const ambient = (params.ambient as AmbientSound) || settings.ambient;
+  // Validate the deep-link param against the known sound whitelist before use —
+  // a URL like `stillness://session?ambient=<anything>` reaches this screen, and
+  // an unknown value would otherwise flow into audio setup as a bad key.
+  const ambient: AmbientSound =
+    params.ambient && (AMBIENT_KEYS as readonly string[]).includes(params.ambient)
+      ? (params.ambient as AmbientSound)
+      : settings.ambient;
 
   const cat = categoryStyle(ambient);
   const generative = isGenerative(ambient);

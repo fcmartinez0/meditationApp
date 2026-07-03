@@ -106,7 +106,9 @@ The app is local-first with **no data collection**, so:
 - [ ] **Google Play Developer** account active ($25 one-time).
 - [ ] Run **`eas init`** to create the Expo project (writes `extra.eas.projectId` + `owner`).
 - [ ] Fill `eas.json` → replace `REPLACE_WITH_APP_STORE_CONNECT_APP_ID` and
-      `REPLACE_WITH_APPLE_TEAM_ID`; confirm `appleId`.
+      `REPLACE_WITH_APPLE_TEAM_ID`. Set your Apple ID via the `EXPO_APPLE_ID` env
+      var on the machine that runs `eas submit` (it's intentionally not committed
+      to `eas.json`).
 - [ ] Create the **app record** in App Store Connect and a **Play Console** app; copy the
       App Store Connect App ID (ascAppId) back into `eas.json`.
 - [ ] Generate a **Google Play service-account JSON**, save as

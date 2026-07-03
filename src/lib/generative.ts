@@ -22,7 +22,6 @@ import { AudioContext, AudioManager, OfflineAudioContext } from 'react-native-au
 import type {
   AudioBuffer,
   AudioBufferSourceNode,
-  BiquadFilterNode,
   GainNode,
   OscillatorNode,
   OscillatorType,
@@ -1030,7 +1029,6 @@ async function foldLoop(
       sumSquares += x * x;
       sampleCount++;
       if (i > 0 && i % CHUNK === 0) {
-        // eslint-disable-next-line no-await-in-loop
         await new Promise<void>((r) => setTimeout(r, 0));
       }
     }
@@ -1050,7 +1048,6 @@ async function foldLoop(
       for (let i = 0; i < dst.length; i++) {
         dst[i] *= gain;
         if (i > 0 && i % CHUNK === 0) {
-          // eslint-disable-next-line no-await-in-loop
           await new Promise<void>((r) => setTimeout(r, 0));
         }
       }

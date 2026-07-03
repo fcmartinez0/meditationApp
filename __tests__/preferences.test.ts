@@ -1,9 +1,9 @@
+import { nextSpec } from '@/lib/preferences';
+import type { PieceRating, PieceSpec } from '@/lib/types';
+
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
 );
-
-import { nextSpec } from '@/lib/preferences';
-import type { PieceRating, PieceSpec } from '@/lib/types';
 
 function spec(overrides: Partial<PieceSpec> = {}): PieceSpec {
   return {
@@ -18,9 +18,12 @@ function spec(overrides: Partial<PieceSpec> = {}): PieceSpec {
     tempo: 60,
     pulseDepth: 0,
     wave: 'sine',
+    instrument: 'pad',
     arp: true,
     bass: true,
     percussion: 'heartbeat',
+    progression: 0,
+    melody: false,
     ...overrides,
   };
 }

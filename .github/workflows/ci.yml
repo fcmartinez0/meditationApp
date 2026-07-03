@@ -5,6 +5,11 @@ on:
     branches: ['**']
   pull_request:
 
+# Least-privilege: these jobs only read the repo. Prevents a compromised
+# dependency/action from using the workflow token to write to the repo.
+permissions:
+  contents: read
+
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -21,8 +26,7 @@ jobs:
       - name: Test
         run: npm test -- --ci
       - name: Lint
-        run: npx expo lint
-        continue-on-error: true
+        run: npm run lint
 
   secrets:
     runs-on: ubuntu-latest
