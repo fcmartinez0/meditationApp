@@ -64,10 +64,25 @@ const AMBIENT_SOURCES: Record<FileSound, number | number[]> = {
   synthwave: [require('@/assets/audio/beats/synthwave-1.mp3'), require('@/assets/audio/beats/synthwave-2.mp3')],
 };
 
+// Genres whose variant list folds in full "real" tracks (Gemini-generated) after
+// the two generated beat loops — the index at which those tracks begin. Biases the
+// pick toward a real track so the featured songs are reliably heard.
+const FEATURE_TRACK_START: Partial<Record<FileSound, number>> = {
+  lofi: 2,
+  downtempo: 2,
+  techno: 2,
+  triphop: 2,
+};
+
 /** Resolve a sound to a single source, choosing a random variant if it has several. */
 function pickSource(ambient: FileSound): number {
   const src = AMBIENT_SOURCES[ambient];
-  return Array.isArray(src) ? src[Math.floor(Math.random() * src.length)] : src;
+  if (!Array.isArray(src)) return src;
+  const featStart = FEATURE_TRACK_START[ambient];
+  if (featStart !== undefined && featStart < src.length && Math.random() < 0.6) {
+    return src[featStart + Math.floor(Math.random() * (src.length - featStart))];
+  }
+  return src[Math.floor(Math.random() * src.length)];
 }
 
 let sharedCtx: AudioContext | null = null;

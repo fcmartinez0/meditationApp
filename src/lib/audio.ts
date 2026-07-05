@@ -94,6 +94,17 @@ function sourcesFor(ambient: FileSound): number[] {
   return Array.isArray(src) ? src : [src];
 }
 
+// Genres whose variant list folds in full "real" tracks (Gemini-generated) after
+// the two generated beat loops — the index at which those tracks begin. Used to
+// bias the opening variant toward a real track so it's reliably heard rather than
+// only surfacing on a lucky random draw.
+const FEATURE_TRACK_START: Partial<Record<FileSound, number>> = {
+  lofi: 2,
+  downtempo: 2,
+  techno: 2,
+  triphop: 2,
+};
+
 // Cycling between variants is driven by playback position so a transition lands
 // at a track's natural end (or a loop seam) instead of cutting it off mid-track.
 const MIN_DWELL_MS = 90000; // play a variant at least this long before moving on
@@ -171,8 +182,15 @@ export class SessionAudio {
     await ensureAudioMode(mixWithMusic);
     if (ambient !== 'none' && !isGenerative(ambient)) {
       this.sources = sourcesFor(ambient);
-      // Start on a random variant so repeat sessions don't always open the same.
-      this.variantIdx = Math.floor(Math.random() * this.sources.length);
+      // Start on a random variant so repeat sessions don't always open the same —
+      // but for genres that include a real track, open on one ~60% of the time so
+      // the featured songs are actually heard (they used to be a rare draw).
+      const featStart = FEATURE_TRACK_START[ambient as FileSound];
+      if (featStart !== undefined && featStart < this.sources.length && Math.random() < 0.6) {
+        this.variantIdx = featStart + Math.floor(Math.random() * (this.sources.length - featStart));
+      } else {
+        this.variantIdx = Math.floor(Math.random() * this.sources.length);
+      }
       this.ambient = createAudioPlayer(this.sources[this.variantIdx]);
       this.ambient.loop = true;
       // Start silent so startAmbient() can fade in and avoid a click.
