@@ -109,7 +109,8 @@ const FEATURE_TRACK_START: Partial<Record<FileSound, number>> = {
 // at a track's natural end (or a loop seam) instead of cutting it off mid-track.
 const MIN_DWELL_MS = 90000; // play a variant at least this long before moving on
 const MAX_DWELL_MS = 240000; // safety cap (e.g. if duration is never reported)
-const END_LEAD_SEC = 2.5; // start the crossfade this far before the track ends
+const XFADE_MS = 3500; // length of the overlapping crossfade between variants
+const END_LEAD_SEC = 4.5; // begin the crossfade this far before the track ends (> XFADE so it fully overlaps)
 
 // Track the last-applied mix mode so we re-apply only when it actually changes.
 let appliedMix: boolean | null = null;
@@ -166,7 +167,9 @@ export class SessionAudio {
   /** Set the background volume (0..1). */
   setVolume(v: number) {
     this.targetVol = 0.6 * Math.max(0, Math.min(1, v));
-    if (this.ambient) {
+    // Don't poke the players mid-crossfade — the ramps own their volume then and
+    // will settle at the new target. Otherwise apply immediately.
+    if (this.ambient && !this.evolving) {
       try {
         this.ambient.volume = this.targetVol;
       } catch {
@@ -195,18 +198,31 @@ export class SessionAudio {
       this.ambient.loop = true;
       // Start silent so startAmbient() can fade in and avoid a click.
       this.ambient.volume = 0;
-      // Mirror external (lock-screen) play/pause back to the session UI. Ignore
-      // the transient pause/play that a mid-session variant swap produces.
-      this.statusSub = this.ambient.addListener('playbackStatusUpdate', (status) => {
-        // Cycle at the track's natural end (after a minimum dwell), not mid-track.
-        this.maybeCycle(status.currentTime ?? 0, status.duration ?? 0);
-        if (this.evolving) return;
-        const playing = !!status.playing;
-        if (this.lastPlaying === playing) return;
-        this.lastPlaying = playing;
-        if (this.emitStatus) this.onPlaying?.(playing);
-      });
+      this.attachStatus(this.ambient);
     }
+  }
+
+  /**
+   * Listen to a player's status: drive the position-based variant crossfade, and
+   * mirror external (lock-screen) play/pause back to the session UI. Re-attached
+   * to the incoming player on each crossfade, so the "current" player is always
+   * the one we watch. The transient pause/play of a swap is ignored (evolving).
+   */
+  private attachStatus(player: AudioPlayer) {
+    try {
+      this.statusSub?.remove();
+    } catch {
+      // ignore
+    }
+    this.statusSub = player.addListener('playbackStatusUpdate', (status) => {
+      // Cycle near the track's natural end (after a minimum dwell), not mid-track.
+      this.maybeCycle(status.currentTime ?? 0, status.duration ?? 0);
+      if (this.evolving) return;
+      const playing = !!status.playing;
+      if (this.lastPlaying === playing) return;
+      this.lastPlaying = playing;
+      if (this.emitStatus) this.onPlaying?.(playing);
+    });
   }
 
   /** Start the loop and fade it in so it doesn't pop on the first sample. */
@@ -265,38 +281,94 @@ export class SessionAudio {
     if (duration > 0 && currentTime >= duration - END_LEAD_SEC) void this.evolve();
   }
 
-  /** Crossfade the single player to the next variant (fade out, swap, fade in). */
+  /**
+   * Crossfade to the next variant with a true two-player mixer: the incoming
+   * track starts silently and both players ramp past each other simultaneously,
+   * so there's no gap of silence between tracks (the old approach faded fully out
+   * before swapping). The incoming player becomes the current one; the outgoing
+   * is retired once the fade completes.
+   */
   private async evolve() {
-    const player = this.ambient;
-    if (!player || this.evolving || !this.playing || this.sources.length < 2) return;
+    const outgoing = this.ambient;
+    if (!outgoing || this.evolving || !this.playing || this.sources.length < 2) return;
     this.evolving = true;
+    let incoming: AudioPlayer | null = null;
     try {
       const next = (this.variantIdx + 1) % this.sources.length;
-      await this.fadeTo(0, 1500);
-      if (!this.playing) return; // paused mid-fade — leave it for resume
-      player.replace(this.sources[next]);
-      player.loop = true;
-      player.volume = 0;
-      player.play();
+      incoming = createAudioPlayer(this.sources[next]);
+      incoming.loop = true;
+      incoming.volume = 0;
+      incoming.play();
+      // The incoming track is now the current player: watch its status and move
+      // the lock-screen controls onto it (they die with the outgoing player).
+      this.attachStatus(incoming);
+      this.ambient = incoming;
       this.variantIdx = next;
-      this.dwellStart = Date.now(); // reset the dwell clock for the new variant
-      await this.fadeTo(this.targetVol, 1800);
+      this.dwellStart = Date.now();
+      if (!this.mixWithMusic) {
+        try {
+          incoming.setActiveForLockScreen(
+            true,
+            { title: this.lockTitle ?? 'Stillness', artist: 'Stillness', artworkUrl: this.artwork },
+            { isLiveStream: true, showSeekForward: false, showSeekBackward: false },
+          );
+        } catch {
+          // Lock-screen controls are a bonus; ignore if unavailable.
+        }
+      }
+      // Overlapping crossfade — the heart of the mixer.
+      await Promise.all([
+        this.ramp(outgoing, outgoing.volume ?? this.targetVol, 0, XFADE_MS),
+        this.ramp(incoming, 0, this.targetVol, XFADE_MS),
+      ]);
     } catch {
       // Best effort — never let an evolve break playback.
     } finally {
+      if (this.ambient === incoming && incoming) {
+        // Swap completed: retire the outgoing player now that it's silent.
+        try {
+          outgoing.clearLockScreenControls();
+        } catch {
+          // ignore
+        }
+        try {
+          outgoing.pause();
+        } catch {
+          // ignore
+        }
+        try {
+          outgoing.remove();
+        } catch {
+          // ignore
+        }
+        // If the user paused during the crossfade, honour it on the new player.
+        if (!this.playing) {
+          try {
+            this.ambient?.pause();
+          } catch {
+            // ignore
+          }
+        }
+      } else if (incoming) {
+        // Swap failed before completing — discard the half-made incoming player
+        // and keep the outgoing one as current so playback never drops out.
+        try {
+          incoming.remove();
+        } catch {
+          // ignore
+        }
+      }
       this.evolving = false;
     }
   }
 
-  /** Ramp the player volume to a target over `ms`. */
-  private async fadeTo(target: number, ms: number) {
-    const player = this.ambient;
+  /** Ramp a specific player's volume from `from` to `to` over `ms`. */
+  private async ramp(player: AudioPlayer | null, from: number, to: number, ms: number) {
     if (!player) return;
-    const steps = 12;
-    const start = player.volume ?? 0;
+    const steps = 16;
     for (let i = 1; i <= steps; i++) {
       try {
-        player.volume = start + (target - start) * (i / steps);
+        player.volume = from + (to - from) * (i / steps);
       } catch {
         break;
       }

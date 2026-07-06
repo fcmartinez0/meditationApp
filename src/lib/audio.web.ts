@@ -74,15 +74,19 @@ const FEATURE_TRACK_START: Partial<Record<FileSound, number>> = {
   triphop: 2,
 };
 
-/** Resolve a sound to a single source, choosing a random variant if it has several. */
-function pickSource(ambient: FileSound): number {
+/** The full variant list for a sound (its sources, or a single source wrapped). */
+function variantList(ambient: FileSound): number[] {
   const src = AMBIENT_SOURCES[ambient];
-  if (!Array.isArray(src)) return src;
+  return Array.isArray(src) ? src : [src];
+}
+
+/** Opening variant index — biased toward a real track when the genre folds one in. */
+function pickInitialIndex(ambient: FileSound, list: number[]): number {
   const featStart = FEATURE_TRACK_START[ambient];
-  if (featStart !== undefined && featStart < src.length && Math.random() < 0.6) {
-    return src[featStart + Math.floor(Math.random() * (src.length - featStart))];
+  if (featStart !== undefined && featStart < list.length && Math.random() < 0.6) {
+    return featStart + Math.floor(Math.random() * (list.length - featStart));
   }
-  return src[Math.floor(Math.random() * src.length)];
+  return Math.floor(Math.random() * list.length);
 }
 
 let sharedCtx: AudioContext | null = null;
@@ -130,6 +134,8 @@ async function loadBuffer(mod: number, ctx: AudioContext): Promise<AudioBuffer> 
 
 const TARGET_VOLUME = 0.6;
 const SILENCE = 0.0001; // exponential ramps can't reach exactly 0
+const CYCLE_MS = 150000; // rotate to the next variant roughly every 2.5 min
+const XFADE_SEC = 3.5; // overlapping crossfade length between variants
 
 export class SessionAudio {
   private ctx: AudioContext | null = null;
@@ -137,6 +143,12 @@ export class SessionAudio {
   private ambientSource: AudioBufferSourceNode | null = null;
   private ambientGain: GainNode | null = null;
   private targetVol = TARGET_VOLUME;
+  // Variant rotation: the loaded sources, the current one, and the crossfade timer.
+  private sources: number[] = [];
+  private variantIdx = 0;
+  private cycleTimer: ReturnType<typeof setInterval> | null = null;
+  private cycling = false;
+  private playing = false;
 
   // No external transport (lock screen) on web; accepted for API parity.
   setOnPlayingChange(_cb: (playing: boolean) => void) {}
@@ -146,7 +158,8 @@ export class SessionAudio {
     this.targetVol = TARGET_VOLUME * Math.max(0, Math.min(1, v));
     const ctx = this.ctx;
     const gain = this.ambientGain;
-    if (ctx && gain) {
+    // Don't fight the crossfade ramps mid-cycle; they settle at the new target.
+    if (ctx && gain && !this.cycling) {
       const now = ctx.currentTime;
       gain.gain.cancelScheduledValues(now);
       gain.gain.setValueAtTime(Math.max(SILENCE, gain.gain.value), now);
@@ -167,7 +180,9 @@ export class SessionAudio {
       }
     }
     if (ambient !== 'none' && !isGenerative(ambient)) {
-      this.ambientBuffer = await loadBuffer(pickSource(ambient), this.ctx);
+      this.sources = variantList(ambient);
+      this.variantIdx = pickInitialIndex(ambient, this.sources);
+      this.ambientBuffer = await loadBuffer(this.sources[this.variantIdx], this.ctx);
     }
   }
 
@@ -188,10 +203,63 @@ export class SessionAudio {
     src.start();
     this.ambientSource = src;
     this.ambientGain = gain;
+    this.playing = true;
+    // Rotate through the other variants mid-session (matches native), crossfading
+    // so a long session doesn't loop one groove forever — and so the folded-in
+    // real tracks are actually heard even if the session opened on a beat.
+    if (this.sources.length > 1 && !this.cycleTimer) {
+      this.cycleTimer = setInterval(() => void this.cycle(), CYCLE_MS);
+    }
+  }
+
+  /** Crossfade to the next variant: start it silently and ramp the two past each
+   *  other over the same window, then release the outgoing source. */
+  private async cycle() {
+    const ctx = this.ctx;
+    if (!ctx || this.cycling || !this.playing || this.sources.length < 2) return;
+    this.cycling = true;
+    const oldSrc = this.ambientSource;
+    const oldGain = this.ambientGain;
+    try {
+      const next = (this.variantIdx + 1) % this.sources.length;
+      const buffer = await loadBuffer(this.sources[next], ctx);
+      if (!this.playing) return; // paused/stopped while the next buffer loaded
+      const now = ctx.currentTime;
+      const src = ctx.createBufferSource();
+      src.buffer = buffer;
+      src.loop = true;
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(SILENCE, now);
+      gain.gain.exponentialRampToValueAtTime(Math.max(SILENCE, this.targetVol), now + XFADE_SEC);
+      src.connect(gain).connect(ctx.destination);
+      src.start();
+      if (oldSrc && oldGain) {
+        oldGain.gain.cancelScheduledValues(now);
+        oldGain.gain.setValueAtTime(Math.max(SILENCE, oldGain.gain.value), now);
+        oldGain.gain.exponentialRampToValueAtTime(SILENCE, now + XFADE_SEC);
+        try {
+          oldSrc.stop(now + XFADE_SEC + 0.1);
+        } catch {}
+        oldSrc.onended = () => {
+          try {
+            oldSrc.disconnect();
+            oldGain.disconnect();
+          } catch {}
+        };
+      }
+      this.ambientSource = src;
+      this.ambientGain = gain;
+      this.variantIdx = next;
+    } catch {
+      // Best effort — never let a cycle break playback.
+    } finally {
+      this.cycling = false;
+    }
   }
 
   // A looping buffer can't truly pause, so mute it (it keeps looping silently).
   pauseAmbient() {
+    this.playing = false;
     const ctx = this.ctx;
     const gain = this.ambientGain;
     if (!ctx || !gain) return;
@@ -202,6 +270,7 @@ export class SessionAudio {
   }
 
   resumeAmbient() {
+    this.playing = true;
     const ctx = this.ctx;
     const gain = this.ambientGain;
     if (!ctx || !gain) return;
@@ -213,6 +282,11 @@ export class SessionAudio {
   }
 
   async stopAmbient() {
+    this.playing = false;
+    if (this.cycleTimer) {
+      clearInterval(this.cycleTimer);
+      this.cycleTimer = null;
+    }
     const ctx = this.ctx;
     const src = this.ambientSource;
     const gain = this.ambientGain;
@@ -256,6 +330,11 @@ export class SessionAudio {
 
   release() {
     // Keep the shared context alive for the next session; just stop our source.
+    this.playing = false;
+    if (this.cycleTimer) {
+      clearInterval(this.cycleTimer);
+      this.cycleTimer = null;
+    }
     this.disposeSource();
     this.ctx = null;
     this.ambientBuffer = null;
