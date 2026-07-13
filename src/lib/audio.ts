@@ -107,10 +107,17 @@ const FEATURE_TRACK_START: Partial<Record<FileSound, number>> = {
 
 // Cycling between variants is driven by playback position so a transition lands
 // at a track's natural end (or a loop seam) instead of cutting it off mid-track.
-const MIN_DWELL_MS = 90000; // play a variant at least this long before moving on
-const MAX_DWELL_MS = 240000; // safety cap (e.g. if duration is never reported)
 const XFADE_MS = 3500; // length of the overlapping crossfade between variants
 const END_LEAD_SEC = 4.5; // begin the crossfade this far before the track ends (> XFADE so it fully overlaps)
+
+// Dwell scales with the user's session length so short sessions still hear the
+// mix move (a 5-min session shouldn't sit on one groove) while long sessions
+// aren't churned. Target ≈ a quarter of the session per variant, within bounds.
+function dwellForSession(sessionSec?: number): { min: number; max: number } {
+  const quarter = (sessionSec ?? 0) * 250; // sessionSec/4 in ms
+  const min = Math.min(90000, Math.max(45000, quarter || 90000));
+  return { min, max: Math.min(240000, min * 2.5) };
+}
 
 // Track the last-applied mix mode so we re-apply only when it actually changes.
 let appliedMix: boolean | null = null;
@@ -149,8 +156,10 @@ export class SessionAudio {
   private playing = false;
   private evolveTimer: ReturnType<typeof setInterval> | null = null;
   private evolving = false;
-  // When the current variant started playing — used to decide when to cycle.
+  // When the current variant started playing — used to decide when to cycle —
+  // and the session-scaled dwell bounds (set in prepare()).
   private dwellStart = 0;
+  private dwell = dwellForSession();
   // Only forward transport changes once we've actually started playing, so the
   // player's initial "not playing" status can't trip a spurious pause at startup.
   private emitStatus = false;
@@ -178,9 +187,10 @@ export class SessionAudio {
     }
   }
 
-  async prepare(ambient: AmbientSound, mixWithMusic = false, lockScreenTitle?: string) {
+  async prepare(ambient: AmbientSound, mixWithMusic = false, lockScreenTitle?: string, sessionSec?: number) {
     this.mixWithMusic = mixWithMusic;
     this.lockTitle = lockScreenTitle ?? null;
+    this.dwell = dwellForSession(sessionSec);
     this.artwork = await resolveArtwork();
     await ensureAudioMode(mixWithMusic);
     if (ambient !== 'none' && !isGenerative(ambient)) {
@@ -268,7 +278,7 @@ export class SessionAudio {
     // position-based cycle can't fire), force a move once the max dwell elapses.
     if (this.sources.length > 1 && !this.evolveTimer) {
       this.evolveTimer = setInterval(() => {
-        if (this.playing && !this.evolving && Date.now() - this.dwellStart >= MAX_DWELL_MS) void this.evolve();
+        if (this.playing && !this.evolving && Date.now() - this.dwellStart >= this.dwell.max) void this.evolve();
       }, 15000);
     }
   }
@@ -277,7 +287,7 @@ export class SessionAudio {
    *  variant — triggering only near the track's end so it isn't cut off. */
   private maybeCycle(currentTime: number, duration: number) {
     if (this.sources.length < 2 || !this.playing || this.evolving) return;
-    if (Date.now() - this.dwellStart < MIN_DWELL_MS) return;
+    if (Date.now() - this.dwellStart < this.dwell.min) return;
     if (duration > 0 && currentTime >= duration - END_LEAD_SEC) void this.evolve();
   }
 

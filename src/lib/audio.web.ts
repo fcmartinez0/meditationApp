@@ -134,8 +134,15 @@ async function loadBuffer(mod: number, ctx: AudioContext): Promise<AudioBuffer> 
 
 const TARGET_VOLUME = 0.6;
 const SILENCE = 0.0001; // exponential ramps can't reach exactly 0
-const CYCLE_MS = 150000; // rotate to the next variant roughly every 2.5 min
 const XFADE_SEC = 3.5; // overlapping crossfade length between variants
+
+// Rotation pace scales with the user's session length (≈ a quarter of the
+// session per variant, bounded) so short sessions still hear the mix move and
+// long ones aren't churned. Matches the native dwell scaling.
+function cycleMsForSession(sessionSec?: number): number {
+  const quarter = (sessionSec ?? 0) * 250; // sessionSec/4 in ms
+  return Math.min(150000, Math.max(60000, quarter || 150000));
+}
 
 export class SessionAudio {
   private ctx: AudioContext | null = null;
@@ -149,6 +156,7 @@ export class SessionAudio {
   private cycleTimer: ReturnType<typeof setInterval> | null = null;
   private cycling = false;
   private playing = false;
+  private cycleMs = cycleMsForSession();
 
   // No external transport (lock screen) on web; accepted for API parity.
   setOnPlayingChange(_cb: (playing: boolean) => void) {}
@@ -169,7 +177,8 @@ export class SessionAudio {
 
   // mixWithMusic / lock-screen title are honoured natively; the browser mixes by
   // default and has no lock screen, so they're accepted for API parity only.
-  async prepare(ambient: AmbientSound, _mixWithMusic = false, _lockScreenTitle?: string) {
+  async prepare(ambient: AmbientSound, _mixWithMusic = false, _lockScreenTitle?: string, sessionSec?: number) {
+    this.cycleMs = cycleMsForSession(sessionSec);
     this.ctx = getCtx();
     if (!this.ctx) return;
     if (this.ctx.state === 'suspended') {
@@ -208,7 +217,7 @@ export class SessionAudio {
     // so a long session doesn't loop one groove forever — and so the folded-in
     // real tracks are actually heard even if the session opened on a beat.
     if (this.sources.length > 1 && !this.cycleTimer) {
-      this.cycleTimer = setInterval(() => void this.cycle(), CYCLE_MS);
+      this.cycleTimer = setInterval(() => void this.cycle(), this.cycleMs);
     }
   }
 
