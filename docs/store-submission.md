@@ -155,10 +155,20 @@ or analytics; all data stays on the device.
    screenshots, or in-app track titles — that risks IP/trademark rejection. Keep titles
    generic (e.g. "Melodic House", "Lo-Fi").
 2. **AI-generated music (Google Gemini).** The instrumental tracks in `assets/audio/tracks/`
-   were created with Google Gemini generative AI. (a) Confirm the specific Gemini tool's terms
-   permit commercial redistribution in a paid/store app, and keep a record. (b) Keep the
-   disclosure accurate and consistent (README, in-app Privacy & Disclaimer → "Sound & credits",
-   reviewer notes, this listing). (c) Do **not** strip the tracks' C2PA content credentials.
+   were created with Google generative AI (C2PA-signed by Google, SynthID-watermarked).
+   Terms research (2026-07, see PRs/chat log) — the verdict depends on WHICH surface
+   generated them:
+   - **Gemini app** (gemini.google.com / mobile app): governed by Google's Generative AI
+     Additional Terms — Google claims no ownership of generated content and commercial use
+     is permitted; you may not misrepresent provenance as solely human-made (our in-app +
+     store disclosure satisfies this).
+   - **MusicFX / Google Labs (AI Test Kitchen)**: NO explicit commercial license — assume
+     commercial redistribution is not permitted; replace such tracks before submission.
+   - **Vertex AI / AI Studio (Lyria, paid)**: commercial use permitted under Cloud terms.
+   Action: confirm which tool produced these 7 files and record it here. Keep the disclosure
+   accurate everywhere (README, in-app "Sound & credits", reviewer notes, this listing), and
+   do **not** strip the C2PA credentials or SynthID watermark (removal would violate the
+   provenance-misrepresentation clause and Google's prohibited-use policy).
 3. **No medical claims.** Binaural/frequency wording must stay as a *wellness aid*, never a
    treatment/cure for anxiety, insomnia, etc. The current disclaimer copy is fine — keep it.
 4. **Reminders permission.** First launch of reminders triggers the notification prompt; make
