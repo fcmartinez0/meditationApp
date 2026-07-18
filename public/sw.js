@@ -8,7 +8,7 @@
 // Bump this version to invalidate any previously-cached app shell (e.g. a stale
 // page cached before the GitHub Pages deploy was serving the real app). The
 // activate handler deletes every cache that isn't the current one.
-const CACHE = 'stillness-v2';
+const CACHE = 'stillness-v3';
 const START = '/meditationApp/';
 
 self.addEventListener('install', (event) => {

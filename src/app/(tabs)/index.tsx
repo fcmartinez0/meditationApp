@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, FadeInUp } from 'react-native-reanimated';
 
@@ -36,6 +36,14 @@ export default function HomeScreen() {
   const generative = isGenerative(settings.ambient);
 
   const [pickerOpen, setPickerOpen] = useState(false);
+  // Time-of-day greeting is set after mount: the static web export bakes the
+  // build machine's hour into the HTML, so rendering greeting() during hydration
+  // mismatches the visitor's local time (React #418). First paint shows the
+  // neutral word on every platform; the personalized one lands a frame later.
+  const [greet, setGreet] = useState('Welcome');
+  useEffect(() => {
+    setGreet(greeting());
+  }, []);
 
   // Pre-render the next generative piece in the background while the user is
   // here, so starting a session is instant instead of stalling on the
@@ -76,7 +84,7 @@ export default function HomeScreen() {
       <View style={styles.root}>
         <Animated.View style={styles.header} entering={FadeInDown.duration(600)}>
           <AppText variant="label" color={colors.accent}>
-            {greeting().toUpperCase()}
+            {greet.toUpperCase()}
           </AppText>
           <AppText variant="title">Take a breath</AppText>
           {stats.currentStreak > 0 && (
