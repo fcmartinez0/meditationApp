@@ -132,24 +132,29 @@ export default function SessionScreen() {
     [ambient, recordSession],
   );
 
+  // Mirror a pause/resume the app didn't initiate — lock-screen transport for
+  // file-based audio, an audio interruption (phone call, Siri) for the
+  // generative engine — back into the session UI and its clocks. Reads only
+  // refs, so the one stable instance serves every listener without staleness.
+  const mirrorExternalPlaying = useCallback((playing: boolean) => {
+    const cur = phaseRef.current;
+    if (playing && cur === 'paused') {
+      const now = Date.now();
+      endAtRef.current = now + remainingRef.current * 1000; // countdown resume
+      startAtRef.current = now - elapsedRef.current * 1000; // count-up resume
+      setPhase('running');
+    } else if (!playing && cur === 'running') {
+      setPhase('paused');
+    }
+  }, []);
+
   // Set up audio once, on mount.
   useEffect(() => {
     const audio = new SessionAudio();
     audioRef.current = audio;
     let cancelled = false;
-    // Mirror a pause/resume triggered from the lock screen or control center
-    // (file-based sounds only) back into the session UI and its clocks.
     audio.setOnPlayingChange((playing) => {
-      if (cancelled) return;
-      const cur = phaseRef.current;
-      if (playing && cur === 'paused') {
-        const now = Date.now();
-        endAtRef.current = now + remainingRef.current * 1000; // countdown resume
-        startAtRef.current = now - elapsedRef.current * 1000; // count-up resume
-        setPhase('running');
-      } else if (!playing && cur === 'running') {
-        setPhase('paused');
-      }
+      if (!cancelled) mirrorExternalPlaying(playing);
     });
     // Start the timer only once audio is ready, so the render doesn't eat into
     // the session.
@@ -190,6 +195,11 @@ export default function SessionScreen() {
           setComposing(true);
           const engine = new GenerativeEngine();
           engineRef.current = engine;
+          // Same UI mirroring as SessionAudio above, but for the engine's own
+          // transport source: audio interruptions (calls, Siri).
+          engine.setOnPlayingChange((playing) => {
+            if (!cancelled) mirrorExternalPlaying(playing);
+          });
           let ok = false;
           try {
             ok = await engine.start(spec, preloaded, settings.mixWithMusic);
@@ -330,6 +340,9 @@ export default function SessionScreen() {
       setSpecLabel(describeSpec(spec));
       setComposing(true);
       const engine = new GenerativeEngine();
+      // Interruption pause/resume mirroring, as on the mount-effect engine.
+      // stop() clears the callback, so a superseded engine can't flip the UI.
+      engine.setOnPlayingChange(mirrorExternalPlaying);
       let ok = false;
       try {
         ok = await engine.start(spec, null, settings.mixWithMusic);

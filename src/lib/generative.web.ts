@@ -776,6 +776,13 @@ export class GenerativeEngine {
     return buf;
   }
 
+  // Native fires this when an audio interruption (phone call, Siri) pauses or
+  // resumes the engine; on web there are no session interruptions — tab
+  // visibility is already handled by hookResume — so this is a no-op kept only
+  // so the session screen can wire it unconditionally (same pattern as
+  // audio.web.ts's SessionAudio.setOnPlayingChange).
+  setOnPlayingChange(_cb: (playing: boolean) => void): void {}
+
   setVolume(v: number): void {
     this.targetGain = 0.5 * Math.max(0, Math.min(1, v));
     const ctx = this.ctx;

@@ -22,6 +22,7 @@ import { AudioContext, AudioManager, OfflineAudioContext } from 'react-native-au
 import type {
   AudioBuffer,
   AudioBufferSourceNode,
+  AudioEventSubscription,
   GainNode,
   OscillatorNode,
   OscillatorType,
@@ -194,6 +195,93 @@ function configureSession(mixWithMusic: boolean): void {
     });
   } catch {
     /* platform defaults */
+  }
+}
+
+// --- Audio interruption recovery --------------------------------------------
+// A phone call or Siri deactivates our audio session; without observing it the
+// realtime context is left silent afterwards while the session UI still shows
+// "playing". The expo-audio path (audio.ts) recovers via its
+// playbackStatusUpdate listener — this is the engine's equivalent: one
+// module-level listener serves every live engine. On 'began' each audible
+// engine is paused (and its UI mirror notified); on 'ended' — when the OS says
+// we may resume — the session is reactivated, the shared realtime context
+// resumed, and exactly the engines we paused fade back in.
+const activeEngines = new Set<GenerativeEngine>();
+// Engines paused *by an interruption* — only these auto-resume on 'ended', so a
+// piece the user paused deliberately never springs back to life on its own.
+const interruptedEngines = new Set<GenerativeEngine>();
+let interruptionSub: AudioEventSubscription | null = null;
+
+function ensureInterruptionObserver(): void {
+  if (interruptionSub) return;
+  try {
+    // Off by default in react-native-audio-api — without it the OS never tells
+    // us the session was taken away, which is exactly the silent-after-a-call
+    // bug. `true` maps to iOS interruption notifications and Android audio
+    // focus 'gain'.
+    AudioManager.observeAudioInterruptions(true);
+    interruptionSub = AudioManager.addSystemEventListener('interruption', (event) => {
+      if (event.type === 'began') {
+        // Remember exactly who was audible so 'ended' resumes those and only those.
+        for (const engine of activeEngines) {
+          if (engine.systemPause()) interruptedEngines.add(engine);
+        }
+        return;
+      }
+      // 'ended'. shouldResume=false means playback moved on for good (e.g. the
+      // user started their own music) — leave the engines paused; the session
+      // screen already shows Paused and the user can resume by hand.
+      const toResume = Array.from(interruptedEngines);
+      interruptedEngines.clear();
+      if (!event.shouldResume || toResume.length === 0) return;
+      void (async () => {
+        try {
+          // Never touch the realtime context while an offline render is in
+          // flight — resuming it mid-render trips the native deadlock the
+          // render lock exists to prevent (see renderLock below).
+          await renderLock;
+        } catch {
+          /* the lock never rejects; stay defensive anyway */
+        }
+        try {
+          // The interruption deactivated our session; reclaim it before
+          // resuming or the resume can silently no-op on iOS.
+          await AudioManager.setAudioSessionActivity(true);
+        } catch {
+          /* best effort — resume below may still succeed */
+        }
+        const ctx = sharedCtx;
+        if (ctx && ctx.state === 'suspended') {
+          try {
+            await ctx.resume();
+          } catch {
+            /* each engine's resume() retries below */
+          }
+        }
+        for (const engine of toResume) engine.systemResume();
+      })();
+    });
+  } catch {
+    /* no interruption recovery — playback itself still works */
+  }
+}
+
+// Torn down when the last engine stops, so the app doesn't keep a native
+// observer (and its subscription) alive outside generative sessions.
+function releaseInterruptionObserver(): void {
+  if (activeEngines.size > 0 || !interruptionSub) return;
+  try {
+    interruptionSub.remove();
+  } catch {
+    /* ignore */
+  }
+  interruptionSub = null;
+  interruptedEngines.clear();
+  try {
+    AudioManager.observeAudioInterruptions(false);
+  } catch {
+    /* ignore */
   }
 }
 
@@ -1137,6 +1225,44 @@ export class GenerativeEngine {
   private source: AudioBufferSourceNode | null = null;
   private targetGain = 0.85;
   private stopped = false;
+  // Audibly playing right now — the interruption handler pauses only playing
+  // engines on 'began' and resumes only the ones it paused on 'ended'.
+  private playing = false;
+  // Fired only for *system-initiated* transport changes (audio interruptions),
+  // so the session screen can mirror a pause it didn't trigger — the engine
+  // counterpart of SessionAudio.setOnPlayingChange. User-initiated pause/resume
+  // flows the other way (UI → engine) and is deliberately not echoed back.
+  private onPlayingChange: ((playing: boolean) => void) | null = null;
+
+  /** Notify when an audio interruption pauses/resumes this engine, so the UI
+   *  can mirror a transport change it didn't initiate. */
+  setOnPlayingChange(cb: (playing: boolean) => void): void {
+    this.onPlayingChange = cb;
+  }
+
+  /** Interruption handler only: pause if audible; returns whether we did. */
+  systemPause(): boolean {
+    if (!this.playing) return false;
+    this.pause();
+    try {
+      this.onPlayingChange?.(false);
+    } catch {
+      /* the UI mirror must never break audio */
+    }
+    return true;
+  }
+
+  /** Interruption handler only: undo a systemPause() — skipped if the user
+   *  already resumed by hand mid-interruption. */
+  systemResume(): void {
+    if (this.playing) return;
+    this.resume();
+    try {
+      this.onPlayingChange?.(true);
+    } catch {
+      /* ignore */
+    }
+  }
 
   /**
    * Returns true once the loop is playing; false on any failure.
@@ -1146,6 +1272,9 @@ export class GenerativeEngine {
     this.stopped = false;
     try {
       configureSession(mixWithMusic);
+      // One shared observer for all engines — set up lazily with the first
+      // session so app launch pays nothing for it.
+      ensureInterruptionObserver();
       try {
         await AudioManager.setAudioSessionActivity(true);
       } catch (e) {
@@ -1206,6 +1335,13 @@ export class GenerativeEngine {
 
       this.master = master;
       this.source = src;
+      // Register for interruption recovery — unless a racing stop() landed
+      // while the graph was being wired, in which case its cleanup already ran
+      // and re-registering would leak a dead engine in the set.
+      if (!this.stopped) {
+        this.playing = true;
+        activeEngines.add(this);
+      }
       dlog('[generative] playing loop');
       return true;
     } catch (e) {
@@ -1226,6 +1362,7 @@ export class GenerativeEngine {
   }
 
   pause(): void {
+    this.playing = false;
     const ctx = this.ctx;
     const master = this.master;
     if (!ctx || !master) return;
@@ -1236,6 +1373,7 @@ export class GenerativeEngine {
   }
 
   resume(): void {
+    this.playing = true;
     const ctx = this.ctx;
     const master = this.master;
     if (!ctx || !master) return;
@@ -1248,6 +1386,11 @@ export class GenerativeEngine {
 
   stop(): void {
     this.stopped = true;
+    this.playing = false;
+    this.onPlayingChange = null; // a stopped engine must never flip the UI
+    activeEngines.delete(this);
+    interruptedEngines.delete(this);
+    releaseInterruptionObserver(); // no-op unless this was the last engine
     const ctx = this.ctx;
     const master = this.master;
     const src = this.source;
