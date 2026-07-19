@@ -10,6 +10,7 @@ import {
   type AudioPlayer,
 } from 'expo-audio';
 
+import { FILE_SCALE, masterGain } from './loudness';
 import type { AmbientSound, FileSound } from './types';
 import { isGenerative } from './types';
 
@@ -142,7 +143,9 @@ async function ensureAudioMode(mixWithMusic: boolean) {
 
 export class SessionAudio {
   private ambient: AudioPlayer | null = null;
-  private targetVol = 0.6;
+  // Effective master level = shared per-source scale × user slider (loudness
+  // policy lives in ./loudness). Default assumes slider at full until set.
+  private targetVol = FILE_SCALE;
   private mixWithMusic = false;
   private lockTitle: string | null = null;
   private artwork: string | undefined;
@@ -175,7 +178,7 @@ export class SessionAudio {
 
   /** Set the background volume (0..1). */
   setVolume(v: number) {
-    this.targetVol = 0.6 * Math.max(0, Math.min(1, v));
+    this.targetVol = masterGain('file', v);
     // Don't poke the players mid-crossfade — the ramps own their volume then and
     // will settle at the new target. Otherwise apply immediately.
     if (this.ambient && !this.evolving) {

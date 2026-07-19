@@ -12,6 +12,7 @@
 
 import { Asset } from 'expo-asset';
 
+import { FILE_SCALE, masterGain } from './loudness';
 import type { AmbientSound, FileSound } from './types';
 import { isGenerative } from './types';
 
@@ -132,7 +133,6 @@ async function loadBuffer(mod: number, ctx: AudioContext): Promise<AudioBuffer> 
   return buffer;
 }
 
-const TARGET_VOLUME = 0.6;
 const SILENCE = 0.0001; // exponential ramps can't reach exactly 0
 const XFADE_SEC = 3.5; // overlapping crossfade length between variants
 
@@ -149,7 +149,9 @@ export class SessionAudio {
   private ambientBuffer: AudioBuffer | null = null;
   private ambientSource: AudioBufferSourceNode | null = null;
   private ambientGain: GainNode | null = null;
-  private targetVol = TARGET_VOLUME;
+  // Effective master level = shared per-source scale × user slider (loudness
+  // policy lives in ./loudness). Default assumes slider at full until set.
+  private targetVol = FILE_SCALE;
   // Variant rotation: the loaded sources, the current one, and the crossfade timer.
   private sources: number[] = [];
   private variantIdx = 0;
@@ -163,7 +165,7 @@ export class SessionAudio {
 
   /** Set the background volume (0..1). */
   setVolume(v: number) {
-    this.targetVol = TARGET_VOLUME * Math.max(0, Math.min(1, v));
+    this.targetVol = masterGain('file', v);
     const ctx = this.ctx;
     const gain = this.ambientGain;
     // Don't fight the crossfade ramps mid-cycle; they settle at the new target.

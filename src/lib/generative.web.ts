@@ -11,6 +11,7 @@
  */
 
 import { ARP_PATTERNS, PROGRESSIONS, SCALES, VOICINGS } from './generative-tables';
+import { GEN_WEB_SCALE, masterGain } from './loudness';
 import type { PieceSpec, Section } from './types';
 
 // Web synthesizes live and instantly, so there's nothing to pre-render or take.
@@ -158,7 +159,10 @@ export class GenerativeEngine {
   private timers: ReturnType<typeof setTimeout>[] = [];
   private rng: () => number = Math.random;
   private spec: PieceSpec | null = null;
-  private targetGain = 0.5;
+  // Effective master level = shared per-source scale × user slider (loudness
+  // policy lives in ./loudness — the web scale was set by ear, see there).
+  // Default assumes slider at full until setVolume runs.
+  private targetGain = GEN_WEB_SCALE;
   private chordTones: number[] = [];
   private arpIdx = 0;
   private step = 0;
@@ -784,7 +788,7 @@ export class GenerativeEngine {
   setOnPlayingChange(_cb: (playing: boolean) => void): void {}
 
   setVolume(v: number): void {
-    this.targetGain = 0.5 * Math.max(0, Math.min(1, v));
+    this.targetGain = masterGain('gen-web', v);
     const ctx = this.ctx;
     const master = this.master;
     if (!ctx || !master) return;

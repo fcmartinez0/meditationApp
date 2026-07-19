@@ -31,6 +31,7 @@ import type {
 } from 'react-native-audio-api';
 
 import { ARP_PATTERNS, PROGRESSIONS, SCALES, VOICINGS } from './generative-tables';
+import { GEN_NATIVE_SCALE, masterGain } from './loudness';
 import { loadRatings, nextSpec } from './preferences';
 import type { PieceSpec, Section } from './types';
 
@@ -1037,6 +1038,8 @@ class Composer {
 // way peak-only normalization does), and the ceiling guarantees no clipping.
 // Matched to the reference tracks, which all measure ≈0.19 RMS, so generated
 // pieces feel as full and present — while staying under the peak ceiling.
+// NOTE: the playback master scale (GEN_NATIVE_SCALE in ./loudness) is derived
+// from this value; if you change it, re-derive the scale there too.
 const TARGET_RMS = 0.18;
 const PEAK_CEILING = 0.95;
 
@@ -1223,7 +1226,12 @@ export class GenerativeEngine {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
   private source: AudioBufferSourceNode | null = null;
-  private targetGain = 0.85;
+  // Effective master level = shared per-source scale × user slider (loudness
+  // policy lives in ./loudness). The render is normalized to TARGET_RMS, so
+  // this scale is what keeps generative level with the file sources — the old
+  // raw default (0.85) played ~2–3 dB hotter than file audio at the same
+  // slider position. Default assumes slider at full until setVolume runs.
+  private targetGain = GEN_NATIVE_SCALE;
   private stopped = false;
   // Audibly playing right now — the interruption handler pauses only playing
   // engines on 'began' and resumes only the ones it paused on 'ended'.
@@ -1351,7 +1359,7 @@ export class GenerativeEngine {
   }
 
   setVolume(v: number): void {
-    this.targetGain = Math.max(0, Math.min(1, v));
+    this.targetGain = masterGain('gen-native', v);
     const ctx = this.ctx;
     const master = this.master;
     if (!ctx || !master) return;
