@@ -13,19 +13,10 @@ Standing rules for autonomous runs (see also AGENTS.md "Operating mode"):
 
 ## Ready for workers (take from the top)
 
-1. **Animation load on low-end Android** — StarField (70–120 per-star infinite
-   Reanimated loops) + BreathingOrb (~70 views, 5 loops) run 100+ concurrent
-   UI-thread animations for whole sessions. Drive twinkles from 3–4 shared
-   phase values, cap default counts, pause the backdrop when unfocused.
-   Preserve the look (subtle, calm); respect reduced motion (already handled).
-2. **Volume normalization across audio paths** — file-audio scales user volume
-   ×0.6, web generative ×0.5, native generative applies raw setting (default
-   0.85) over a normalized render. Define one loudness policy/helper so
-   switching sound types is volume-neutral at the same slider position.
-3. **Test expansion** — storage migration tests (settingsVersion < 3, recents
+1. **Test expansion** — storage migration tests (settingsVersion < 3, recents
    sanitization), extract foldLoop's DSP into a testable pure function with
    tests, SessionAudio dwell/cycle logic with a fake player.
-4. **`(tabs)/index.tsx` + session screen React-Compiler warnings** — resolve
+2. **`(tabs)/index.tsx` + session screen React-Compiler warnings** — resolve
    the react-hooks purity/refs warnings properly (they're set to warn in
    eslint.config.js; fixing them makes the compiler's optimizations safe).
 
@@ -37,6 +28,13 @@ Standing rules for autonomous runs (see also AGENTS.md "Operating mode"):
 - Device checks: crossfade mixer listen, production build smoke test
 
 ## Shipped
+
+- 2026-07-19 · 0371797 · **Animation load** (run #2a): 4 shared twinkle clocks +
+  focus pause — ~11 concurrent animations focused, 0 unfocused (was 100+).
+  Worth an eyeball on device: twinkle waveform is now a smooth sine.
+- 2026-07-19 · 40d8c08 · **Volume normalization** (run #2b): one loudness policy
+  (src/lib/loudness.ts); native generative now plays level with the tracks
+  (~4 dB quieter at the default slider — intended). Web-gen scale still by-ear.
 
 - 2026-07-14 · ca8fe0d · **Audio interruption recovery** (run #1): generative
   playback now pauses on phone-call/Siri interruptions and resumes when the OS
