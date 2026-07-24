@@ -13,12 +13,8 @@ Standing rules for autonomous runs (see also AGENTS.md "Operating mode"):
 
 ## Ready for workers (take from the top)
 
-1. **Test expansion** — storage migration tests (settingsVersion < 3, recents
-   sanitization), extract foldLoop's DSP into a testable pure function with
-   tests, SessionAudio dwell/cycle logic with a fake player.
-2. **`(tabs)/index.tsx` + session screen React-Compiler warnings** — resolve
-   the react-hooks purity/refs warnings properly (they're set to warn in
-   eslint.config.js; fixing them makes the compiler's optimizations safe).
+(empty — the worker backlog is done; add items here and the nightly routine
+will pick them up)
 
 ## Blocked on the user (do NOT take these autonomously)
 
@@ -28,6 +24,13 @@ Standing rules for autonomous runs (see also AGENTS.md "Operating mode"):
 - Device checks: crossfade mixer listen, production build smoke test
 
 ## Shipped
+
+- 2026-07-19 · (see git log) · **Compiler warnings** (run #3b): four rule
+  downgrades removed from eslint.config.js; render purity fixed on the session
+  screen; 19 -> 10 warnings, new violations now fail CI.
+- 2026-07-19 · (see git log) · **Test expansion** (run #3a): +28 tests (60
+  total) — storage migration, foldLoop DSP extracted pure + tested, dwell
+  bounds.
 
 - 2026-07-19 · 0371797 · **Animation load** (run #2a): 4 shared twinkle clocks +
   focus pause — ~11 concurrent animations focused, 0 unfocused (was 100+).
