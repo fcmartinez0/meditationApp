@@ -42,6 +42,9 @@ export default function HomeScreen() {
   // neutral word on every platform; the personalized one lands a frame later.
   const [greet, setGreet] = useState('Welcome');
   useEffect(() => {
+    // The post-mount cascade is deliberate (see above) — greeting() is
+    // time-dependent, so it can't be derived during render either.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setGreet(greeting());
   }, []);
 

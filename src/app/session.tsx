@@ -94,8 +94,10 @@ export default function SessionScreen() {
   // Bumped on every regenerate() (and on unmount) so a slow render that has been
   // superseded knows to discard itself instead of leaving a second engine playing.
   const regenIdRef = useRef(0);
-  const endAtRef = useRef<number>(Date.now() + totalSec * 1000);
-  const startAtRef = useRef<number>(Date.now());
+  // Stamped in the mount effect (and re-stamped by startCountdown once audio is
+  // ready) — never read before then, and Date.now() in render breaks purity.
+  const endAtRef = useRef<number>(0);
+  const startAtRef = useRef<number>(0);
   const recordedRef = useRef(false);
   // Mirrors for the lock-screen sync listener, which is set up once and must read
   // current values without a stale closure.
@@ -150,6 +152,11 @@ export default function SessionScreen() {
 
   // Set up audio once, on mount.
   useEffect(() => {
+    // Provisional clock stamp so ticks during audio setup count down sanely;
+    // startCountdown re-stamps below once audio is actually ready.
+    const mountedAt = Date.now();
+    endAtRef.current = mountedAt + totalSec * 1000;
+    startAtRef.current = mountedAt;
     const audio = new SessionAudio();
     audioRef.current = audio;
     let cancelled = false;
@@ -395,7 +402,9 @@ export default function SessionScreen() {
             </>
           )}
 
-          {useEngine && specRef.current && (
+          {/* specLabel is set in lockstep with specRef, and unlike the ref it's
+              legal to read in render (and is what triggers this re-render). */}
+          {useEngine && specLabel !== null && (
             <View style={styles.rating}>
               {rated === null ? (
                 <>

@@ -86,10 +86,18 @@ export function DurationPicker({
   const lastIdx = useSharedValue(value - MIN);
   const [current, setCurrent] = useState(value);
 
-  // Snap to the current value whenever the sheet opens.
+  // Snap the live label to the incoming value when the sheet opens (or the value
+  // prop changes while open) — adjusted during render, per the React docs
+  // pattern, rather than cascading a setState from the effect below.
+  const [prevSnap, setPrevSnap] = useState({ visible, value });
+  if (visible !== prevSnap.visible || value !== prevSnap.value) {
+    setPrevSnap({ visible, value });
+    if (visible) setCurrent(value);
+  }
+
+  // Snap the wheel to the current value whenever the sheet opens.
   useEffect(() => {
     if (!visible) return;
-    setCurrent(value);
     lastIdx.value = value - MIN;
     scrollY.value = (value - MIN) * ITEM_H;
     const id = setTimeout(() => scrollRef.current?.scrollTo({ y: (value - MIN) * ITEM_H, animated: false }), 0);
@@ -106,9 +114,13 @@ export function DurationPicker({
 
   const onScroll = useAnimatedScrollHandler({
     onScroll: (e) => {
+      // Reanimated shared values are mutable by design (`sv.value =` is the
+      // documented API); the compiler can't know this worklet isn't render code.
+      // eslint-disable-next-line react-hooks/immutability
       scrollY.value = e.contentOffset.y;
       const idx = Math.round(e.contentOffset.y / ITEM_H);
       if (idx !== lastIdx.value) {
+        // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value
         lastIdx.value = idx;
         runOnJS(onTick)(idx);
       }
@@ -123,6 +135,7 @@ export function DurationPicker({
 
   const selectValue = (v: number) => {
     setCurrent(v);
+    // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value, mutable by design
     lastIdx.value = v - MIN;
     scrollRef.current?.scrollTo({ y: (v - MIN) * ITEM_H, animated: true });
     Haptics.selectionAsync().catch(() => {});
