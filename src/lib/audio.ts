@@ -114,7 +114,7 @@ const END_LEAD_SEC = 4.5; // begin the crossfade this far before the track ends 
 // Dwell scales with the user's session length so short sessions still hear the
 // mix move (a 5-min session shouldn't sit on one groove) while long sessions
 // aren't churned. Target ≈ a quarter of the session per variant, within bounds.
-function dwellForSession(sessionSec?: number): { min: number; max: number } {
+export function dwellForSession(sessionSec?: number): { min: number; max: number } {
   const quarter = (sessionSec ?? 0) * 250; // sessionSec/4 in ms
   const min = Math.min(90000, Math.max(45000, quarter || 90000));
   return { min, max: Math.min(240000, min * 2.5) };

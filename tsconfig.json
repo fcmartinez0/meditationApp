@@ -4,11 +4,11 @@
     "strict": true,
     "types": ["jest", "node", "react"],
     "paths": {
-      "@/*": [
-        "./src/*"
-      ],
       "@/assets/*": [
         "./assets/*"
+      ],
+      "@/*": [
+        "./src/*"
       ]
     }
   },
