@@ -1,14 +1,16 @@
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
-import { Platform, useColorScheme } from 'react-native';
+import { useEffect, useMemo } from 'react';
+import { Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Onboarding } from '@/components/Onboarding';
+import { useAppColorScheme } from '@/hooks/useThemeColors';
 import { GENERATIVE_SUPPORTED, prefetchGenerative } from '@/lib/generative';
 import { isGenerative, sectionFor } from '@/lib/types';
 import { AppDataProvider, useAppData } from '@/store/AppData';
+import { getColors } from '@/theme';
 
 function OnboardingGate() {
   const { ready, settings } = useAppData();
@@ -37,13 +39,32 @@ function LaunchPrefetch() {
 }
 
 export default function RootLayout() {
-  const scheme = useColorScheme();
+  const scheme = useAppColorScheme();
+
+  // The navigator paints its own surfaces (scene background, the strip behind a
+  // custom tab bar) from this theme — derive them from the app palette so no
+  // stock React-Navigation grey ever shows through the night sky.
+  const navTheme = useMemo(() => {
+    const base = scheme === 'dark' ? DarkTheme : DefaultTheme;
+    const colors = getColors(scheme);
+    return {
+      ...base,
+      colors: {
+        ...base.colors,
+        primary: colors.accent,
+        background: colors.background,
+        card: colors.background,
+        text: colors.text,
+        border: colors.border,
+      },
+    };
+  }, [scheme]);
 
   return (
     <ErrorBoundary>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <AppDataProvider>
-          <ThemeProvider value={scheme === 'dark' ? DarkTheme : DefaultTheme}>
+          <ThemeProvider value={navTheme}>
             {/* Native iOS animations: card-sheet modals (parent scales back) and a
                 smooth slide-up for the immersive screens. */}
             <Stack screenOptions={{ headerShown: false, animation: 'default' }}>
