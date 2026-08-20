@@ -6,7 +6,7 @@ name: Deploy web (PWA) to GitHub Pages
 
 on:
   push:
-    branches: ['claude/meditation-app-ios-android-j3pS2']
+    branches: ['main']
   workflow_dispatch:
 
 permissions:
