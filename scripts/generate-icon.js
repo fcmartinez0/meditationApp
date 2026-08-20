@@ -1,13 +1,12 @@
 /**
- * Generates the app's icon set procedurally (no design tools): a bold geometric
- * emblem — a filled 12-point starburst with a luminous teal->periwinkle gradient
- * and sheen, ringed by a thin hexagon, with a bright core — on a vibrant
- * full-bleed indigo->navy gradient. Modern-iOS style (edge-to-edge colour, one
- * bold centred subject, no inner frame; iOS applies the rounded mask). It mirrors
- * the in-app breathing orb's starburst. 2x2 supersampled. `node scripts/generate-icon.js`.
+ * Generates the app's icon set procedurally (no design tools): a serene crescent
+ * moon with a soft luminous glow and a few sparkle stars, on a deep full-bleed
+ * indigo->navy night-sky gradient. Modern-iOS style (edge-to-edge colour, one
+ * calm centred subject, no inner frame; iOS applies the rounded mask). Fits a
+ * sleep/calm app and stays legible down to the favicon. 3x3 supersampled.
+ * Run: `node scripts/generate-icon.js`.
  *
  *   assets/images/icon.png                     – 1024² master icon (RGB, opaque)
- *   assets/images/now-playing.png              – 1024² lock-screen artwork
  *   assets/images/splash-icon.png              – 512² emblem on transparent
  *   assets/images/android-icon-foreground.png  – 512² emblem, in the safe zone
  *   assets/images/android-icon-background.png   – 512² gradient
@@ -117,48 +116,52 @@ function polyEdges(cx, cy, R, sides, rotDeg) {
 }
 
 const BG_STOPS = [
-  [0.0, hex('#454AA0')],
-  [0.45, hex('#23264B')],
-  [1.0, hex('#0C0E1C')],
+  [0.0, hex('#3B3F86')],
+  [0.5, hex('#1B1E3B')],
+  [1.0, hex('#0A0B17')],
 ];
-// Luminous fill swept diagonally: pale periwinkle (top-left) -> sky -> teal.
-const INK_STOPS = [
-  [0.0, hex('#D8DEFF')],
-  [0.5, hex('#85CBEE')],
-  [1.0, hex('#54E0CC')],
+// Moon body: warm-cream core -> soft lilac -> periwinkle rim (a lit sphere).
+const MOON_STOPS = [
+  [0.0, hex('#FFF7EC')],
+  [0.55, hex('#E7E4FF')],
+  [1.0, hex('#AEB6F0')],
 ];
-const RING = hex('#A6B2F8'); // hexagon ring + glow accent
+const GLOW = hex('#AAB6FF'); // soft halo around the moon
+const STAR = hex('#EAF0FF'); // sparkle stars
 
 /**
- * Render the geometric emblem.
+ * Render the crescent-moon emblem.
  *  opts.bg     – 'gradient' | 'transparent'
  *  opts.scale  – 1 = fill; <1 shrinks (Android safe zone)
  *  opts.mono   – flat white silhouette (Android themed icon)
- *  opts.geom   – include the hexagon ring (off for tiny sizes)
+ *  opts.geom   – include the sparkle stars (off for tiny / safe-zone sizes)
  */
 function render(size, opts = {}) {
   const { bg = 'gradient', scale = 1, mono = false, geom = true } = opts;
   const transparent = bg === 'transparent';
   const cx = size / 2;
   const cy = size / 2;
-  const SS = 2;
-  const Ro = 0.40 * size * scale; // star outer radius
-  const Ri = 0.17 * size * scale; // star inner radius (sharp 12-point)
-  const POINTS = 12;
-  const coreR = 0.085 * size * scale;
-  const hexR = 0.495 * size * scale;
-  const stroke = Math.max(1.5, size * 0.012 * scale);
+  const SS = 3;
 
-  // 12-point star vertices (24 points alternating outer/inner), starting at top.
-  const star = [];
-  const starEdges = [];
-  for (let i = 0; i < POINTS * 2; i++) {
-    const ang = (Math.PI * i) / POINTS - Math.PI / 2;
-    const rad = i % 2 === 0 ? Ro : Ri;
-    star.push([cx + Math.cos(ang) * rad, cy + Math.sin(ang) * rad]);
-  }
-  for (let i = 0; i < star.length; i++) starEdges.push([...star[i], ...star[(i + 1) % star.length]]);
-  const hexEdges = geom ? polyEdges(cx, cy, hexR, 6, 0) : [];
+  // Crescent = moon disk minus an offset "shadow" disk. The shadow sits up-and-
+  // to-the-right, so the crescent opens toward the upper right (a waxing moon).
+  const Rmoon = 0.34 * size * scale;
+  const moonCx = cx - 0.015 * size * scale;
+  const moonCy = cy;
+  const Rshadow = Rmoon * 1.02;
+  const shadowCx = moonCx + Rmoon * 0.7;
+  const shadowCy = moonCy - Rmoon * 0.34;
+
+  // Sparkle stars near the crescent's opening. Omitted on tiny / safe-zone icons.
+  const stars = geom
+    ? [
+        [0.70, 0.24, 1.0],
+        [0.80, 0.42, 0.62],
+        [0.635, 0.135, 0.5],
+      ]
+    : [];
+  const starR = 0.05 * size * scale;
+  const aa = size * 0.0011 + 0.6;
 
   const buf = Buffer.alloc(size * size * 4);
   for (let y = 0; y < size; y++) {
@@ -196,39 +199,41 @@ function render(size, opts = {}) {
             if (transparent) a = Math.max(a, amt);
           };
 
-          // Hexagon ring (under the star): crisp line + soft glow.
-          if (geom && !mono) {
-            let dmin = Infinity;
-            for (const e of hexEdges) { const d = distSeg(px, py, e[0], e[1], e[2], e[3]); if (d < dmin) dmin = d; }
-            over(RING, (1 - smooth(0, stroke, dmin)) * 0.8);
-            over(RING, (1 - smooth(0, stroke * 6, dmin)) * 0.12);
-          }
+          const dM = Math.hypot(px - moonCx, py - moonCy);
+          // Soft halo around the moon (skip for the flat mono silhouette).
+          if (!mono) over(GLOW, (1 - smooth(Rmoon * 0.92, Rmoon * 1.75, dM)) * 0.16);
 
-          // Distance to the star boundary (for AA + outer glow).
-          let sd = Infinity;
-          for (const e of starEdges) { const d = distSeg(px, py, e[0], e[1], e[2], e[3]); if (d < sd) sd = d; }
-          const inside = inPoly(px, py, star);
-          const aa = 1.2;
+          // Crescent coverage: inside the moon AND outside the shadow disk.
+          const dMoonEdge = Rmoon - dM; // + inside moon
+          const dShadowEdge = Math.hypot(px - shadowCx, py - shadowCy) - Rshadow; // + outside shadow
+          const cov = smooth(-aa, aa, Math.min(dMoonEdge, dShadowEdge));
 
           if (mono) {
-            const cov = inside ? 1 : 1 - smooth(0, aa, sd);
             if (cov > 0) { r = g = b = 1; a = Math.max(a, cov); }
-          } else {
-            // Outer glow around the star.
-            if (!inside) over(mix(INK_STOPS[2][1], RING, 0.4), Math.pow(1 - smooth(0, Ro * 0.5, sd), 2) * 0.28);
-            // Filled star: diagonal ink + upper-left sheen.
-            const cov = inside ? 1 : 1 - smooth(0, aa, sd);
-            if (cov > 0) {
-              const ink = gradient(INK_STOPS, clamp01((fx + fy) / 2));
-              const hd = Math.hypot(fx - 0.36, fy - 0.32);
-              const sheen = Math.pow(clamp01(1 - hd / 0.5), 3) * 0.7;
-              const col = [lerp(ink[0], 255, sheen), lerp(ink[1], 255, sheen), lerp(ink[2], 255, sheen)];
-              over(col, cov);
-            }
-            // Bright core.
-            const cd = Math.hypot(px - cx, py - cy);
-            over([255, 255, 255], (1 - smooth(coreR * 0.6, coreR, cd)) * 0.95);
-            over(INK_STOPS[1][1], (1 - smooth(coreR, coreR * 1.8, cd)) * 0.3);
+          } else if (cov > 0) {
+            // Lit-sphere shading: bright core out to a periwinkle rim.
+            const ink = gradient(MOON_STOPS, clamp01(dM / Rmoon));
+            // Sheen on the upper-left, where the light falls.
+            const hd = Math.hypot(fx - 0.40, fy - 0.36);
+            const sheen = Math.pow(clamp01(1 - hd / 0.42), 3) * 0.5;
+            const col = [lerp(ink[0], 255, sheen), lerp(ink[1], 255, sheen), lerp(ink[2], 255, sheen)];
+            over(col, cov);
+            // Cool rim light on the outer (left) edge for a little depth.
+            if (px < moonCx) over(GLOW, (1 - smooth(0, aa * 4, Math.abs(dMoonEdge))) * cov * 0.5);
+          }
+
+          // Sparkle stars: soft dot + a gentle 4-point glint.
+          for (const [sfx, sfy, ss] of stars) {
+            const sxp = sfx * size;
+            const syp = sfy * size;
+            const rr = starR * ss;
+            const ax = Math.abs(px - sxp);
+            const ay = Math.abs(py - syp);
+            const dot = 1 - smooth(rr * 0.18, rr * 0.5, Math.hypot(ax, ay));
+            const glintH = (1 - smooth(0, rr * 0.14, ay)) * (1 - smooth(rr * 0.3, rr * 1.4, ax));
+            const glintV = (1 - smooth(0, rr * 0.14, ax)) * (1 - smooth(rr * 0.3, rr * 1.4, ay));
+            const spark = clamp01(dot + 0.7 * Math.max(glintH, glintV));
+            if (spark > 0) { if (mono) { r = g = b = 1; a = Math.max(a, spark); } else over(STAR, spark); }
           }
 
           Rr += clamp01(r);
@@ -263,9 +268,8 @@ function flatGradient(size) {
   return buf;
 }
 
-console.log('Generating geometric app icons...');
+console.log('Generating crescent-moon app icons...');
 writePNG(path.join(OUT, 'icon.png'), 1024, 1024, render(1024, { bg: 'gradient' }), true);
-writePNG(path.join(OUT, 'now-playing.png'), 1024, 1024, render(1024, { bg: 'gradient' }), true);
 writePNG(path.join(OUT, 'splash-icon.png'), 512, 512, render(512, { bg: 'transparent' }));
 writePNG(path.join(OUT, 'android-icon-foreground.png'), 512, 512, render(512, { bg: 'transparent', scale: 0.62, geom: false }));
 writePNG(path.join(OUT, 'android-icon-background.png'), 512, 512, flatGradient(512));

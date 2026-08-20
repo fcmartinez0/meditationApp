@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useIsFocused } from 'expo-router';
 import Animated, {
   Easing,
   cancelAnimation,
@@ -41,7 +42,9 @@ interface BreathingOrbProps {
  * A crisp geometric "bloom" that paces the breath: two counter-rotating polygon
  * rings, a wheel of radial spokes, sharp concentric rings, and a gradient core —
  * all revolving slowly in the brand colours. Breathes when active, drifts when
- * still, and holds steady for Reduce Motion.
+ * still, and holds steady for Reduce Motion. Every loop pauses while the screen
+ * is unfocused — expo-router keeps tab screens mounted, so an off-screen orb
+ * would otherwise keep five UI-thread animations burning battery.
  */
 export function BreathingOrb({ active = false, still, core, halo, colors: gradient, breath: breathProp, children }: BreathingOrbProps) {
   const theme = useThemeColors();
@@ -51,6 +54,7 @@ export function BreathingOrb({ active = false, still, core, halo, colors: gradie
   // A small multi-hue palette so the geometry reads as colourful, not mono.
   const palette = ['#FFFFFF', grad[0], grad[1], haloColor];
   const reduced = useReducedMotion();
+  const focused = useIsFocused();
 
   // Internal breath LFO, used unless the caller drives the breath externally.
   const internalBreath = useSharedValue(0.5);
@@ -61,8 +65,14 @@ export function BreathingOrb({ active = false, still, core, halo, colors: gradie
   const sheen = useSharedValue(0); // glassy light sweep across the core
 
   useEffect(() => {
-    const loop = (sv: typeof spinA, ms: number) =>
-      (sv.value = withRepeat(withTiming(1, { duration: ms, easing: Easing.linear }), -1, false));
+    const loop = (sv: typeof spinA, ms: number) => {
+      // Resume from the frozen fraction and animate a full turn past it: the
+      // rotation styles multiply by 360°, so wrapping from `from+1` back to
+      // `from` lands on the same angle — no snap after a focus round-trip.
+      const from = sv.value % 1;
+      sv.value = from;
+      sv.value = withRepeat(withTiming(from + 1, { duration: ms, easing: Easing.linear }), -1, false);
+    };
 
     if (reduced) {
       cancelAnimation(internalBreath);
@@ -75,6 +85,17 @@ export function BreathingOrb({ active = false, still, core, halo, colors: gradie
       spinB.value = 0;
       spinS.value = 0;
       sheen.value = 0;
+      return;
+    }
+
+    // Unfocused screens stay mounted under expo-router; freeze in place and
+    // let the re-run on focus restart everything seamlessly.
+    if (!focused) {
+      cancelAnimation(internalBreath);
+      cancelAnimation(spinA);
+      cancelAnimation(spinB);
+      cancelAnimation(spinS);
+      cancelAnimation(sheen);
       return;
     }
 
@@ -107,7 +128,7 @@ export function BreathingOrb({ active = false, still, core, halo, colors: gradie
       cancelAnimation(spinS);
       cancelAnimation(sheen);
     };
-  }, [active, still, reduced, breathProp, internalBreath, spinA, spinB, spinS, sheen]);
+  }, [active, still, reduced, focused, breathProp, internalBreath, spinA, spinB, spinS, sheen]);
 
   const haloStyle = useAnimatedStyle(() => ({
     transform: [{ scale: 0.96 + breath.value * 0.16 }],

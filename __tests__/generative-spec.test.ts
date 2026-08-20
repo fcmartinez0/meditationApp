@@ -1,9 +1,9 @@
+import { nextSpec } from '@/lib/preferences';
+import { PROGRESSION_COUNT, type PieceRating, type PieceSpec, type Section } from '@/lib/types';
+
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
 );
-
-import { nextSpec } from '@/lib/preferences';
-import { PROGRESSION_COUNT, type PieceRating, type PieceSpec, type Section } from '@/lib/types';
 
 // The valid value sets the generative engine knows how to render. nextSpec is
 // the only thing that produces specs, so if it ever emits a value outside these

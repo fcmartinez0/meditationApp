@@ -19,7 +19,7 @@ import { dayKey, formatClock } from '@/lib/date';
 import { GENERATIVE_SUPPORTED, GenerativeEngine, takeGenerative, type LoopData } from '@/lib/generative';
 import { describeSpec, loadRatings, nextSpec, recordRating } from '@/lib/preferences';
 import type { AmbientSound, FileSound, GenerativeSound, PieceSpec } from '@/lib/types';
-import { isGenerative, sectionFor } from '@/lib/types';
+import { AMBIENT_KEYS, isGenerative, sectionFor } from '@/lib/types';
 import { useAppData } from '@/store/AppData';
 import { radius, spacing } from '@/theme';
 import { categoryStyle } from '@/theme/categories';
@@ -54,7 +54,13 @@ export default function SessionScreen() {
   const params = useLocalSearchParams<{ duration?: string; ambient?: string }>();
 
   const totalSec = Math.max(1, Number(params.duration) || settings.durationMin) * 60;
-  const ambient = (params.ambient as AmbientSound) || settings.ambient;
+  // Validate the deep-link param against the known sound whitelist before use —
+  // a URL like `stillness://session?ambient=<anything>` reaches this screen, and
+  // an unknown value would otherwise flow into audio setup as a bad key.
+  const ambient: AmbientSound =
+    params.ambient && (AMBIENT_KEYS as readonly string[]).includes(params.ambient)
+      ? (params.ambient as AmbientSound)
+      : settings.ambient;
 
   const cat = categoryStyle(ambient);
   const generative = isGenerative(ambient);
@@ -85,8 +91,13 @@ export default function SessionScreen() {
   const audioRef = useRef<SessionAudio | null>(null);
   const engineRef = useRef<GenerativeEngine | null>(null);
   const specRef = useRef<PieceSpec | null>(null);
-  const endAtRef = useRef<number>(Date.now() + totalSec * 1000);
-  const startAtRef = useRef<number>(Date.now());
+  // Bumped on every regenerate() (and on unmount) so a slow render that has been
+  // superseded knows to discard itself instead of leaving a second engine playing.
+  const regenIdRef = useRef(0);
+  // Stamped in the mount effect (and re-stamped by startCountdown once audio is
+  // ready) — never read before then, and Date.now() in render breaks purity.
+  const endAtRef = useRef<number>(0);
+  const startAtRef = useRef<number>(0);
   const recordedRef = useRef(false);
   // Mirrors for the lock-screen sync listener, which is set up once and must read
   // current values without a stale closure.
@@ -123,24 +134,34 @@ export default function SessionScreen() {
     [ambient, recordSession],
   );
 
+  // Mirror a pause/resume the app didn't initiate — lock-screen transport for
+  // file-based audio, an audio interruption (phone call, Siri) for the
+  // generative engine — back into the session UI and its clocks. Reads only
+  // refs, so the one stable instance serves every listener without staleness.
+  const mirrorExternalPlaying = useCallback((playing: boolean) => {
+    const cur = phaseRef.current;
+    if (playing && cur === 'paused') {
+      const now = Date.now();
+      endAtRef.current = now + remainingRef.current * 1000; // countdown resume
+      startAtRef.current = now - elapsedRef.current * 1000; // count-up resume
+      setPhase('running');
+    } else if (!playing && cur === 'running') {
+      setPhase('paused');
+    }
+  }, []);
+
   // Set up audio once, on mount.
   useEffect(() => {
+    // Provisional clock stamp so ticks during audio setup count down sanely;
+    // startCountdown re-stamps below once audio is actually ready.
+    const mountedAt = Date.now();
+    endAtRef.current = mountedAt + totalSec * 1000;
+    startAtRef.current = mountedAt;
     const audio = new SessionAudio();
     audioRef.current = audio;
     let cancelled = false;
-    // Mirror a pause/resume triggered from the lock screen or control center
-    // (file-based sounds only) back into the session UI and its clocks.
     audio.setOnPlayingChange((playing) => {
-      if (cancelled) return;
-      const cur = phaseRef.current;
-      if (playing && cur === 'paused') {
-        const now = Date.now();
-        endAtRef.current = now + remainingRef.current * 1000; // countdown resume
-        startAtRef.current = now - elapsedRef.current * 1000; // count-up resume
-        setPhase('running');
-      } else if (!playing && cur === 'running') {
-        setPhase('paused');
-      }
+      if (!cancelled) mirrorExternalPlaying(playing);
     });
     // Start the timer only once audio is ready, so the render doesn't eat into
     // the session.
@@ -155,7 +176,7 @@ export default function SessionScreen() {
     };
     (async () => {
       try {
-        await audio.prepare(effectiveAmbient, settings.mixWithMusic, soundMeta(ambient).label);
+        await audio.prepare(effectiveAmbient, settings.mixWithMusic, soundMeta(ambient).label, totalSec);
         if (cancelled) return;
         audio.setVolume(settings.volume);
         if (useEngine) {
@@ -181,6 +202,11 @@ export default function SessionScreen() {
           setComposing(true);
           const engine = new GenerativeEngine();
           engineRef.current = engine;
+          // Same UI mirroring as SessionAudio above, but for the engine's own
+          // transport source: audio interruptions (calls, Siri).
+          engine.setOnPlayingChange((playing) => {
+            if (!cancelled) mirrorExternalPlaying(playing);
+          });
           let ok = false;
           try {
             ok = await engine.start(spec, preloaded, settings.mixWithMusic);
@@ -192,7 +218,7 @@ export default function SessionScreen() {
             engine.setVolume(settings.volume);
           } else {
             // Render failed — fall back to a bundled track so it's never silent.
-            await audio.prepare(GENERATIVE_FALLBACK[ambient as GenerativeSound], settings.mixWithMusic, soundMeta(ambient).label);
+            await audio.prepare(GENERATIVE_FALLBACK[ambient as GenerativeSound], settings.mixWithMusic, soundMeta(ambient).label, totalSec);
             if (cancelled) return;
             audio.setVolume(settings.volume);
             audio.startAmbient();
@@ -203,12 +229,14 @@ export default function SessionScreen() {
       } catch (e) {
         // Audio setup failed — let the session run silently but tell the user,
         // rather than leaving them in unexplained silence.
+        if (__DEV__) console.warn('[session] audio setup failed', e);
         if (!cancelled) setAudioFailed(true);
       }
       startCountdown();
     })();
     return () => {
       cancelled = true;
+      regenIdRef.current++; // abort any in-flight regenerate so it can't outlive the screen
       engineRef.current?.stop();
       // Let the fade-out finish before tearing down, otherwise cutting the
       // audio mid-sample produces a click.
@@ -300,26 +328,40 @@ export default function SessionScreen() {
     void recordRating(specRef.current, 1);
   };
 
-  // Swap to a freshly generated piece without ending the session.
+  // Swap to a freshly generated piece without ending the session. Guarded against
+  // rapid double-taps: each call claims a generation id; a render that finishes
+  // after a newer tap (or after unmount) discards its engine instead of stacking
+  // a second loop on the shared audio context.
   const regenerate = () => {
     if (!useEngine) return;
     Haptics.selectionAsync().catch(() => {});
+    const gen = ++regenIdRef.current;
     engineRef.current?.stop();
+    engineRef.current = null;
     setLiked(false);
     void (async () => {
       const ratings = await loadRatings();
+      if (regenIdRef.current !== gen) return; // superseded while loading ratings
       const spec = nextSpec(sectionFor(ambient as GenerativeSound), ratings);
       specRef.current = spec;
       setSpecLabel(describeSpec(spec));
       setComposing(true);
       const engine = new GenerativeEngine();
-      engineRef.current = engine;
+      // Interruption pause/resume mirroring, as on the mount-effect engine.
+      // stop() clears the callback, so a superseded engine can't flip the UI.
+      engine.setOnPlayingChange(mirrorExternalPlaying);
       let ok = false;
       try {
         ok = await engine.start(spec, null, settings.mixWithMusic);
       } finally {
-        setComposing(false);
+        if (regenIdRef.current === gen) setComposing(false);
       }
+      if (regenIdRef.current !== gen) {
+        // A newer regenerate (or unmount) won the race — don't leak this engine.
+        engine.stop();
+        return;
+      }
+      engineRef.current = engine;
       if (ok) engine.setVolume(settings.volume);
     })();
   };
@@ -360,7 +402,9 @@ export default function SessionScreen() {
             </>
           )}
 
-          {useEngine && specRef.current && (
+          {/* specLabel is set in lockstep with specRef, and unlike the ref it's
+              legal to read in render (and is what triggers this re-render). */}
+          {useEngine && specLabel !== null && (
             <View style={styles.rating}>
               {rated === null ? (
                 <>

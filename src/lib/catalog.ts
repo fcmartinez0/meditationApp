@@ -5,8 +5,15 @@
 
 import { Ionicons } from '@expo/vector-icons';
 
-import type { SoundItem } from '@/components/SoundRow';
 import type { AmbientSound } from '@/lib/types';
+
+/** One selectable sound in the catalog (home + browse). */
+export interface SoundItem {
+  key: AmbientSound;
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  hint?: string;
+}
 
 export interface Section {
   title: string;

@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, FadeInUp } from 'react-native-reanimated';
 
@@ -14,7 +14,6 @@ import { Screen } from '@/components/Screen';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { greeting, soundMeta } from '@/lib/catalog';
 import { GENERATIVE_SUPPORTED, prefetchGenerative } from '@/lib/generative';
-import type { AmbientSound } from '@/lib/types';
 import { isGenerative, sectionFor } from '@/lib/types';
 import { categoryStyle } from '@/theme/categories';
 import { useAppData } from '@/store/AppData';
@@ -37,6 +36,22 @@ export default function HomeScreen() {
   const generative = isGenerative(settings.ambient);
 
   const [pickerOpen, setPickerOpen] = useState(false);
+  // Time-of-day greeting is set after mount: the static web export bakes the
+  // build machine's hour into the HTML, so rendering greeting() during hydration
+  // mismatches the visitor's local time (React #418). First paint shows the
+  // neutral word on every platform; the personalized one lands a frame later.
+  const [greet, setGreet] = useState('Welcome');
+  useEffect(() => {
+    // The post-mount cascade is deliberate (see above) — greeting() is
+    // time-dependent, so it can't be derived during render either.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setGreet(greeting());
+  }, []);
+  // A small time-of-day mark beside the greeting — the crescent at night echoes
+  // the app icon; sun and cloud carry the day. Derived from the greeting text so
+  // the pair can never disagree.
+  const greetIcon: keyof typeof Ionicons.glyphMap =
+    greet === 'Good morning' ? 'sunny-outline' : greet === 'Good afternoon' ? 'partly-sunny-outline' : greet === 'Good evening' ? 'moon-outline' : 'sparkles-outline';
 
   // Pre-render the next generative piece in the background while the user is
   // here, so starting a session is instant instead of stalling on the
@@ -76,9 +91,12 @@ export default function HomeScreen() {
     <Screen>
       <View style={styles.root}>
         <Animated.View style={styles.header} entering={FadeInDown.duration(600)}>
-          <AppText variant="label" color={colors.accent}>
-            {greeting().toUpperCase()}
-          </AppText>
+          <View style={styles.greetRow}>
+            <Ionicons name={greetIcon} size={14} color={colors.accent} />
+            <AppText variant="label" color={colors.accent}>
+              {greet.toUpperCase()}
+            </AppText>
+          </View>
           <AppText variant="title">Take a breath</AppText>
           {stats.currentStreak > 0 && (
             <AppText variant="caption" muted style={styles.streak}>
@@ -99,7 +117,12 @@ export default function HomeScreen() {
               onPress={begin}
               accessibilityRole="button"
               accessibilityLabel={`Begin ${sel.label} session`}
-              style={({ pressed }) => [styles.beginWrap, { transform: [{ scale: pressed ? 0.96 : 1 }] }]}>
+              style={({ pressed }) => [
+                styles.beginWrap,
+                // The one bold moment on the screen: the button glows in the
+                // chosen sound's colour, so changing sounds re-lights the room.
+                { shadowColor: cat.accent, transform: [{ scale: pressed ? 0.96 : 1 }] },
+              ]}>
               <LinearGradient
                 colors={cat.colors}
                 start={{ x: 0, y: 0 }}
@@ -152,7 +175,11 @@ export default function HomeScreen() {
               router.push('/breathe');
             }}
             accessibilityRole="button"
-            style={({ pressed }) => [styles.breatheLink, { opacity: pressed ? 0.55 : 1 }]}>
+            style={({ pressed }) => [
+              styles.breatheLink,
+              { borderColor: colors.border, opacity: pressed ? 0.55 : 1 },
+            ]}>
+            <Ionicons name="flower-outline" size={15} color={colors.textSecondary} />
             <AppText variant="label" muted>
               Breathing exercises
             </AppText>
@@ -173,9 +200,17 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   header: { gap: spacing.xs, marginTop: spacing.sm, alignItems: 'center' },
+  greetRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   streak: { marginTop: spacing.xs },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.xl },
-  beginWrap: { marginTop: spacing.sm },
+  beginWrap: {
+    marginTop: spacing.sm,
+    // shadowColor is set inline from the sound category's accent.
+    shadowOpacity: 0.5,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 14,
+  },
   begin: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -206,5 +241,9 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
     minHeight: 44, // ≥ 44pt HIG touch target
     paddingHorizontal: spacing.lg,
+    // A quiet ghost chip (borderColor from theme, set inline) so the third
+    // action reads as a destination, not stray text.
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: radius.pill,
   },
 });

@@ -1,9 +1,9 @@
+import { isValidSpec, nextSpec } from '@/lib/preferences';
+import type { PieceRating, PieceSpec } from '@/lib/types';
+
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
 );
-
-import { nextSpec } from '@/lib/preferences';
-import type { PieceRating, PieceSpec } from '@/lib/types';
 
 function spec(overrides: Partial<PieceSpec> = {}): PieceSpec {
   return {
@@ -18,9 +18,12 @@ function spec(overrides: Partial<PieceSpec> = {}): PieceSpec {
     tempo: 60,
     pulseDepth: 0,
     wave: 'sine',
+    instrument: 'pad',
     arp: true,
     bass: true,
     percussion: 'heartbeat',
+    progression: 0,
+    melody: false,
     ...overrides,
   };
 }
@@ -98,5 +101,27 @@ describe('nextSpec', () => {
     for (let i = 0; i < 4; i++) ratings.push({ section: 'rest', spec: spec({ scale: 'aeolian' }), score: 1, at: i });
     for (let i = 4; i < 12; i++) ratings.push({ section: 'rest', spec: spec({ scale: 'phrygian' }), score: 1, at: i });
     expect(nextSpec('rest', ratings).scale).toBe('phrygian');
+  });
+});
+
+describe('isValidSpec (guards the engine against stale/corrupt persisted specs)', () => {
+  it('accepts a well-formed spec', () => {
+    expect(isValidSpec(spec())).toBe(true);
+  });
+
+  it('rejects specs missing newer required fields (old schema)', () => {
+    for (const field of ['progression', 'instrument', 'melody', 'scale'] as const) {
+      const bad: Record<string, unknown> = { ...spec() };
+      delete bad[field];
+      expect(isValidSpec(bad)).toBe(false);
+    }
+  });
+
+  it('rejects non-finite numerics, bad section, and non-objects', () => {
+    expect(isValidSpec(spec({ tempo: NaN }))).toBe(false);
+    expect(isValidSpec(spec({ progression: Infinity }))).toBe(false);
+    expect(isValidSpec({ ...spec(), section: 'bogus' } as unknown)).toBe(false);
+    expect(isValidSpec(null)).toBe(false);
+    expect(isValidSpec('nope')).toBe(false);
   });
 });

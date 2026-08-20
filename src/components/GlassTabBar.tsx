@@ -1,5 +1,5 @@
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
@@ -74,10 +74,12 @@ export function GlassTabBar({ state, descriptors, navigation }: TabBarProps) {
             style={[StyleSheet.absoluteFill, { borderRadius: pillRadius }]}
           />
         ) : (
+          // No Liquid Glass here: a slightly translucent surface still reads as
+          // material floating over the starfield instead of an opaque slab.
           <View
             style={[
               StyleSheet.absoluteFill,
-              { borderRadius: pillRadius, backgroundColor: colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
+              { borderRadius: pillRadius, backgroundColor: withAlpha(colors.surface, 0.92), borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
             ]}
           />
         )}
@@ -143,6 +145,12 @@ const styles = StyleSheet.create({
   pill: {
     width: '100%',
     overflow: 'hidden',
+    // A gentle lift so the floating bar separates from the scene beneath it.
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 10,
   },
   indicator: {
     position: 'absolute',

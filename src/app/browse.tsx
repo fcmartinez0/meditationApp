@@ -10,7 +10,7 @@ import { AppText } from '@/components/AppText';
 import { Backdrop } from '@/components/Backdrop';
 import { GlassFill } from '@/components/GlassFill';
 import { SoundCard } from '@/components/SoundCard';
-import type { SoundItem } from '@/components/SoundRow';
+import type { SoundItem } from '@/lib/catalog';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { SECTIONS } from '@/lib/catalog';
 import type { AmbientSound } from '@/lib/types';

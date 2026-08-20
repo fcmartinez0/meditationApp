@@ -15,8 +15,13 @@ screen locked (for focus, rest, and sleep). This is why UIBackgroundModes
 includes "audio".
 
 NO MICROPHONE / NO RECORDING
-All audio is synthesized on-device. The app does not record audio and requests
-no microphone access.
+The app does not record audio and requests no microphone access. All music is
+bundled with the app or generated on-device — nothing is streamed.
+
+MUSIC CREDITS
+The ambient textures, binaural frequencies and the live "Rest"/"Flow" sessions
+are synthesized digitally. Some instrumental music tracks were created with
+Google Gemini generative AI and are bundled with the app.
 
 PRIVACY
 No tracking, no analytics, no ads. All data (preferences, streak, history,

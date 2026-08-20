@@ -2,7 +2,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { AMBIENT_KEYS, DEFAULT_SETTINGS, type SessionRecord, type Settings } from './types';
+import { AMBIENT_KEYS, DEFAULT_SETTINGS, RECENTS_MAX, type SessionRecord, type Settings } from './types';
 
 const SESSIONS_KEY = 'mc.sessions.v1';
 const SETTINGS_KEY = 'mc.settings.v1';
@@ -10,12 +10,24 @@ const SETTINGS_KEY = 'mc.settings.v1';
 /** Keep history bounded; a year of daily sessions is plenty for stats. */
 const MAX_SESSIONS = 1000;
 
+function isValidSession(r: unknown): r is SessionRecord {
+  if (!r || typeof r !== 'object') return false;
+  const o = r as Record<string, unknown>;
+  // endedAt/durationSec must be finite numbers — a corrupt value would otherwise
+  // poison the derived stats (total minutes, streaks) with NaN.
+  return (
+    typeof o.endedAt === 'number' && Number.isFinite(o.endedAt) &&
+    typeof o.durationSec === 'number' && Number.isFinite(o.durationSec) &&
+    typeof o.day === 'string'
+  );
+}
+
 export async function loadSessions(): Promise<SessionRecord[]> {
   try {
     const raw = await AsyncStorage.getItem(SESSIONS_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as SessionRecord[]) : [];
+    return Array.isArray(parsed) ? parsed.filter(isValidSession) : [];
   } catch {
     return [];
   }
@@ -50,7 +62,7 @@ export async function loadSettings(): Promise<Settings> {
     // Sanitize recents: keep only still-valid keys, deduped and bounded.
     merged.recents = Array.from(
       new Set((Array.isArray(merged.recents) ? merged.recents : []).filter((k) => AMBIENT_KEYS.includes(k))),
-    ).slice(0, 12);
+    ).slice(0, RECENTS_MAX);
     return merged;
   } catch {
     return { ...DEFAULT_SETTINGS };

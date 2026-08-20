@@ -51,7 +51,7 @@ export default function Root({ children }: PropsWithChildren) {
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/meditationApp/sw.js',{scope:'/meditationApp/'}).catch(function(){});});}",
+              "if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/meditationApp/sw.js',{scope:'/meditationApp/',updateViaCache:'none'}).catch(function(){});});}",
           }}
         />
       </body>

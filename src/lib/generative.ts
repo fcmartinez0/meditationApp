@@ -22,7 +22,7 @@ import { AudioContext, AudioManager, OfflineAudioContext } from 'react-native-au
 import type {
   AudioBuffer,
   AudioBufferSourceNode,
-  BiquadFilterNode,
+  AudioEventSubscription,
   GainNode,
   OscillatorNode,
   OscillatorType,
@@ -30,6 +30,9 @@ import type {
   StereoPannerNode,
 } from 'react-native-audio-api';
 
+import { ARP_PATTERNS, PROGRESSIONS, SCALES, VOICINGS } from './generative-tables';
+import { foldLoop } from './loop-fold';
+import { GEN_NATIVE_SCALE, masterGain } from './loudness';
 import { loadRatings, nextSpec } from './preferences';
 import type { PieceSpec, Section } from './types';
 
@@ -41,55 +44,8 @@ const dwarn = (...args: unknown[]) => {
   if (__DEV__) console.warn(...args);
 };
 
-const SCALES: Record<string, number[]> = {
-  major_pentatonic: [0, 2, 4, 7, 9],
-  minor_pentatonic: [0, 3, 5, 7, 10],
-  lydian: [0, 2, 4, 6, 7, 9, 11],
-  dorian: [0, 2, 3, 5, 7, 9, 10],
-  aeolian: [0, 2, 3, 5, 7, 8, 10],
-  mixolydian: [0, 2, 4, 5, 7, 9, 10],
-  phrygian: [0, 1, 3, 5, 7, 8, 10],
-  harmonic_minor: [0, 2, 3, 5, 7, 8, 11],
-  major: [0, 2, 4, 5, 7, 9, 11], // bright, open
-  lydian_dominant: [0, 2, 4, 6, 7, 9, 10], // dreamy, floating
-  hirajoshi: [0, 2, 3, 7, 8], // Japanese pentatonic — spacious, calm
-};
-
-const VOICINGS = [
-  [0, 2, 4, 6], // 7th
-  [0, 1, 4, 6], // sus2
-  [0, 3, 4, 6], // sus4
-  [0, 2, 4, 8], // add9
-  [0, 4, 6, 8], // open / quartal
-  [0, 4, 8, 10], // wide stacked — spacious
-  [0, 2, 6, 8], // open with 11th colour
-];
-
-const ARP_PATTERNS = [
-  [0, 2, 1, 3, 2, 4, 1, 2],
-  [0, 1, 2, 3, 4, 3, 2, 1],
-  [0, 2, 4, 2, 1, 3, 1, 0],
-  [0, 3, 1, 4, 2, 0, 3, 1],
-  [4, 3, 2, 1, 0, 1, 2, 3],
-  [0, 2, 4, 6, 4, 2, 0, 2], // arch
-  [0, 4, 1, 5, 2, 6, 3, 0], // wide skips
-  [2, 0, 3, 1, 4, 2, 5, 3], // interleaved climb
-];
-
-const PROGRESSIONS = [
-  [0, 0, 0, 0],
-  [0, 3, 4, 0],
-  [0, 5, 3, 4],
-  [0, 4, 5, 3],
-  [0, 2, 4, 5],
-  [0, 5, 1, 4],
-  [0, 6, 4, 5],
-  [0, 3, 0, 4],
-  [0, 4, 1, 5], // gentle circle
-  [0, 2, 5, 3],
-  [0, 6, 3, 4],
-  [0, 1, 4, 5],
-];
+// Musical tables (scales, voicings, arps, progressions) are shared with the web
+// engine via ./generative-tables so native and web can never drift apart.
 
 // Loop length and seamless-crossfade window. Render cost scales with ALL of
 // these: a longer window means more scheduled nodes AND more samples to process,
@@ -157,12 +113,6 @@ function leadVoices(prev: number[], chordMidi: number[], count: number, root: nu
     out[i] = best;
   }
   return out;
-}
-
-// Gentle tanh soft-clip for the crossfade-fold safety net — applied in JS only
-// to stray peaks that the fold's summing can create after the render.
-function softClip(x: number): number {
-  return Math.tanh(1.5 * x);
 }
 
 // A gentle tanh saturation curve for the master "glue": adds subtle analog
@@ -241,6 +191,93 @@ function configureSession(mixWithMusic: boolean): void {
     });
   } catch {
     /* platform defaults */
+  }
+}
+
+// --- Audio interruption recovery --------------------------------------------
+// A phone call or Siri deactivates our audio session; without observing it the
+// realtime context is left silent afterwards while the session UI still shows
+// "playing". The expo-audio path (audio.ts) recovers via its
+// playbackStatusUpdate listener — this is the engine's equivalent: one
+// module-level listener serves every live engine. On 'began' each audible
+// engine is paused (and its UI mirror notified); on 'ended' — when the OS says
+// we may resume — the session is reactivated, the shared realtime context
+// resumed, and exactly the engines we paused fade back in.
+const activeEngines = new Set<GenerativeEngine>();
+// Engines paused *by an interruption* — only these auto-resume on 'ended', so a
+// piece the user paused deliberately never springs back to life on its own.
+const interruptedEngines = new Set<GenerativeEngine>();
+let interruptionSub: AudioEventSubscription | null = null;
+
+function ensureInterruptionObserver(): void {
+  if (interruptionSub) return;
+  try {
+    // Off by default in react-native-audio-api — without it the OS never tells
+    // us the session was taken away, which is exactly the silent-after-a-call
+    // bug. `true` maps to iOS interruption notifications and Android audio
+    // focus 'gain'.
+    AudioManager.observeAudioInterruptions(true);
+    interruptionSub = AudioManager.addSystemEventListener('interruption', (event) => {
+      if (event.type === 'began') {
+        // Remember exactly who was audible so 'ended' resumes those and only those.
+        for (const engine of activeEngines) {
+          if (engine.systemPause()) interruptedEngines.add(engine);
+        }
+        return;
+      }
+      // 'ended'. shouldResume=false means playback moved on for good (e.g. the
+      // user started their own music) — leave the engines paused; the session
+      // screen already shows Paused and the user can resume by hand.
+      const toResume = Array.from(interruptedEngines);
+      interruptedEngines.clear();
+      if (!event.shouldResume || toResume.length === 0) return;
+      void (async () => {
+        try {
+          // Never touch the realtime context while an offline render is in
+          // flight — resuming it mid-render trips the native deadlock the
+          // render lock exists to prevent (see renderLock below).
+          await renderLock;
+        } catch {
+          /* the lock never rejects; stay defensive anyway */
+        }
+        try {
+          // The interruption deactivated our session; reclaim it before
+          // resuming or the resume can silently no-op on iOS.
+          await AudioManager.setAudioSessionActivity(true);
+        } catch {
+          /* best effort — resume below may still succeed */
+        }
+        const ctx = sharedCtx;
+        if (ctx && ctx.state === 'suspended') {
+          try {
+            await ctx.resume();
+          } catch {
+            /* each engine's resume() retries below */
+          }
+        }
+        for (const engine of toResume) engine.systemResume();
+      })();
+    });
+  } catch {
+    /* no interruption recovery — playback itself still works */
+  }
+}
+
+// Torn down when the last engine stops, so the app doesn't keep a native
+// observer (and its subscription) alive outside generative sessions.
+function releaseInterruptionObserver(): void {
+  if (activeEngines.size > 0 || !interruptionSub) return;
+  try {
+    interruptionSub.remove();
+  } catch {
+    /* ignore */
+  }
+  interruptionSub = null;
+  interruptedEngines.clear();
+  try {
+    AudioManager.observeAudioInterruptions(false);
+  } catch {
+    /* ignore */
   }
 }
 
@@ -641,7 +678,7 @@ class Composer {
   }
 
   private applyChord(when: number, initial: boolean): void {
-    const { ctx, spec } = this;
+    const { spec } = this;
     const scale = SCALES[spec.scale] ?? SCALES.major_pentatonic;
     const L = scale.length;
     const deg = (x: number) => 12 * Math.floor(x / L) + scale[((x % L) + L) % L];
@@ -983,81 +1020,9 @@ class Composer {
   }
 }
 
-/**
- * Equal-power crossfade-fold a rendered buffer into a seamless loop, then
- * normalize it to a consistent loudness so pieces don't jump in volume from one
- * to the next. Runs on the JS thread (no native nodes), so it yields between
- * chunks: a full-length pass would otherwise block the UI for a noticeable beat
- * right as the "Composing" screen hands off to playback. Only samples that
- * actually approach clipping pay for the tanh; the rest pass through untouched.
- */
-// Target loudness (RMS) and a hard peak ceiling. RMS targeting gives consistent
-// *perceived* level (a lone loud transient won't drag the whole piece down the
-// way peak-only normalization does), and the ceiling guarantees no clipping.
-// Matched to the reference tracks, which all measure ≈0.19 RMS, so generated
-// pieces feel as full and present — while staying under the peak ceiling.
-const TARGET_RMS = 0.18;
-const PEAK_CEILING = 0.95;
-
-async function foldLoop(
-  rendered: AudioBuffer,
-  loopSamples: number,
-  xfSamples: number,
-): Promise<Float32Array[]> {
-  const out: Float32Array[] = [];
-  const CHUNK = 65536; // yield roughly every ~2 s of samples
-  let sumSquares = 0;
-  let sampleCount = 0;
-  let peak = 0;
-  for (let c = 0; c < rendered.numberOfChannels; c++) {
-    const src = rendered.getChannelData(c);
-    const dst = new Float32Array(loopSamples);
-    dst.set(src.subarray(0, loopSamples));
-    // Blend the tail [loop, loop+xf) over the head [0, xf) so the wrap is seamless.
-    for (let i = 0; i < xfSamples; i++) {
-      const t = i / xfSamples;
-      dst[i] = src[i] * Math.sqrt(t) + src[loopSamples + i] * Math.sqrt(1 - t);
-    }
-    // Safety soft-clip stray fold peaks, and measure level for normalization.
-    for (let i = 0; i < loopSamples; i++) {
-      let x = dst[i];
-      if (x > 0.6 || x < -0.6) {
-        x = softClip(x);
-        dst[i] = x;
-      }
-      const a = x < 0 ? -x : x;
-      if (a > peak) peak = a;
-      sumSquares += x * x;
-      sampleCount++;
-      if (i > 0 && i % CHUNK === 0) {
-        // eslint-disable-next-line no-await-in-loop
-        await new Promise<void>((r) => setTimeout(r, 0));
-      }
-    }
-    out.push(dst);
-  }
-
-  // Normalize toward a steady loudness, clamped so we never wildly boost a near-
-  // silent piece, then pulled under the peak ceiling so it can't clip.
-  const rms = Math.sqrt(sumSquares / Math.max(1, sampleCount));
-  let gain = rms > 1e-5 ? TARGET_RMS / rms : 1;
-  // Floor lowered so a loud, bass+percussion-heavy render is actually pulled
-  // down to the target loudness instead of clamping hot.
-  gain = Math.max(0.4, Math.min(2.2, gain));
-  if (peak * gain > PEAK_CEILING) gain = peak > 1e-5 ? PEAK_CEILING / peak : gain;
-  if (Math.abs(gain - 1) > 0.02) {
-    for (const dst of out) {
-      for (let i = 0; i < dst.length; i++) {
-        dst[i] *= gain;
-        if (i > 0 && i % CHUNK === 0) {
-          // eslint-disable-next-line no-await-in-loop
-          await new Promise<void>((r) => setTimeout(r, 0));
-        }
-      }
-    }
-  }
-  return out;
-}
+// The crossfade-fold + RMS normalization (formerly a local foldLoop here) now
+// lives in ./loop-fold as a pure, unit-tested function; the algorithm and its
+// constants (TARGET_RMS, PEAK_CEILING) are unchanged.
 
 export type LoopData = { data: Float32Array[]; length: number; sampleRate: number };
 
@@ -1184,8 +1149,51 @@ export class GenerativeEngine {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
   private source: AudioBufferSourceNode | null = null;
-  private targetGain = 0.85;
+  // Effective master level = shared per-source scale × user slider (loudness
+  // policy lives in ./loudness). The render is normalized to TARGET_RMS, so
+  // this scale is what keeps generative level with the file sources — the old
+  // raw default (0.85) played ~2–3 dB hotter than file audio at the same
+  // slider position. Default assumes slider at full until setVolume runs.
+  private targetGain = GEN_NATIVE_SCALE;
   private stopped = false;
+  // Audibly playing right now — the interruption handler pauses only playing
+  // engines on 'began' and resumes only the ones it paused on 'ended'.
+  private playing = false;
+  // Fired only for *system-initiated* transport changes (audio interruptions),
+  // so the session screen can mirror a pause it didn't trigger — the engine
+  // counterpart of SessionAudio.setOnPlayingChange. User-initiated pause/resume
+  // flows the other way (UI → engine) and is deliberately not echoed back.
+  private onPlayingChange: ((playing: boolean) => void) | null = null;
+
+  /** Notify when an audio interruption pauses/resumes this engine, so the UI
+   *  can mirror a transport change it didn't initiate. */
+  setOnPlayingChange(cb: (playing: boolean) => void): void {
+    this.onPlayingChange = cb;
+  }
+
+  /** Interruption handler only: pause if audible; returns whether we did. */
+  systemPause(): boolean {
+    if (!this.playing) return false;
+    this.pause();
+    try {
+      this.onPlayingChange?.(false);
+    } catch {
+      /* the UI mirror must never break audio */
+    }
+    return true;
+  }
+
+  /** Interruption handler only: undo a systemPause() — skipped if the user
+   *  already resumed by hand mid-interruption. */
+  systemResume(): void {
+    if (this.playing) return;
+    this.resume();
+    try {
+      this.onPlayingChange?.(true);
+    } catch {
+      /* ignore */
+    }
+  }
 
   /**
    * Returns true once the loop is playing; false on any failure.
@@ -1195,6 +1203,9 @@ export class GenerativeEngine {
     this.stopped = false;
     try {
       configureSession(mixWithMusic);
+      // One shared observer for all engines — set up lazily with the first
+      // session so app launch pays nothing for it.
+      ensureInterruptionObserver();
       try {
         await AudioManager.setAudioSessionActivity(true);
       } catch (e) {
@@ -1255,6 +1266,13 @@ export class GenerativeEngine {
 
       this.master = master;
       this.source = src;
+      // Register for interruption recovery — unless a racing stop() landed
+      // while the graph was being wired, in which case its cleanup already ran
+      // and re-registering would leak a dead engine in the set.
+      if (!this.stopped) {
+        this.playing = true;
+        activeEngines.add(this);
+      }
       dlog('[generative] playing loop');
       return true;
     } catch (e) {
@@ -1264,7 +1282,7 @@ export class GenerativeEngine {
   }
 
   setVolume(v: number): void {
-    this.targetGain = Math.max(0, Math.min(1, v));
+    this.targetGain = masterGain('gen-native', v);
     const ctx = this.ctx;
     const master = this.master;
     if (!ctx || !master) return;
@@ -1275,6 +1293,7 @@ export class GenerativeEngine {
   }
 
   pause(): void {
+    this.playing = false;
     const ctx = this.ctx;
     const master = this.master;
     if (!ctx || !master) return;
@@ -1285,6 +1304,7 @@ export class GenerativeEngine {
   }
 
   resume(): void {
+    this.playing = true;
     const ctx = this.ctx;
     const master = this.master;
     if (!ctx || !master) return;
@@ -1297,6 +1317,11 @@ export class GenerativeEngine {
 
   stop(): void {
     this.stopped = true;
+    this.playing = false;
+    this.onPlayingChange = null; // a stopped engine must never flip the UI
+    activeEngines.delete(this);
+    interruptedEngines.delete(this);
+    releaseInterruptionObserver(); // no-op unless this was the last engine
     const ctx = this.ctx;
     const master = this.master;
     const src = this.source;

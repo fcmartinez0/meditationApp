@@ -10,6 +10,8 @@
  *  - sparse chimes on scale tones
  */
 
+import { ARP_PATTERNS, PROGRESSIONS, SCALES, VOICINGS } from './generative-tables';
+import { GEN_WEB_SCALE, masterGain } from './loudness';
 import type { PieceSpec, Section } from './types';
 
 // Web synthesizes live and instantly, so there's nothing to pre-render or take.
@@ -18,57 +20,8 @@ export async function takeGenerative(_section: Section): Promise<null> {
   return null;
 }
 
-const SCALES: Record<string, number[]> = {
-  major_pentatonic: [0, 2, 4, 7, 9],
-  minor_pentatonic: [0, 3, 5, 7, 10],
-  lydian: [0, 2, 4, 6, 7, 9, 11],
-  dorian: [0, 2, 3, 5, 7, 9, 10],
-  aeolian: [0, 2, 3, 5, 7, 8, 10],
-  mixolydian: [0, 2, 4, 5, 7, 9, 10],
-  phrygian: [0, 1, 3, 5, 7, 8, 10],
-  harmonic_minor: [0, 2, 3, 5, 7, 8, 11],
-  major: [0, 2, 4, 5, 7, 9, 11], // bright, open
-  lydian_dominant: [0, 2, 4, 6, 7, 9, 10], // dreamy, floating
-  hirajoshi: [0, 2, 3, 7, 8], // Japanese pentatonic — spacious, calm
-};
-
-// Four-note chord voicings as scale-degree offsets from the chord root.
-const VOICINGS = [
-  [0, 2, 4, 6], // 7th
-  [0, 1, 4, 6], // sus2
-  [0, 3, 4, 6], // sus4
-  [0, 2, 4, 8], // add9
-  [0, 4, 6, 8], // open / quartal
-  [0, 4, 8, 10], // wide stacked — spacious
-  [0, 2, 6, 8], // open with 11th colour
-];
-
-const ARP_PATTERNS = [
-  [0, 2, 1, 3, 2, 4, 1, 2],
-  [0, 1, 2, 3, 4, 3, 2, 1], // up & down
-  [0, 2, 4, 2, 1, 3, 1, 0],
-  [0, 3, 1, 4, 2, 0, 3, 1], // wider leaps
-  [4, 3, 2, 1, 0, 1, 2, 3], // descending
-  [0, 2, 4, 6, 4, 2, 0, 2], // arch
-  [0, 4, 1, 5, 2, 6, 3, 0], // wide skips
-  [2, 0, 3, 1, 4, 2, 5, 3], // interleaved climb
-];
-
-// Chord-root movement as scale-degree sequences (index 0 is a static drone).
-const PROGRESSIONS = [
-  [0, 0, 0, 0], // drone — no movement
-  [0, 3, 4, 0], // I – IV – V – I
-  [0, 5, 3, 4], // I – vi – IV – V
-  [0, 4, 5, 3], // I – V – vi – IV
-  [0, 2, 4, 5],
-  [0, 5, 1, 4],
-  [0, 6, 4, 5],
-  [0, 3, 0, 4],
-  [0, 4, 1, 5], // gentle circle
-  [0, 2, 5, 3],
-  [0, 6, 3, 4],
-  [0, 1, 4, 5],
-];
+// Musical tables (scales, voicings, arps, progressions) are shared with the
+// native engine via ./generative-tables so web and native can never drift apart.
 
 function midiToFreq(m: number): number {
   return 440 * Math.pow(2, (m - 69) / 12);
@@ -206,7 +159,10 @@ export class GenerativeEngine {
   private timers: ReturnType<typeof setTimeout>[] = [];
   private rng: () => number = Math.random;
   private spec: PieceSpec | null = null;
-  private targetGain = 0.5;
+  // Effective master level = shared per-source scale × user slider (loudness
+  // policy lives in ./loudness — the web scale was set by ear, see there).
+  // Default assumes slider at full until setVolume runs.
+  private targetGain = GEN_WEB_SCALE;
   private chordTones: number[] = [];
   private arpIdx = 0;
   private step = 0;
@@ -824,8 +780,15 @@ export class GenerativeEngine {
     return buf;
   }
 
+  // Native fires this when an audio interruption (phone call, Siri) pauses or
+  // resumes the engine; on web there are no session interruptions — tab
+  // visibility is already handled by hookResume — so this is a no-op kept only
+  // so the session screen can wire it unconditionally (same pattern as
+  // audio.web.ts's SessionAudio.setOnPlayingChange).
+  setOnPlayingChange(_cb: (playing: boolean) => void): void {}
+
   setVolume(v: number): void {
-    this.targetGain = 0.5 * Math.max(0, Math.min(1, v));
+    this.targetGain = masterGain('gen-web', v);
     const ctx = this.ctx;
     const master = this.master;
     if (!ctx || !master) return;

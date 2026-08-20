@@ -170,12 +170,48 @@ function pick<T>(arr: readonly T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
+// Numeric spec fields that the engine reads arithmetically or as table indices
+// (e.g. PROGRESSIONS[spec.progression % len]). A stale/corrupt rating with any of
+// these missing or non-finite would send NaN/undefined into the offline render
+// and silently kill generative audio — so such ratings are dropped on load.
+const SPEC_NUM_FIELDS = [
+  'seed', 'root', 'brightness', 'chordChangeSec', 'binauralHz',
+  'chimeDensity', 'tempo', 'pulseDepth', 'progression',
+] as const;
+
+export function isValidSpec(s: unknown): s is PieceSpec {
+  if (!s || typeof s !== 'object') return false;
+  const o = s as Record<string, unknown>;
+  if (o.section !== 'rest' && o.section !== 'chill') return false;
+  for (const k of SPEC_NUM_FIELDS) {
+    if (typeof o[k] !== 'number' || !Number.isFinite(o[k] as number)) return false;
+  }
+  if (typeof o.scale !== 'string' || o.scale.length === 0) return false;
+  if (typeof o.wave !== 'string' || typeof o.instrument !== 'string' || typeof o.percussion !== 'string') {
+    return false;
+  }
+  return typeof o.arp === 'boolean' && typeof o.bass === 'boolean' && typeof o.melody === 'boolean';
+}
+
+function isValidRating(r: unknown): r is PieceRating {
+  if (!r || typeof r !== 'object') return false;
+  const o = r as Record<string, unknown>;
+  return (
+    (o.section === 'rest' || o.section === 'chill') &&
+    typeof o.score === 'number' &&
+    typeof o.at === 'number' &&
+    isValidSpec(o.spec)
+  );
+}
+
 export async function loadRatings(): Promise<PieceRating[]> {
   try {
     const raw = await AsyncStorage.getItem(RATINGS_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as PieceRating[]) : [];
+    // Drop anything malformed (older schema, partial writes) rather than letting
+    // it flow into the engine; a bad rating must never break playback.
+    return Array.isArray(parsed) ? parsed.filter(isValidRating) : [];
   } catch {
     return [];
   }
@@ -320,7 +356,7 @@ const NOTE_NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A'
 /** A short "now playing" description of a piece, e.g. "D dorian · heartbeat". */
 export function describeSpec(spec: PieceSpec): string {
   const note = NOTE_NAMES[(((spec.root % 12) + 12) % 12)];
-  const parts = [`${note} ${spec.scale.replace('_', ' ')}`];
+  const parts = [`${note} ${spec.scale.replaceAll('_', ' ')}`];
   parts.push(spec.instrument);
   if (spec.melody) parts.push('melody');
   if (spec.percussion !== 'none') parts.push(spec.percussion);
@@ -345,6 +381,6 @@ export function summarizePreference(section: Section, ratings: PieceRating[]): s
       bestScale = scale;
     }
   }
-  const scaleName = bestScale ? bestScale.replace('_', ' ') : 'varied';
+  const scaleName = bestScale ? bestScale.replaceAll('_', ' ') : 'varied';
   return `${likes}/${here.length} liked · leaning ${scaleName}`;
 }

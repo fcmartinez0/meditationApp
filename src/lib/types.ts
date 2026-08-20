@@ -66,6 +66,9 @@ export const AMBIENT_KEYS: AmbientSound[] = [
   'gen_chill',
 ];
 
+/** How many recently-played sounds to remember (one source of truth). */
+export const RECENTS_MAX = 8;
+
 export function isGenerative(sound: AmbientSound): sound is GenerativeSound {
   return sound === 'gen_rest' || sound === 'gen_chill';
 }
@@ -128,8 +131,11 @@ export interface PieceSpec {
   melody: boolean;
 }
 
-/** Number of chord progressions the generative engine can choose from. */
-export const PROGRESSION_COUNT = 12;
+/**
+ * Number of chord progressions the generative engine can choose from. Derived
+ * from the shared table so it can never fall out of sync with the actual list.
+ */
+export { PROGRESSION_COUNT } from './generative-tables';
 
 /** A user rating of a generated piece, used to learn preferences per section. */
 export interface PieceRating {

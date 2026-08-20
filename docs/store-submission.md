@@ -41,12 +41,13 @@ GUIDED BREATHING
 Box, 4-7-8, Calm, and Coherent rhythms with an animated pace guide and gentle
 haptics to keep you in time.
 
-A DEEP LIBRARY OF SOUND — all generated on your device, no recordings
+A DEEP LIBRARY OF SOUND — synthesized, not sampled
 • Ambient: rain, ocean, forest, stream, campfire, night crickets, and brown,
   pink & white noise.
 • Frequencies: binaural-beat tracks tuned for Calm, Clarity, Focus, Dream, and
   Deep states (headphones recommended).
-• Beats: original instrumental grooves, from warm melodic house to dusty lo-fi.
+• Beats: original instrumental grooves, from warm melodic house to dusty lo-fi —
+  some created with Google Gemini generative AI.
 • Generative: endless, never-repeating music that learns what you like as you
   rate it.
 
@@ -105,7 +106,9 @@ The app is local-first with **no data collection**, so:
 - [ ] **Google Play Developer** account active ($25 one-time).
 - [ ] Run **`eas init`** to create the Expo project (writes `extra.eas.projectId` + `owner`).
 - [ ] Fill `eas.json` → replace `REPLACE_WITH_APP_STORE_CONNECT_APP_ID` and
-      `REPLACE_WITH_APPLE_TEAM_ID`; confirm `appleId`.
+      `REPLACE_WITH_APPLE_TEAM_ID`. Set your Apple ID via the `EXPO_APPLE_ID` env
+      var on the machine that runs `eas submit` (it's intentionally not committed
+      to `eas.json`).
 - [ ] Create the **app record** in App Store Connect and a **Play Console** app; copy the
       App Store Connect App ID (ascAppId) back into `eas.json`.
 - [ ] Generate a **Google Play service-account JSON**, save as
@@ -137,9 +140,10 @@ The app is local-first with **no data collection**, so:
 ```
 Stillness plays continuous background audio so focus/rest/sleep sessions keep
 running with the screen locked — this is why UIBackgroundModes includes "audio".
-All audio is synthesized on-device; the app does not record audio and requests
-no microphone access. There is no account, server, tracking, or analytics; all
-data stays on the device.
+The app does not record audio and requests no microphone access; all music is
+bundled with the app or generated on-device (some instrumental tracks were
+created with Google Gemini generative AI). There is no account, server, tracking,
+or analytics; all data stays on the device.
 ```
 
 ---
@@ -150,10 +154,25 @@ data stays on the device.
    artist's style." Do **not** reference any real artist/brand names in store metadata,
    screenshots, or in-app track titles — that risks IP/trademark rejection. Keep titles
    generic (e.g. "Melodic House", "Lo-Fi").
-2. **No medical claims.** Binaural/frequency wording must stay as a *wellness aid*, never a
+2. **AI-generated music (Google Gemini).** The instrumental tracks in `assets/audio/tracks/`
+   were created with Google generative AI (C2PA-signed by Google, SynthID-watermarked).
+   Terms research (2026-07, see PRs/chat log) — the verdict depends on WHICH surface
+   generated them:
+   - **Gemini app** (gemini.google.com / mobile app): governed by Google's Generative AI
+     Additional Terms — Google claims no ownership of generated content and commercial use
+     is permitted; you may not misrepresent provenance as solely human-made (our in-app +
+     store disclosure satisfies this).
+   - **MusicFX / Google Labs (AI Test Kitchen)**: NO explicit commercial license — assume
+     commercial redistribution is not permitted; replace such tracks before submission.
+   - **Vertex AI / AI Studio (Lyria, paid)**: commercial use permitted under Cloud terms.
+   Action: confirm which tool produced these 7 files and record it here. Keep the disclosure
+   accurate everywhere (README, in-app "Sound & credits", reviewer notes, this listing), and
+   do **not** strip the C2PA credentials or SynthID watermark (removal would violate the
+   provenance-misrepresentation clause and Google's prohibited-use policy).
+3. **No medical claims.** Binaural/frequency wording must stay as a *wellness aid*, never a
    treatment/cure for anxiety, insomnia, etc. The current disclaimer copy is fine — keep it.
-3. **Reminders permission.** First launch of reminders triggers the notification prompt; make
+4. **Reminders permission.** First launch of reminders triggers the notification prompt; make
    sure that flow is reachable for the reviewer (it's optional, so the app must work without it).
-4. **Generative "learns what you like".** This is on-device personalization only — make sure the
+5. **Generative "learns what you like".** This is on-device personalization only — make sure the
    data-safety forms still say "no data collected" (they should; nothing leaves the device).
 ```
