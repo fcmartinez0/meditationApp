@@ -48,3 +48,7 @@ example
 
 # Generative harness temp renders
 .gen-harness-*
+
+# Local scratch scripts for UI screenshots / one-off probes (never committed)
+.ui-*.mjs
+.wip-*
