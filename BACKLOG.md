@@ -13,8 +13,30 @@ Standing rules for autonomous runs (see also AGENTS.md "Operating mode"):
 
 ## Ready for workers (take from the top)
 
-(empty — the worker backlog is done; add items here and the nightly routine
-will pick them up)
+1. **Flow sits dark and undynamic vs the reference tracks** — after the loudness
+   fix, Flow measures centroid 2434 / crest 3.5 against the tracks' 3111 / 7.8.
+   Chief suspect is `brightMax` in src/lib/preferences.ts (0.5 rest / 0.74 chill)
+   feeding `baseCut = 2200 + brightness*9000` -> up to 8.9 kHz, i.e. effectively
+   no filter on a sawtooth choir; and the instrument pools mixing sustained
+   (pad/choir) with plucked (keys/bells/pluck) archetypes at the same brightness.
+   Needs a per-archetype brightness range. NOTE: cannot be validated headlessly
+   (see below) — pair it with a device listen.
+2. **`spec.bass` semantics are now stale** — the low-end foundation is
+   unconditional, so the flag sets prominence (0.7 vs 1.0), not presence.
+   `bassChance: 0.95` in preferences.ts should become an explicit `bassLevel`, or
+   the flag should be dropped.
+3. **Generative loudness is ~0.6 dB under the bundled tracks** — matching them
+   means TARGET_RMS ~0.185, which requires re-deriving GEN_NATIVE_SCALE in
+   src/lib/loudness.ts at the same time.
+
+### Known tooling limitation (read before engine work)
+
+The Node harness backend mis-renders a deterministic subset of specs: every
+`pad`/`choir` spec tried produced either a near-DC blob or a piece missing
+everything routed through the `pulse` bus. Failures are deterministic in the
+seed and do NOT reflect device behaviour. `node scripts/gen-harness.mjs fixed`
+therefore measures keys/bells/pluck only. Do not tune sustained-instrument
+timbre against harness numbers — it needs a device.
 
 ## Blocked on the user (do NOT take these autonomously)
 
