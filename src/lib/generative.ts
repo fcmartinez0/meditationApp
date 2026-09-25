@@ -532,7 +532,12 @@ class Composer {
         gain.gain.value = 0;
         const pan = ctx.createStereoPanner();
         const side = i % 2 === 0 ? -1 : 1;
-        pan.pan.value = side * (0.3 + this.rng() * 0.5);
+        // Modest spread. Adjacent voices play *different notes* on opposite
+        // sides, so their side energy adds up fast: at the old ±0.3..0.8 the pad
+        // alone measured a stereo width of ~0.4-0.6 against the reference
+        // tracks' 0.18, which on headphones reads as an unstable, hollow centre.
+        // Keep the chord wide enough to breathe, narrow enough to feel anchored.
+        pan.pan.value = side * (0.12 + this.rng() * 0.28);
         driftGain.connect(osc.detune);
         osc.connect(gain).connect(pan).connect(bus);
         osc.start();
@@ -545,14 +550,27 @@ class Composer {
     // as a featureless rumble, so we pair it with a quiet triangle "body" an
     // octave up, lowpassed to stay warm — together they sound like a played bass
     // note (the single biggest lever on "this is music, not a drone").
-    if (spec.bass) {
+    //
+    // EVERY piece gets this foundation. Gating it on spec.bass was the biggest
+    // single source of tonal inconsistency between pieces: rendering one fixed
+    // spec both ways, the bass-less version carried 1% of its energy below
+    // 250 Hz against 87% with the layer (reference tracks: ~86%), and its stereo
+    // image blew open from 0.17 to 0.86 wide with nothing centred to anchor it.
+    // That is a different, hollow instrument, not a variation — and no amount of
+    // loudness normalization can put a missing octave back.
+    //
+    // So spec.bass now chooses how *prominent* the low end is, not whether it
+    // exists. At 0.7 the "no bass" pieces still measure ~79% low and 0.23 wide:
+    // audibly lighter, still part of the same family.
+    {
       // Reference tracks carry ~86% of their energy below 250 Hz, so the sub +
       // body sit a touch louder here than a typical pad bed would.
+      const level = spec.bass ? 1 : 0.7;
       const osc = ctx.createOscillator();
       osc.type = 'sine';
       osc.frequency.value = midiToFreq(spec.root - 12);
       const gain = ctx.createGain();
-      gain.gain.value = 0.3;
+      gain.gain.value = 0.3 * level;
       osc.connect(gain).connect(pulse);
       osc.start();
 
@@ -564,7 +582,7 @@ class Composer {
       bodyLp.frequency.value = 320;
       bodyLp.Q.value = 0.5;
       const bodyGain = ctx.createGain();
-      bodyGain.gain.value = 0.1;
+      bodyGain.gain.value = 0.1 * level;
       body.connect(bodyLp).connect(bodyGain).connect(pulse);
       body.start();
 
@@ -625,7 +643,7 @@ class Composer {
         const tones = this.chordAt(when);
         const order = this.rng() < 0.5 ? tones : [...tones].reverse();
         order.forEach((m, i) =>
-          this.compNote(this.hum(when + i * 0.05, 0.012), midiToFreq(m), spec.instrument, bellWave, i % 2 ? 0.4 : -0.4),
+          this.compNote(this.hum(when + i * 0.05, 0.012), midiToFreq(m), spec.instrument, bellWave, i % 2 ? 0.25 : -0.25),
         );
         await this.breathe();
       }
@@ -769,7 +787,7 @@ class Composer {
     if (s % this.arpEvery !== 0 || this.chordTones.length === 0) return;
     const deg = this.arpPattern[this.arpIdx % this.arpPattern.length] % this.chordTones.length;
     const midi = this.chordTones[deg] + 12;
-    const pan = this.arpIdx % 2 === 0 ? -0.6 : 0.6;
+    const pan = this.arpIdx % 2 === 0 ? -0.35 : 0.35; // narrowed with the pad, see build()
     this.arpIdx++;
     const base = this.spec.section === 'rest' ? 0.05 : 0.08;
     this.arpNote(this.hum(when, 0.008), midiToFreq(midi), pan, this.vel(base));
@@ -999,7 +1017,7 @@ class Composer {
     g.gain.exponentialRampToValueAtTime(this.vel(0.06), when + 0.02);
     g.gain.exponentialRampToValueAtTime(0.0001, when + 3);
     const pan = ctx.createStereoPanner();
-    pan.pan.value = this.rng() * 2 - 1;
+    pan.pan.value = (this.rng() * 2 - 1) * 0.55; // scattered, but never hard-panned
     osc.connect(g).connect(pan);
     pan.connect(master);
     if (this.reverbSend) pan.connect(this.reverbSend);
@@ -1011,11 +1029,27 @@ class Composer {
     const { ctx } = this;
     const len = Math.floor(seconds * ctx.sampleRate);
     const buf = ctx.createBuffer(2, len, ctx.sampleRate);
-    for (let ch = 0; ch < 2; ch++) {
-      const d = new Float32Array(len);
-      for (let i = 0; i < len; i++) d[i] = (this.rng() * 2 - 1) * Math.pow(1 - i / len, decay);
-      buf.copyToChannel(d, ch);
+    // Partially-correlated tails. Two *independent* noise impulses put all of
+    // the reverb's energy in the side channel — a stereo width of 1.0 for that
+    // layer on its own — and at a 0.3-0.42 wet level that was much of why pieces
+    // measured 0.32-0.49 wide against the reference tracks' 0.18. Over-wide
+    // reverb is what makes a mix feel unstable and hollow in the middle on
+    // headphones. Correlating the channels keeps a real sense of space (this
+    // layer's width becomes sqrt((1-r)/(1+r)) ≈ 0.42) while anchoring the tail
+    // to the centre, where the tracks put it.
+    const r = 0.7;
+    const q = Math.sqrt(1 - r * r);
+    const left = new Float32Array(len);
+    const right = new Float32Array(len);
+    for (let i = 0; i < len; i++) {
+      const env = Math.pow(1 - i / len, decay);
+      const a = this.rng() * 2 - 1;
+      const b = this.rng() * 2 - 1;
+      left[i] = a * env;
+      right[i] = (r * a + q * b) * env;
     }
+    buf.copyToChannel(left, 0);
+    buf.copyToChannel(right, 1);
     return buf;
   }
 }

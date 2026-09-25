@@ -2,69 +2,84 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useKeepAwake } from 'expo-keep-awake';
 import { useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
-import { Easing, useSharedValue, withTiming } from 'react-native-reanimated';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import Animated, {
+  Easing,
+  FadeInDown,
+  useReducedMotion,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/AppText';
 import { Backdrop } from '@/components/Backdrop';
+import {
+  BreathGuidanceNote,
+  BreathSuggestionLine,
+  suggestRhythm,
+  type BreathRhythmKey,
+} from '@/components/BreathGuidance';
+import { BreathPaceLegend, BreathRhythmCard, type BreathPhase } from '@/components/BreathRhythmCard';
 import { BreathingOrb } from '@/components/BreathingOrb';
 import { Button } from '@/components/Button';
-import { GlassFill } from '@/components/GlassFill';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { formatClock } from '@/lib/date';
-import { radius, spacing } from '@/theme';
+import { spacing } from '@/theme';
 
-interface Phase {
-  label: string;
-  seconds: number;
+interface Phase extends BreathPhase {
   to: number; // target circle scale at the end of this phase
 }
 
-const PATTERNS: Record<string, { label: string; hint: string; phases: Phase[] }> = {
+const PATTERNS: Record<BreathRhythmKey, { label: string; hint: string; phases: Phase[] }> = {
   box: {
     label: 'Box',
-    hint: '4-4-4-4 · steady focus',
+    hint: 'Four equal sides — nothing rushes or lingers.',
     phases: [
-      { label: 'Breathe in', seconds: 4, to: 1 },
-      { label: 'Hold', seconds: 4, to: 1 },
-      { label: 'Breathe out', seconds: 4, to: 0.45 },
-      { label: 'Hold', seconds: 4, to: 0.45 },
+      { label: 'Breathe in', kind: 'in', seconds: 4, to: 1 },
+      { label: 'Hold', kind: 'hold', seconds: 4, to: 1 },
+      { label: 'Breathe out', kind: 'out', seconds: 4, to: 0.45 },
+      { label: 'Hold', kind: 'hold', seconds: 4, to: 0.45 },
     ],
   },
   relax: {
     label: '4-7-8',
-    hint: 'calming · for sleep',
+    hint: 'A long hold, then the slowest exhale here.',
     phases: [
-      { label: 'Breathe in', seconds: 4, to: 1 },
-      { label: 'Hold', seconds: 7, to: 1 },
-      { label: 'Breathe out', seconds: 8, to: 0.45 },
+      { label: 'Breathe in', kind: 'in', seconds: 4, to: 1 },
+      { label: 'Hold', kind: 'hold', seconds: 7, to: 1 },
+      { label: 'Breathe out', kind: 'out', seconds: 8, to: 0.45 },
     ],
   },
   calm: {
     label: 'Calm',
-    hint: '4-6 · gentle exhale',
+    hint: 'No holds — the exhale just runs longer.',
     phases: [
-      { label: 'Breathe in', seconds: 4, to: 1 },
-      { label: 'Breathe out', seconds: 6, to: 0.45 },
+      { label: 'Breathe in', kind: 'in', seconds: 4, to: 1 },
+      { label: 'Breathe out', kind: 'out', seconds: 6, to: 0.45 },
     ],
   },
   coherent: {
     label: 'Coherent',
-    hint: '5-5 · balance',
+    hint: 'Even in, even out — six breaths a minute.',
     phases: [
-      { label: 'Breathe in', seconds: 5, to: 1 },
-      { label: 'Breathe out', seconds: 5, to: 0.45 },
+      { label: 'Breathe in', kind: 'in', seconds: 5, to: 1 },
+      { label: 'Breathe out', kind: 'out', seconds: 5, to: 0.45 },
     ],
   },
 };
+
+const PATTERN_KEYS = Object.keys(PATTERNS) as BreathRhythmKey[];
 
 export default function BreatheScreen() {
   const colors = useThemeColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [patternKey, setPatternKey] = useState<string | null>(null);
+  const reduced = useReducedMotion();
+  const [patternKey, setPatternKey] = useState<BreathRhythmKey | null>(null);
+  // Fixed for the life of the screen so the nudge can't shuffle under a thumb.
+  const suggestion = useMemo(() => suggestRhythm(), []);
 
   return (
     <View style={[styles.fill, styles.clip, { backgroundColor: colors.background }]}>
@@ -84,29 +99,37 @@ export default function BreatheScreen() {
         {patternKey ? (
           <BreathingRunner pattern={PATTERNS[patternKey]} onEnd={() => router.back()} />
         ) : (
-          <View style={styles.select}>
+          <ScrollView
+            style={styles.fill}
+            contentContainerStyle={styles.select}
+            showsVerticalScrollIndicator={false}>
             <View style={styles.selectHead}>
               <AppText variant="label" muted>
                 BREATHE
               </AppText>
               <AppText variant="title">Choose a rhythm</AppText>
+              <BreathSuggestionLine note={suggestion.note} />
             </View>
-            {Object.entries(PATTERNS).map(([key, p]) => (
-              <Pressable
-                key={key}
-                onPress={() => setPatternKey(key)}
-                style={({ pressed }) => [styles.row, { borderColor: colors.border, opacity: pressed ? 0.7 : 1 }]}>
-                <GlassFill fallback={colors.surface} radius={radius.md} />
-                <View style={{ flex: 1 }}>
-                  <AppText variant="body">{p.label}</AppText>
-                  <AppText variant="caption" muted>
-                    {p.hint}
-                  </AppText>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
-              </Pressable>
-            ))}
-          </View>
+
+            <View style={styles.list}>
+              {PATTERN_KEYS.map((key, i) => (
+                <Animated.View
+                  key={key}
+                  entering={reduced ? undefined : FadeInDown.duration(420).delay(80 * i)}>
+                  <BreathRhythmCard
+                    label={PATTERNS[key].label}
+                    hint={PATTERNS[key].hint}
+                    phases={PATTERNS[key].phases}
+                    suggested={key === suggestion.key}
+                    onPress={() => setPatternKey(key)}
+                  />
+                </Animated.View>
+              ))}
+            </View>
+
+            <BreathPaceLegend />
+            <BreathGuidanceNote />
+          </ScrollView>
         )}
       </SafeAreaView>
     </View>
@@ -210,18 +233,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  select: { flex: 1, paddingHorizontal: spacing.xl, paddingTop: spacing.md, gap: spacing.md },
-  selectHead: { gap: spacing.xs, marginBottom: spacing.md },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  select: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.md,
     gap: spacing.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    overflow: 'hidden',
   },
+  selectHead: { gap: spacing.xs },
+  list: { gap: spacing.md },
   runner: { flex: 1, justifyContent: 'space-between', paddingBottom: spacing.xl },
   orbArea: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   orbCenter: { alignItems: 'center', gap: spacing.xs },
