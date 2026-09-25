@@ -41,11 +41,15 @@ timbre against harness numbers — it needs a device.
 ## Blocked on the user (do NOT take these autonomously)
 
 - Sentry crash reporting (needs DSN + privacy-declaration decision)
-- Gemini music license confirmation (user must check the tool's terms)
 - Store account wiring (eas init, credentials, screenshots)
 - Device checks: crossfade mixer listen, production build smoke test
 
 ## Shipped
+
+- 2026-09-25 · **Gemini music licensing RESOLVED** — developer confirmed the tracks
+  came from the Gemini app, whose Additional Terms permit commercial use and claim
+  no ownership. Only obligation is provenance disclosure (already in place in four
+  places) and keeping C2PA/SynthID intact. Recorded in docs/store-submission.md.
 
 - 2026-07-19 · (see git log) · **Compiler warnings** (run #3b): four rule
   downgrades removed from eslint.config.js; render purity fixed on the session

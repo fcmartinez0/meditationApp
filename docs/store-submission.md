@@ -154,21 +154,23 @@ or analytics; all data stays on the device.
    artist's style." Do **not** reference any real artist/brand names in store metadata,
    screenshots, or in-app track titles — that risks IP/trademark rejection. Keep titles
    generic (e.g. "Melodic House", "Lo-Fi").
-2. **AI-generated music (Google Gemini).** The instrumental tracks in `assets/audio/tracks/`
-   were created with Google generative AI (C2PA-signed by Google, SynthID-watermarked).
-   Terms research (2026-07, see PRs/chat log) — the verdict depends on WHICH surface
-   generated them:
-   - **Gemini app** (gemini.google.com / mobile app): governed by Google's Generative AI
-     Additional Terms — Google claims no ownership of generated content and commercial use
-     is permitted; you may not misrepresent provenance as solely human-made (our in-app +
-     store disclosure satisfies this).
-   - **MusicFX / Google Labs (AI Test Kitchen)**: NO explicit commercial license — assume
-     commercial redistribution is not permitted; replace such tracks before submission.
-   - **Vertex AI / AI Studio (Lyria, paid)**: commercial use permitted under Cloud terms.
-   Action: confirm which tool produced these 7 files and record it here. Keep the disclosure
-   accurate everywhere (README, in-app "Sound & credits", reviewer notes, this listing), and
-   do **not** strip the C2PA credentials or SynthID watermark (removal would violate the
-   provenance-misrepresentation clause and Google's prohibited-use policy).
+2. **AI-generated music (Google Gemini) — RESOLVED 2026-09.** The instrumental tracks in
+   `assets/audio/tracks/` were created with the **Gemini app**, confirmed by the developer
+   (fcmartinez0). They are C2PA-signed by Google and SynthID-watermarked.
+   - Basis: Gemini app output is governed by Google's [Generative AI Additional Terms]
+     (https://policies.google.com/terms/generative-ai) — Google claims no ownership of
+     generated content and commercial use is permitted.
+   - The one binding obligation is provenance: you may **not** misrepresent AI output as
+     solely human-made ([prohibited use policy](https://policies.google.com/terms/generative-ai/use-policy)).
+     The app satisfies this via the disclosure in README, in-app Privacy & Disclaimer →
+     "Sound & credits", the reviewer notes and this listing. Keep all four consistent.
+   - Therefore: **do not strip the C2PA credentials or the SynthID watermark** from the
+     files, and do not re-encode them in a way that would drop the manifest.
+   - (Recorded for the project file; this is not legal advice. If Google's terms change,
+     re-check before a major release.)
+   For reference, the surfaces that would NOT have been safe: **MusicFX / Google Labs**
+   (no explicit commercial license) and, conversely, **Vertex AI / AI Studio (Lyria, paid)**
+   which is permitted under Cloud terms.
 3. **No medical claims.** Binaural/frequency wording must stay as a *wellness aid*, never a
    treatment/cure for anxiety, insomnia, etc. The current disclaimer copy is fine — keep it.
 4. **Reminders permission.** First launch of reminders triggers the notification prompt; make
